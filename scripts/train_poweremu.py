@@ -68,30 +68,52 @@ emu06 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto10050
 emu07a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_June06_adaptive.pkl",preprocesss_log_x=False)
 emu08f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025.pkl",preprocesss_log_x=False)
 emu09f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025_v2.pkl",preprocesss_log_x=False)
+emu10m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl",preprocesss_log_x=False)
 ## (100, 30, 10, 5) layers, with adaptive (SGD) or constant (Adam) learning rates
 emu_c = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_constant.pkl",preprocesss_log_x=False)
 emu_a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_adaptive.pkl",preprocesss_log_x=False)
 emu_f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
 emu_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
 emu_m2 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_evenmorez_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+emu_m3 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m3_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+emu_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+
 
 # Training data
 #model_generation = "Sims"
 model_generation = "RadLyA"
 
-def model_of_k(z, karr, p, emu=None):
-    par0 = np.array([z, np.NaN, *p])
-    params=np.tile(par0, (len(karr), 1))
-    params[:,1] = karr
-    return emu.predict(params)
-
-def model_of_z(zarr, k, p, emu=None):
-    par0 = np.array([np.NaN, k, *p])
-    params=np.tile(par0, (len(karr), 1))
-    params[:,0] = zarr
-    return emu.predict(params)
-
 if model_generation == "Sims":
+    #TODO
+    if False:
+        for key in ["TS", "TR", "TK"]:
+            x = PL_Sims
+            y = {"TS":TS_Sims, "TK":TK_Sims, "TR":Trad_Sims}[key][:,2]
+            mask = np.logical_not(np.logical_or(np.isnan(y), y==0))
+            print(key, "using", np.sum(mask), "out of", len(mask))
+            x_train, x_test, y_train, y_test = train_test_split(x[mask], y[mask], test_size=0.2, random_state=42)
+            print("min:", np.min(y[mask]))
+            loadfile = None if train else "emulator_poweremu/trained_emulators/"+key+"_emu_Sims_prelim_v2_31.05.2022.pkl"
+            emu = poweremu(loadfile=loadfile, tol=0, n_iter_no_change=99999, preprocesss_log_x=False, offset=1)
+            if train:
+                for i in range(10):
+                    emu.train(x_train, y_train)
+            y_pred = emu.predict(x_test)
+            plt.scatter(y_test, y_pred)
+            plt.loglog()
+            plt.ylabel("Pred")
+            plt.xlabel("Test")
+            plt.figure()
+            limit95 = 10**confidence_level(np.log10(y_test/y_pred), level=0.95)
+            plt.hist(np.log10(y_test/y_pred), bins=50, label="95% samples within +{1:.0f} / {0:.0f} % of true".format(*(100*(limit95-1))))
+            plt.xlabel("log10(Test/Pred)")
+            plt.legend()
+            plt.show()
+            if train:
+               emu.save("emulator_poweremu/trained_emulators/"+key+"_emu_Sims_prelim_v2_31.05.2022.pkl")
+
+
+elif model_generation == "Sims":
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
     PL_Sims_train, PL_Sims_test, Pk_Sims_train, Pk_Sims_test = train_test_split(PL_Sims, Pk_Sims, test_size=0.2, random_state=42)
     train_x, train_y = gen_training(100, PL_Sims_train, Pk_Sims_train)
@@ -121,7 +143,8 @@ elif model_generation == "RadLyA":
     # Reproduce that performance with lots of samples
     #mtrain_x, mtrain_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1)
     #m2train_x, m2train_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1, zhigh=21)
-    m3train_x, m3train_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1, zhigh=31)
+    #m3train_x, m3train_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1, zhigh=31)
+    #m4train_x, m4train_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1, zlow=7, zhigh=31, klow=0.1, khigh=0.5)
 
     test_x, test_y = gen_training(10, PL_RSD_Itamar_test, Pk_RSD_Itamar_test, seed=2, flag=1)
     ptest_x, ptest_y = gen_training(1, PL_RSD_Itamar_test, Pk_RSD_Itamar_test, seed=3, flag=1, fix_k=0.192, fix_z=8)
@@ -162,16 +185,23 @@ emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
 #           Do we achieve this with the general emulator? [emu_a]
 #               68% samples within +24% / -5% of true --> 0.30
 #               95% samples within +59% / -19% of true --> 0.77
-#           No. Let's run an emulator with 1k oversampling
+#           No. Let's run an emulator with 1k oversampling [emu_m]
 #               68% samples within +13% / -8% of true --> 0.21
 #               95% samples within +54% / -19% of true --> 0.73
 #           Awesome! Can we increase the z bounds and still achieve this?
-#           Now with 1k oversampling, converged @ 232 iterations
+#           Now with 1k oversampling up to z=21, converged @ 232 iterations
 #               68% samples within +15% / -9% of true --> 0.24
 #               95% samples within +61% / -19% of true --> 0.80
 #           That's alright for now --> Do SARAS+HERA tests with Pk_emu_evenmorez_RadLyA_adaptive.
-#           Ah wait need to z=30. Here we go, m3 ...
-#
+#           Ah wait need to z=31. Here we go Pk_emu_m3_RadLyA_adaptive.pkl @ 234 converged
+#               68% samples within +22% / -11% of true --> 0.33
+#               95% samples within +68% / -30% of true --> 0.98
+#           Hmm OK. But give it one more try with less k space (m4train) and slightly larger layers (150, 50, 15, 5)
+#               ("data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl")
+#               68% samples within +16% / -10% of true --> 0.26
+#               95% samples within +54% / -22% of true --> 0.77
+#           Yeah here we go.
+
 #           Let's apply this to Sims though! Let's see what is the best score we can get with fixed k & z:
 #               (100, 30, 10, 5), adaptive
 #                   68% samples within +23% / -15% of true --> 0.38
@@ -204,4 +234,27 @@ emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
 #                  99.7% samples within +179% / -86% of true --> 2.66
 #           Okay, (200, 100, 50, 25) w/ adam is the score to beat, saved as Pk_emuL_fixkz_Sims_adam_2001005025_v2
 #           Run Sims emulator aiming for 68% ~ 0.26 and 95% ~ 1 scores.
+#               Here we go! (100, 30, 10, 5) layers with adaptive sgd for 234 iterations, trained on mtrain
+#               gives excellent numbers, took ages. Pk_emu_m_Sims_adaptive.pkl
+#                   68% samples within +14% / -10% of true --> 0.24
+#                   95% samples within +55% / -30% of true --> 0.85
+#                   99.7% samples within +229% / -75% of true --> 3.04
 
+
+
+
+
+def model_of_k(z, karr, p, emu=None):
+    par0 = np.array([z, np.NaN, *p])
+    params=np.tile(par0, (len(karr), 1))
+    params[:,1] = karr
+    return emu.predict(params)
+
+def model_of_z(zarr, k, p, emu=None):
+    par0 = np.array([np.NaN, k, *p])
+    params=np.tile(par0, (len(karr), 1))
+    params[:,0] = zarr
+    return emu.predict(params)
+
+#todo: make some plots of emulators
+#todo: make prior bounds plots
