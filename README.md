@@ -11,11 +11,13 @@ I so far used 3 emulators, 1 of which is uploaded here (poweremu).
 ### Notes on final (TM) emulator files
 
 Final PS emulators for HERA, trained on z=7-11 and k=0.02-3:
-    Pk_emu_m_Sims_adaptive.pkl (initially different name)
-    Pk_emu_m_RadLyA_adaptive.pkl (initially different name)
+
+* Pk_emu_m_Sims_adaptive.pkl (initially different name)
+* Pk_emu_m_RadLyA_adaptive.pkl (initially different name)
     
 Final PS emulator for SARAS comparisons, trained on z=7-31 and k=0.1-0.5:
-    Pk_emu_m4_RadLyA_adaptive.pkl
+
+* Pk_emu_m4_RadLyA_adaptive.pkl
 
 
 ## 21cmSim runs
