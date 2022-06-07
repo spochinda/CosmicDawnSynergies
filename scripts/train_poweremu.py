@@ -50,7 +50,8 @@ def score(emu, test_x, test_y):
     deltas = np.log10((test_y+10)/(pred_y+10))
     limit68 = 10**confidence_level(deltas, level=0.68)
     limit95 = 10**confidence_level(deltas, level=0.95)
-    print("68% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit68-1)), np.sum(np.abs(limit68-1)))+"\n95% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit95-1)), np.sum(np.abs(limit95-1)))+"\n(assuming 10 mK² level threshold; +% means test>pred)")
+    limit997 = 10**confidence_level(deltas, level=0.997)
+    print("68% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit68-1)), np.sum(np.abs(limit68-1)))+"\n95% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit95-1)), np.sum(np.abs(limit95-1)))+"\n99.7% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit997-1)), np.sum(np.abs(limit997-1)))+"\n(assuming 10 mK² level threshold; +% means test>pred)")
     return deltas
 
 
@@ -65,12 +66,14 @@ emu04 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto10010
 emu05 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto10030105_better.pkl",preprocesss_log_x=False)
 emu06 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto100505_better.pkl",preprocesss_log_x=False)
 emu07a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_June06_adaptive.pkl",preprocesss_log_x=False)
-
+emu08f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025.pkl",preprocesss_log_x=False)
+emu09f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025_v2.pkl",preprocesss_log_x=False)
 ## (100, 30, 10, 5) layers, with adaptive (SGD) or constant (Adam) learning rates
 emu_c = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_constant.pkl",preprocesss_log_x=False)
 emu_a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_adaptive.pkl",preprocesss_log_x=False)
 emu_f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-emu_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_Sims_adaptive.pkl",preprocesss_log_x=False)
+emu_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+emu_m2 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_evenmorez_RadLyA_adaptive.pkl",preprocesss_log_x=False)
 
 # Training data
 #model_generation = "Sims"
@@ -91,9 +94,13 @@ def model_of_z(zarr, k, p, emu=None):
 if model_generation == "Sims":
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
     PL_Sims_train, PL_Sims_test, Pk_Sims_train, Pk_Sims_test = train_test_split(PL_Sims, Pk_Sims, test_size=0.2, random_state=42)
-    test_x, test_y = gen_training(10, PL_Sims_test, Pk_Sims_test, seed=0)
     train_x, train_y = gen_training(100, PL_Sims_train, Pk_Sims_train)
-    ptest_x, ptest_y = gen_training(1, PL_Sims_test, Pk_Sims_test, fix_k=0.192, fix_z=8)
+    ptrain_x, ptrain_y = gen_training(1, PL_Sims_train, Pk_Sims_train, fix_k=0.192, fix_z=8)
+    #mtrain_x, mtrain_y = gen_training(1000, PL_Sims_train, Pk_Sims_train)
+    #m2train_x, m2train_y = gen_training(1000, PL_Sims_train, Pk_Sims_train, zhigh=21)
+
+    test_x, test_y = gen_training(10, PL_Sims_test, Pk_Sims_test, seed=0)
+    ptest_x, ptest_y = gen_training(1, PL_Sims_test, Pk_Sims_test, seed=1, fix_k=0.192, fix_z=8)
 
     for e in [emu03, emu04, emu05, emu06, emu07a]:
         print(e.mlp[1].hidden_layer_sizes)
@@ -112,8 +119,9 @@ elif model_generation == "RadLyA":
     ptrain_x = np.concatenate([ptrain0_x, ptrain1_x])
     ptrain_y = np.concatenate([ptrain0_y, ptrain1_y])
     # Reproduce that performance with lots of samples
-    mtrain_x, mtrain_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, seed=1, flag=1)
-    m2train_x, m2train_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, seed=1, flag=1, zhigh=21)
+    #mtrain_x, mtrain_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1)
+    #m2train_x, m2train_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1, zhigh=21)
+    m3train_x, m3train_y = gen_training(1000, PL_RSD_Itamar_train, Pk_RSD_Itamar_train, flag=1, zhigh=31)
 
     test_x, test_y = gen_training(10, PL_RSD_Itamar_test, Pk_RSD_Itamar_test, seed=2, flag=1)
     ptest_x, ptest_y = gen_training(1, PL_RSD_Itamar_test, Pk_RSD_Itamar_test, seed=3, flag=1, fix_k=0.192, fix_z=8)
@@ -122,24 +130,32 @@ elif model_generation == "RadLyA":
         print(e.mlp[1].hidden_layer_sizes)
         print(score(e, test_x, test_y))
         print(score(e, ptest_x, ptest_y))
-    plt.title("Deviation in log10; 0.3 corresponds to Factor 2")
-    plt.hist(score(emu_m, ptest_x, ptest_y), bins=50, alpha=0.5, range=(-0.3, 0.3))
-    plt.hist(score(emu_f, ptest_x, ptest_y), bins=50, alpha=0.5, range=(-0.3, 0.3))
+    plt.title("Deviation in log10 (0.3 corresponds to factor 2)")
+    plt.hist(score(emu_m, ptest_x, ptest_y), bins=100, alpha=0.5, range=(-0.7, 0.4), label="Fixed k=0.192 and z=8")
+    plt.hist(score(emu_f, ptest_x, ptest_y), bins=100, alpha=0.5, range=(-0.7, 0.4), label="Emulator for 'all' k and z")
+    plt.legend()
     plt.show()
 
 # Make a new emulator
 layers = (100, 30, 10, 5)
+
 ## Adaptive
 emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, learning_rate="adaptive", solver="sgd")
+
 ## Constant
 #emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam")
 
-# Train
-#emu.train(m2train_x, m2train_y)
+# Train & Save
+#emu.train(m3train_x, m3train_y)
 
-# Save
-#emu.save("data/trained_emulators_poweremu/x.pkl")
+#emu.train(ptrain_x, ptrain_y)
+#emu.save("data/trained_emulators_poweremu/Pk_emu_fixkz_Sims_adaptive.pkl")
 
+#emu.train(mtrain_x, mtrain_y)
+#emu.save("data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl")
+
+
+# Discussion, here focused on RadLyA models:
 # Question: What's the maximum we can achieve at fix_k=0.192, fix_z=8? [emu_f]
 #               68% samples within +14% / -8% of true --> 0.22
 #               95% samples within +44% / -33% of true --> 0.77
@@ -150,3 +166,42 @@ emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
 #               68% samples within +13% / -8% of true --> 0.21
 #               95% samples within +54% / -19% of true --> 0.73
 #           Awesome! Can we increase the z bounds and still achieve this?
+#           Now with 1k oversampling, converged @ 232 iterations
+#               68% samples within +15% / -9% of true --> 0.24
+#               95% samples within +61% / -19% of true --> 0.80
+#           That's alright for now --> Do SARAS+HERA tests with Pk_emu_evenmorez_RadLyA_adaptive.
+#           Ah wait need to z=30. Here we go, m3 ...
+#
+#           Let's apply this to Sims though! Let's see what is the best score we can get with fixed k & z:
+#               (100, 30, 10, 5), adaptive
+#                   68% samples within +23% / -15% of true --> 0.38
+#                   95% samples within +87% / -53% of true --> 1.40
+#                   99.7% samples within +529% / -82% of true --> 6.11
+#               (200, 100, 50, 25), adaptive
+#                   68% samples within +18% / -14% of true --> 0.32
+#                   95% samples within +87% / -45% of true --> 1.32
+#                   99.7% samples within +282% / -79% of true --> 3.61
+#               repeat
+#                   68% samples within +18% / -15% of true --> 0.33
+#                   95% samples within +75% / -48% of true --> 1.24
+#                   99.7% samples within +190% / -74% of true --> 2.64
+#               Pk_emuL_fixkz_Sims_adaptive
+#               (200, 100, 50, 25), adam
+#                   68% samples within +15% / -11% of true --> 0.26
+#                   95% samples within +60% / -38% of true --> 0.98
+#                   99.7% samples within +281% / -69% of true --> 3.51
+#               repeat (save as Pk_emuL_fixkz_Sims_adam_2001005025)
+#                   68% samples within +19% / -11% of true --> 0.30
+#                   95% samples within +65% / -42% of true --> 1.07
+#                   99.7% samples within +206% / -80% of true --> 2.86
+#               repeat (save as Pk_emuL_fixkz_Sims_adam_2001005025_v2)
+#                   68% samples within +17% / -8% of true --> 0.26
+#                   95% samples within +67% / -37% of true --> 1.04
+#                   99.7% samples within +323% / -75% of true --> 3.98
+#              (400, 200, 100, 50), adam
+#                  68% samples within +13% / -9% of true --> 0.22
+#                  95% samples within +57% / -35% of true --> 0.92
+#                  99.7% samples within +179% / -86% of true --> 2.66
+#           Okay, (200, 100, 50, 25) w/ adam is the score to beat, saved as Pk_emuL_fixkz_Sims_adam_2001005025_v2
+#           Run Sims emulator aiming for 68% ~ 0.26 and 95% ~ 1 scores.
+
