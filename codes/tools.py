@@ -37,7 +37,8 @@ def powerspec_of_z_k_hovercMpc(data, z_array=z_array, k_array_over_h=k_array/h):
     f = sip.interp2d(z_array, np.log(k_array_over_h), np.log(data+1).T, kind="linear", fill_value=0, bounds_error=False)
     return lambda z,k: np.exp(f(z, np.log(k)))-1
 
-def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag=None):
+def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag=None,
+                 zlow=7, zhigh=11, klow=0.02, khigh=3):
     # Sample random z and k from the power spectra interpolations
     # Note: Use k in h/cMpc !
     # n_over = number of random (z,k) samples per model
@@ -49,8 +50,8 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
         np.random.seed(seed)
     for m in np.random.permutation(len(params)):
         p = params[m]
-        z = [fix_z]*n_over if fix_z else np.random.uniform(low=7, high=11, size=n_over)
-        k = [fix_k]*n_over if fix_k else np.random.uniform(low=0.02, high=3, size=n_over)
+        z = [fix_z]*n_over if fix_z else np.random.uniform(low=zlow, high=zhigh, size=n_over)
+        k = [fix_k]*n_over if fix_k else np.random.uniform(low=klow, high=khigh, size=n_over)
         f = powerspec_of_z_k_hovercMpc(data=data[m])
         for j in range(n_over):
             if flag is None:
