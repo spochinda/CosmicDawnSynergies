@@ -2,11 +2,21 @@
 Model inference from 21cm power specrum observations, notably (i) power spectrum emulator and (ii) likelihood for data (e.g. HERA upper limits)
 
 ## Emulators
-I used ~3 emulators, one of which is uploaded here.
+I so far used 3 emulators, 1 of which is uploaded here (poweremu).
 
 * Old 'classic' emulator, vaguely based on Sudipta Sidker's emulator but without the PCR (did not improve performance now) and also completely rewritten.
 * Harry's 'globalemu' emulator. See https://github.com/htjb/globalemu
 * My new 'poweremu' emulator, inspired by Harry's globalemu idea but for powerspectra (2D input). The main trick is to treat k and z as input parameters, instead of treating the spectra as output arrays.
+
+### Notes on final (TM) emulator files
+
+Final PS emulators for HERA, trained on z=7-11 and k=0.02-3:
+    Pk_emu_m_Sims_adaptive.pkl (initially different name)
+    Pk_emu_m_RadLyA_adaptive.pkl (initially different name)
+    
+Final PS emulator for SARAS comparisons, trained on z=7-31 and k=0.1-0.5:
+    Pk_emu_m4_RadLyA_adaptive.pkl
+
 
 ## 21cmSim runs
 The data can be found on `AFdata/21cmDATA/` (?), containing 3 directories:
