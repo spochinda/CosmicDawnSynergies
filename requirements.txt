@@ -4,6 +4,7 @@ git+https://github.com/HERA-Team/hera_cal
 git+https://github.com/nkern/simpleQE
 git+https://github.com/williamjameshandley/anesthetic
 git+https://github.com/williamjameshandley/fgivenx
+git+https://github.com/PolyChord/PolyChordLite
 git+https://github.com/htjb/margarine
 numpy
 matplotlib

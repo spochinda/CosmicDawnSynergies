@@ -38,6 +38,22 @@ like_idr3_preliminary.plot_data(axes=axes)
 fig.suptitle("HERA IDR3 preliminary")
 
 
+like_idr3_all = likelihood(
+    datapath='data/observations_HERA_IDR3_final/Deltasq_Band_{1:}_Field_{0:}.h5',
+    decimation_factor=1,
+    selections = {"1": {
+            "D": {"kstart":1},
+            "C": {"kstart":1},
+            "B": {"kstart":1},
+            "E": {"kstart":1},
+            "A": {"kstart":1}
+        }, "2": {
+            "C": {"kstart":1},
+            "D": {"kstart":1},
+            "B": {"kstart":1},
+            "E": {"kstart":1},
+            "A": {"kstart":1}}})
+
 like_idr3 = likelihood(
     datapath='data/observations_HERA_IDR3_final/Deltasq_Band_{1:}_Field_{0:}.h5',
     decimation_factor=2,
@@ -54,7 +70,8 @@ like_idr3 = likelihood(
             "E": {"kstart":0.337},
             "A": {"kstart":0.478}}})
 
-fig, axes = plt.subplots(ncols=2, figsize=(10,5))
+fig, axes = plt.subplots(ncols=2, nrows=5, figsize=(10,5))
+like_idr3_all.plot_data(axes=axes, color="blue")
 like_idr3.plot_data(axes=axes)
 fig.suptitle("HERA IDR3 final")
 

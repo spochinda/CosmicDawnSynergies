@@ -188,23 +188,32 @@ class likelihood:
     def plot_data(self, axes=None, color="green"):
         data = self.data
         if axes is None:
+            # Just make a panel for each band
             ncols = len(self.data)
-            fig, axes = plt.subplots(ncols=ncols, figsize=(10,5))
-            axes = [axes] if ncols==1 else axes
-        i = 0
-        for band in data.keys():
-            for field in self.data[band].keys():
+            fig, ax = plt.subplots(ncols=ncols, figsize=(10,5))
+            ax = [ax] if ncols==1 else ax
+        else:
+            if len(np.shape(axes)) == 2:
+                formatting = "2D"
+            else:
+                formatting = "1D"
+        for b in range(len(data.keys())):
+            band = list(data.keys())[b]
+            for f in range(len(data[band].keys())):
+                field = list(data[band].keys())[f]
+                print(band, field)
+                ax = axes[b] if formatting=="1D" else axes[f][b]
                 d=data[band][field]
-                axes[i].errorbar(d["k_data"], d["dsq"], yerr=d["std"], color=color, fmt="o", zorder=10)
-                axes[i].scatter(d["k_data"], d["dsq"]+2*d["std"], color=color, marker=7, s=60, zorder=10)
-                axes[i].scatter(d["k_data"], d["dsq"]+2*d["std"], color=color, marker='_', s=60, zorder=10)
-                #axes[i].scatter(d["k_data"], d["dsq"]+3*d["std"], color=color, marker='*', zorder=10)
-                #axes[i].scatter(d["k_data"], d["dsq"]+4*d["std"], color=color, marker='x', zorder=10)
-                axes[i].set_title("Band "+band+" (z={0:.2f})".format(d["z"]))
-                axes[i].set_yscale("log")
-                axes[i].set_ylabel("$\Delta^2$")
-                axes[i].set_xlabel("k [h/Mpc]")
-            i = (i+1)%len(axes)
+                ax.errorbar(d["k_data"], d["dsq"], yerr=d["std"], color=color, fmt="o", zorder=10)
+                ax.scatter(d["k_data"], d["dsq"]+2*d["std"], color=color, marker=7, s=60, zorder=10)
+                ax.scatter(d["k_data"], d["dsq"]+2*d["std"], color=color, marker='_', s=60, zorder=10)
+                #ax.scatter(d["k_data"], d["dsq"]+3*d["std"], color=color, marker='*', zorder=10)
+                #ax.scatter(d["k_data"], d["dsq"]+4*d["std"], color=color, marker='x', zorder=10)
+                ax.set_yscale("log")
+                ax.set_ylabel("$\Delta^2$")
+                if f == 0:
+                    ax.set_title("Band "+band+" (z={0:.2f})".format(d["z"]))
+                    ax.set_xlabel("k [h/Mpc]")
 
     def plot_data_violin(self, axes=None):
         self.plot_data(axes=axes, color="black")
@@ -227,7 +236,7 @@ class likelihood:
                     axes[i].axvline(d["k_data"][j]+w/2, color="green", ls=":")
                     for b in v["bodies"]:
                         b.set_alpha(1)
-                        # https://stackoverflow.com/questions/29776114/half-violin-plot-in-matplotlib
+                        # From https://stackoverflow.com/questions/29776114/half-violin-plot-in-matplotlib
                         # half violin
                         b.set_color("green")
                         b.set_facecolor("green")
