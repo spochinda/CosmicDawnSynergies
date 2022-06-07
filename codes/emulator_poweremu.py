@@ -1,4 +1,3 @@
-
 from copy import deepcopy
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.colors import LinearSegmentedColormap
@@ -15,7 +14,6 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 import anesthetic
-import emcee
 import hera_pspec as hp # HERA-Stack
 import joblib
 import matplotlib
