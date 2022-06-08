@@ -1,4 +1,6 @@
+from codes.emulator_poweremu import *
 from codes.loader_21cmSim import *
+from codes.tools import *
 import matplotlib.pyplot as plt
 
 # Redshift and k ranges used in data, and load params and powerspectra
@@ -18,8 +20,6 @@ k_array = k_array[0]
 # Little h for wave number conversions, use h from simulation
 h=0.6704
 
-from codes.emulator_poweremu import *
-from codes.tools import *
 
 # Load Radio_and_LyAheating_Itamar models (5 parameters)
 ## These models are without RSDs (9927+800-26):

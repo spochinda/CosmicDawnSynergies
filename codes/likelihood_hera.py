@@ -1,10 +1,8 @@
 # HERA-Stack
 import hera_pspec as hp
-import simpleqe as sqe # https://github.com/nkern/simpleQE
-
+#import simpleqe #https://github.com/nkern/simpleQE
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy import special
+import scipy.special as ssp
 
 # Likelihood and data extraction code based on notebook in archive here:
 # http://reionization.org/science/public-data-release-1/
@@ -165,7 +163,7 @@ class likelihood:
                 m = model(z,k)
                 theory = wfn @ m
                 r = dsq - theory
-                l = 0.5 * (1 + special.erf(r / np.sqrt(2) / np.sqrt(std**2+(self.theory_err*theory)**2)))
+                l = 0.5 * (1 + ssp.erf(r / np.sqrt(2) / np.sqrt(std**2+(self.theory_err*theory)**2)))
                 assert np.shape(theory) == np.shape(dsq), "Shape mismatch"
                 # where likelihood == 0 replace w/ zero_fill: note that float equivalence is okay here
                 if self.zero_fill>0:
@@ -229,7 +227,7 @@ class likelihood:
                 y = np.geomspace(1,1e7,1000)
                 stats = []; positions=[]
                 for j in range(len(d["dsq"])):
-                    kde = 0.5 * (1 + special.erf((d["dsq"][j]-y) / np.sqrt(2) / np.sqrt(d["std"][j]**2)))
+                    kde = 0.5 * (1 + ssp.erf((d["dsq"][j]-y) / np.sqrt(2) / np.sqrt(d["std"][j]**2)))
                     w = 0.5 if len(d["k_data"])==1 else np.min(np.diff(d["k_data"])/0.75)
                     v = axes[i].violin([{"coords": y, "vals": kde, "mean": 100, "median": -1, "min": -1, "max": -1}],
                         positions=[d["k_data"][j]], widths=w*kde[0])

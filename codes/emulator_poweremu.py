@@ -1,33 +1,11 @@
-from copy import deepcopy
-from matplotlib.ticker import AutoMinorLocator
-from matplotlib.colors import LinearSegmentedColormap
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from numpy import pi, log, sqrt
 from os.path import isfile
-from os import makedirs
-from scipy import special
-from scipy.io import loadmat
-from sklearn.decomposition import PCA
-from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-import anesthetic
-import hera_pspec as hp # HERA-Stack
+#from sklearn.model_selection import GridSearchCV
 import joblib
-import matplotlib
-import matplotlib as mpl
-import matplotlib.cm as cm
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas
-import scipy.interpolate as sip
-import scipy.stats as sst
-import matplotlib.colors as mpc
 
 
 def benchmark(PS_of_params, test_PS, test_params):
