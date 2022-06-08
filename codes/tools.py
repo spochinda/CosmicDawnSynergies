@@ -145,8 +145,8 @@ def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
         print("p1", p1)
         print("p2", p2)
         print("alphamin", alphamin)
-    line = lambda alpha, startalpha=4, startbeta=5: startbeta+(alpha-startalpha)
-    abcd = lambda alpha: [betamin, line(alpha, startalpha=alphamin, startbeta=betamin), zmax, line(alpha, startalpha=alphamin, startbeta=zmax)]
+    #line = lambda alpha, startalpha=4, startbeta=5: startbeta+(alpha-startalpha)
+    #abcd = lambda alpha: [betamin, line(alpha, startalpha=alphamin, startbeta=betamin), zmax, line(alpha, startalpha=alphamin, startbeta=zmax)]
     overallnorm = trapezoidal_bump(alphamin, p1, p2, alphamax)(alpha)
     if yellow=="rect":
         a = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin, betamin, betalow], fill_value=0, bounds_error=False)(alpha)
