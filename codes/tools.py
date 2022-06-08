@@ -108,8 +108,13 @@ texDict = {"Rmfp": r"$R_{\rm mfp}$",
            "powerInd": r"\alpha_X",
            "numin": r"\nu_{\rm min}",
            "tau": r"$\tau$",
+           "log10fr": r"$\log_{10} f_{\rm r}$",
            "log10Fr": r"$\log_{10} f_{\rm r}$",
-           "log10Ar": r"$\log_{10} A_{\rm r}$"}
+           "log10Ar": r"$\log_{10} A_{\rm r}$",
+           "log10TS": r"$\log_{10} T_{\rm spin}$",
+           "log10TK": r"$\log_{10} T_{\rm gas}$",
+           "log10TR": r"$\log_{10} T_{\rm rad}$",
+           "log10Trad": r"$\log_{10} T_{\rm rad}$"}
 
 #todo show test
 

@@ -4,7 +4,7 @@ data/models_21cmSim
 data/trained_emulators_poweremu
 # Non-public HERA data
 data/observations_HERA_IDR3*
-
+non-public/
 # Python stuff
 __pycache__/
 .ipynb_checkpoints

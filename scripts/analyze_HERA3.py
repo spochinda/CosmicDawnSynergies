@@ -43,6 +43,17 @@ like_idr3 = likelihood(
 #lwa_allowed = lwa_allowed_z8["allowed"]
 #logL_true, [PT, lwa_allowed] = remove_powerspectra_nans(logL_true, [PT, lwa_allowed])
 
+
+TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TS_emu_Sims_prelim_v2_31.05.2022.pkl", tol=0, n_iter_no_change=99999, preprocesss_log_x=False)
+TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_Sims_prelim_v2_31.05.2022.pkl", tol=0, n_iter_no_change=99999, preprocesss_log_x=False, offset=1e-3)
+TR_emu = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_Sims_prelim_v2_31.05.2022.pkl", tol=0, n_iter_no_change=99999, preprocesss_log_x=False, offset=1e-3)
+def TS_TK_Trad_from_emus(df):
+    emuCols = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "powerInd", "numin", "tau", "log10Fr"]
+    TS = TS_emu.predict(df[emuCols])
+    TK = TK_emu.predict(df[emuCols])
+    TR = TR_emu.predict(df[emuCols])
+    return TS, TK, TR
+
 print("=== Loading chains ===")
 # Old samples need to pass cols manually
 cols=[*paramNames, *["ll"+str(i) for i in range(10)]]
@@ -52,7 +63,7 @@ for i in range(51):
     tmp = anesthetic.anesthetic.samples.NestedSamples(root="/data/camHPC/May22/21cm_powerspectra_analysis/chains2/run_{:02}".format(i), columns=cols)
     tmp.tex = texDict
     tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
-    #tmp["log10TS"], tmp["log10TK"], tmp["log10TR"] = np.nan_to_num(np.log10(TS_TK_Trad_from_emus(tmp)), nan=-3)
+    tmp["log10TS"], tmp["log10TK"], tmp["log10TR"] = np.nan_to_num(np.log10(TS_TK_Trad_from_emus(tmp)), nan=-3)
     samples.append(tmp)
     logModelWeights.append(tmp.logZ()+np.log(numinPrior(i)*powerIndPrior))
     print("LogZ(",i,") =", tmp.logZ())
@@ -70,7 +81,7 @@ idr3["log10fsfX"]=idr3["log10fStar"]+idr3["log10fX"]
 idr3["log10fsfR"]=idr3["log10fStar"]+idr3["log10Fr"]
 
 venn_corrected_idr3 = anesthetic.samples.MCMCSamples(idr3.copy())
-print("Computing prior PDF -- might take a while")
+print("Computing prior PDF values -- might take a while ~ 10mins")
 priorpdf = [sum_pdf_2d(venn_corrected_idr3.iloc[i]["log10fsfX"], venn_corrected_idr3.iloc[i]["log10fsfR"], -5,3, -1,6, -5,-0.3) for i in range(len(venn_corrected_idr3))]
 assert not np.any(np.array(priorpdf)<1e-10)
 venn_corrected_idr3.importance_sample(-np.log(priorpdf), inplace=True)
@@ -87,6 +98,7 @@ fig, ax = prior.plot_2d(["log10fsfX", "log10fsfR"], alpha=0.2, types={"lower": "
 idr3.plot_2d(ax, alpha=1, color="red", facecolor=None)
 venn_corrected_idr3.plot_2d(ax, alpha=0.6)
 fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels())
+plt.savefig("non-public/info_HERA_IDR3_LWA_Chandra.pdf")
 plt.show()
 
 venn_corrected_idr3.label=None
@@ -104,7 +116,7 @@ ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, a
 ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), 0, 5, hatch="\\", color=ccb[4], fc=(1,1,1,0), lw=2)
 ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), 0, 5, alpha=0.5, color=ccb[4], label="Chandra excluded", lw=2)
 fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels(), loc="center right")
-plt.savefig("HERA_IDR3_LWA_Chandra.pdf")
+plt.savefig("non-public/HERA_IDR3_LWA_Chandra.pdf")
 plt.show()
 
 
@@ -119,11 +131,8 @@ for i in range(51):
     samples[i].plot_2d(ax, alpha=0.5, types={"diagonal": "kde"}, color=c)
     # blue = low i = low numin = warmer = weaker constraints
 idr3.plot_2d(ax, alpha=1, color=ccb[0])
+plt.savefig("non-public/info_HERA_IDR3_triangle.pdf")
 plt.show()
-#plt.savefig("all_plots.pdf")
-#b=anesthetic.anesthetic.samples.NestedSamples(root="chains/run2_")
-#
-#
 
 
 
