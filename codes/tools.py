@@ -27,6 +27,15 @@ def powerInd_and_numin_from_index(index):
     numin = numins[index % len(numins)]
     return powerInd, numin
 
+powerIndPrior = 1/3
+def numinPrior(index):
+    numins = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0]
+    d = np.diff(np.log10(numins))
+    weights = np.array([0, *(d/2)]) + np.array([*(d/2), 0])
+    numin_index = index % len(numins)
+    return weights[numin_index]/np.sum(weights)
+
+
 from codes.loader_21cmSim import *
 ## 21cmSim uses these redshifts for all outputs, except xHI.
 z_array = np.arange(6,50.01,1)
