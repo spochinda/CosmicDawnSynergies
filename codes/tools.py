@@ -1,5 +1,6 @@
 import scipy.interpolate as sip
 import scipy.optimize as sop
+import scipy.integrate as sin
 import numpy as np
 
 def confidence_level(samples, weights=None, level=0.68):
@@ -18,6 +19,13 @@ def confidence_level(samples, weights=None, level=0.68):
     distance = lambda a, level=level: invcdf(a+level)-invcdf(a)
     res = sop.minimize(distance, (1-level)/2, bounds=[(0,1-level)], method="Nelder-Mead")
     return np.array([invcdf(res.x[0]), invcdf(res.x[0]+level)])
+
+def powerInd_and_numin_from_index(index):
+    powerInds = [1, 1.3, 1.5]
+    numins = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0]
+    powerInd = powerInds[int(index/len(numins))]
+    numin = numins[index % len(numins)]
+    return powerInd, numin
 
 from codes.loader_21cmSim import *
 ## 21cmSim uses these redshifts for all outputs, except xHI.
@@ -62,3 +70,147 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
             training_y.append(r)
     indices = np.random.choice(len(training_y), size=len(training_y), replace=False)
     return np.array(training_x)[indices], np.array(training_y)[indices,0]
+
+
+paramNames_Sims_poly = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
+paramNames_Sims_full = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "powerInd", "numin", "tau", "log10Fr"]
+priorDict_Sims = {
+             "Rmfp": [10, 70],
+             "log10fStar": [-4, np.log10(0.5)],
+             "log10Vc": [np.log10(4.2), 2],
+             "log10fX": [-5, 3],
+             "powerInd": [1, 1.3, 1.5], #discrete
+             "numin": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0], #discrete
+             "tau": [0.02, 0.1],
+             "log10Fr": [-1, 6]}
+
+paramNames_RadLyA = ["log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
+priorDict_RadLyA = {
+             "log10fStar": [-3, np.log10(0.5)],
+             "log10Vc": [np.log10(4.2), 2],
+             "log10fX": [-4, 3],
+             "tau": [0.035, 0.088],
+             "log10Fr": [0, 5]}
+
+texDict = {"Rmfp": r"$R_{\rm mfp}$",
+           "log10fStar": r"$\log_{10} f_{\rm star}$",
+           "log10Vc": r"$V_c$",
+           "log10fX": r"$\log_{10} f_{\rm X}$",
+           "powerInd": r"\alpha_X",
+           "numin": r"\nu_{\rm min}",
+           "tau": r"$\tau$",
+           "log10Fr": r"$\log_{10} f_{\rm r}$",
+           "log10Ar": r"$\log_{10} A_{\rm r}$"}
+
+#todo show test
+
+def trapezoidal_bump(a,b,c,d, peak=1):
+    return sip.interp1d([a,b,c,d], [0,peak,peak,0], fill_value=(0,0), bounds_error=False)
+
+def sum_pdf_1d(alpha, xmin, xmax, ymin, ymax):
+    # PDF for alpha which is the sum of two uniformly distributed
+    # random variables x and y, alpha = x + y
+    a = xmin+ymin
+    b = ymin+xmax#np.minimum(xmin+ymax, ymin+xmax)
+    c = xmin+ymax#np.maximum(xmin+ymax, ymin+xmax)
+    d = xmax+ymax
+    f = trapezoidal_bump(a,b,c,d)
+    norm = sin.quad(f,a,d)[0]
+    return f(alpha)/norm
+
+def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
+    # 2D PDF in (alpha, beta) where the alpha = x + z and beta = y + z
+    # where x, y and z are uniformly distributed random variables.
+    # Approach to calculate this: Compute the beta-1d-pdf for every alpha:
+    # There are (up to) 5 distinct regimes. Use empirical formulas. Proof: Todo.
+    alphamin = xmin+zmin 
+    betamin = ymin+zmin
+    alphamax = xmax+zmax
+    betamax = ymax+zmax
+    alphalow = np.minimum(xmax+zmin, xmin+zmax)
+    alphaup = np.maximum(xmax+zmin, xmin+zmax)
+    betalow = np.minimum(ymax+zmin, ymin+zmax)
+    betaup = np.maximum(ymax+zmin, ymin+zmax)
+    p1_prelim = xmax+zmin
+    p2_prelim = xmin+zmax
+    if p1_prelim>p2_prelim:
+        yellow = "rect"
+    else:
+        yellow = "diag"
+    if debug:
+        print("yellow =", yellow)
+    p1 = np.minimum(p1_prelim, p2_prelim)
+    p2 = np.maximum(p1_prelim, p2_prelim)
+    if debug:
+        print("p1", p1)
+        print("p2", p2)
+        print("alphamin", alphamin)
+    line = lambda alpha, startalpha=4, startbeta=5: startbeta+(alpha-startalpha)
+    abcd = lambda alpha: [betamin, line(alpha, startalpha=alphamin, startbeta=betamin), zmax, line(alpha, startalpha=alphamin, startbeta=zmax)]
+    overallnorm = trapezoidal_bump(alphamin, p1, p2, alphamax)(alpha)
+    if yellow=="rect":
+        a = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin, betamin, betalow], fill_value=0, bounds_error=False)(alpha)
+        b = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betalow, betalow, betalow], fill_value=0, bounds_error=False)(alpha)
+        c = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betaup, betaup, betaup, betamax], fill_value=0, bounds_error=False)(alpha)
+        d = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betaup, betamax, betamax, betamax], fill_value=0, bounds_error=False)(alpha)
+        if debug:
+            print("a,b,c,d", a,b,c,d)
+        overallnorm = trapezoidal_bump(alphamin, alphalow, alphaup, alphamax)(alpha)
+        return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
+    elif yellow=="diag":
+        #beta1 = betamin
+        #beta2 = betalow
+        #beta3 = ymax
+        #beta4 = betaup - (alphaup-alphalow)
+        #beta5 = betaup
+        #beta6 = betamax
+        assert betalow+(alphaup-alphamin) == betamax
+        a = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin, betamin+(alphaup-alphalow), betamin+(alphamax-alphalow)], fill_value=0, bounds_error=False)(alpha)
+        b = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin+(alphalow-alphamin), betamin+(alphaup-alphamin), betamin+(alphaup-alphamin)], fill_value=0, bounds_error=False)(alpha)
+        c = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betalow, betalow, betalow+(alphaup-alphalow), betalow+(alphamax-alphalow)], fill_value=0, bounds_error=False)(alpha)
+        d = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betalow, betalow+(alphalow-alphamin), betalow+(alphaup-alphamin), betalow+(alphaup-alphamin)], fill_value=0, bounds_error=False)(alpha)
+        overallnorm = trapezoidal_bump(alphamin, alphalow, alphaup, alphamax)(alpha)
+        return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
+    else:
+        assert False, yellow
+    #if alpha<alphamin:
+    #    if debug:
+    #        print("Case 0")
+    #    return 0
+    #elif alpha <= p1:
+    #    if debug:
+    #        print("Case 1")
+    #    a,b,c,d = abcd(alpha)
+    #    if debug:
+    #        print("Returning step-pdf with steps", a,b,c,d, "at beta =", beta, "peak=", overallnorm)
+    #    return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
+    #elif alpha <= p2:
+    #    if debug:
+    #        print("Case 2")
+    #    a,b,c,d = abcd(p1)
+    #    if yellow=="diag":
+    #        a += (alpha-p1)
+    #        b += (alpha-p1)
+    #        c += (alpha-p1)
+    #        d += (alpha-p1)
+    #    if debug:
+    #        print("Returning step-pdf with steps", a,b,c,d, "at beta =", beta, "peak=", overallnorm)
+    #    return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
+    #elif alpha <= alphamax:
+    #    if debug:
+    #        print("Case 3")
+    #    a,_,c,_ = abcd(p2)
+    #    a += (alpha-p1)
+    #    c += (alpha-p1)
+    #    b = ymin+zmax
+    #    d = betamax
+    #    if debug:
+    #        print("Returning step-pdf with steps", a,b,c,d, "at beta =", beta, "peak=", overallnorm)
+    #    return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
+    #elif alpha>=alphamax:
+    #    if debug:
+    #        print("Case 4")
+    #    return 0
+    #else:
+    #    assert False
+
