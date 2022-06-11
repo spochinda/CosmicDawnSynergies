@@ -3,6 +3,7 @@ from codes.likelihood_hera import *
 from codes.loader_21cmSim import *
 from codes.plotlibs import *
 from codes.tools import *
+import pandas as pd
 import anesthetic
 
 paramNames = paramNames_Sims_poly
@@ -54,6 +55,14 @@ def TS_TK_Trad_from_emus(df):
     TR = TR_emu.predict(df[emuCols])
     return TS, TK, TR
 
+
+def mergeS(prior_samples, weights=None):
+    merge_prior = anesthetic.samples.merge_samples_weighted(prior_samples, weights=weights)
+    merge_prior = merge_prior.reset_index().set_index("weights", append=True).drop(columns="#")
+    merge_prior.index.set_names(["#", "weights"], inplace=True)
+    return merge_prior
+
+
 print("=== Loading chains ===")
 # Old samples need to pass cols manually
 cols=[*paramNames, *["ll"+str(i) for i in range(10)]]
@@ -67,7 +76,10 @@ for i in range(51):
     samples.append(tmp)
     logModelWeights.append(tmp.logZ()+np.log(numinPrior(i)*powerIndPrior))
     print("LogZ(",i,") =", tmp.logZ())
-idr3 = anesthetic.samples.merge_samples_weighted(samples, weights=np.exp(logModelWeights))
+#idr3 = mergeS()
+idr3 = mergeS(samples, weights=np.exp(logModelWeights))
+
+
 
 print("=== 'venn' figure ===")
 priordata = {}
@@ -99,23 +111,29 @@ idr3.plot_2d(ax, alpha=1, color="red", facecolor=None)
 venn_corrected_idr3.plot_2d(ax, alpha=0.6)
 fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels())
 plt.savefig("non-public/info_HERA_IDR3_LWA_Chandra.pdf")
-plt.show()
+plt.close()
 
 venn_corrected_idr3.label=None
 fig, ax = venn_corrected_idr3.plot_2d(["log10fsfX", "log10fsfR"], alpha=1, types={"lower": "kde"}, facecolor=None, lw=2, color="k")
 fig.set_size_inches(8,6)
 sigma1 = ((((fig.axes[0].collections[0].get_paths()[0]).vertices.T)))
 sigma2 = ((((fig.axes[0].collections[1].get_paths()[0]).vertices.T)))
-ax.log10fsfX.log10fsfR.fill_between(sigma2[0], y1=sigma2[1], y2=10*np.ones(len(sigma2[0])), where=sigma2[1]>-1, color=ccb[-1], alpha=1, label="Outside of HERA 1sigma contours\n aka 68% excluded")
+ax.log10fsfX.log10fsfR.fill_between(sigma2[0], y1=sigma2[1], y2=10*np.ones(len(sigma2[0])), where=sigma2[1]>-1, color=ccb[-1], alpha=1, label="Excluded by HERA (this work)\nat >68% confidence")
 ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-5,10,100), x1=-10, x2=-3, alpha=1, color=ccb[-1])
-ax.log10fsfX.log10fsfR.fill_between(sigma1[0], y1=sigma1[1], y2=10*np.ones(len(sigma1[0])), where=sigma1[1]>-1, color=ccb[0], alpha=1, label="Outside of HERA 2sigma contours\n aka 95% excluded")
+ax.log10fsfX.log10fsfR.fill_between(sigma1[0], y1=sigma1[1], y2=10*np.ones(len(sigma1[0])), where=sigma1[1]>-1, color=ccb[0], alpha=1, label="Excluded by HERA (this work)\nat >68% confidence")
 ax.log10fsfX.log10fsfR.set_xlim(-6,2)
 ax.log10fsfX.log10fsfR.set_ylim(0,5)
+ax.log10fsfX.log10fsfR.set_xticks(np.linspace(-6,2,9), [r"$10^{-6}$", r"$10^{-5}$", r"$10^{-4}$", r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$10^{0}$", r"$10^1$", r"$10^2$"])
+ax.log10fsfX.log10fsfR.set_yticks(np.linspace(0,5,6), [r"$10^0$", r"$10^1$", r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"])
+ax.log10fsfX.log10fsfR.set_xlabel(r"$f_{\rm star} \cdot f_X$")
+ax.log10fsfX.log10fsfR.set_xlabel(r"$f_{\rm star} \cdot f_{\rm r}}$")
 ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, hatch="/", color=ccb[1], fc=(1,1,1,0), lw=2)
-ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, alpha=0.5, color=ccb[1], label="LWA excluded 2 sigma", lw=2)
-ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), 0, 5, hatch="\\", color=ccb[4], fc=(1,1,1,0), lw=2)
-ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), 0, 5, alpha=0.5, color=ccb[4], label="Chandra excluded", lw=2)
-fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels(), loc="center right")
+ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, alpha=0.5, color=ccb[1], label="Exceeds extra-galactic\n radio background today", lw=2)
+# 1.142 to make this 2 sigma "Computed using a total 0.5–2 keV CXB flux of 8.15 ± 0.58 × 10−12 erg cm−2 s−1 deg−2"
+ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, hatch="\\", color=ccb[4], fc=(1,1,1,0), lw=2)
+ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, alpha=0.5, color=ccb[4], label="Exceeds unresolved extra-galactic\nX-ray background today", lw=2)
+fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels(), loc="lower right", bbox_to_anchor=(0,0.1,1,1))
+plt.tight_layout()
 plt.savefig("non-public/HERA_IDR3_LWA_Chandra.pdf")
 plt.show()
 
@@ -138,18 +156,11 @@ plt.show()
 
 
 
+idr3.label = None
+prior.label = None
 
 
 
-
-
-
-
-
-
-
-
-assert False
 def fastCL(samples, weights=None, level=0.68, method="iso-probability"):
     weights = np.ones(len(samples)) if weights is None else weights
     # Sort and normalize
@@ -178,38 +189,33 @@ def fastCL(samples, weights=None, level=0.68, method="iso-probability"):
     return interval
 
 
-yellow_line_Xray = fastCL(samples.log10fX, weights=samples.weights, method="lower-limit")
-yellow_line_radio = fastCL(samples[paramNames[-1]], weights=samples.weights, method="upper-limit")
-#posterior_limit_Trad_over_TK = -fastCL(emcee_results.TK_over_Trad, method="lower-limit", level=0.95)
-#prior_limit_Trad_over_TK = -fastCL(prior_distrib.TK_over_Trad, method="lower-limit", level=0.95)
+yellow_line_Xray = fastCL(idr3.log10fX, weights=idr3.weights, method="lower-limit")
+yellow_line_Xray2 = fastCL(idr3.log10fX, weights=idr3.weights)
+yellow_line_radio = fastCL(idr3["log10Fr"], weights=idr3.weights, method="upper-limit")
+yellow_line_radio2 = fastCL(idr3["log10Fr"], weights=idr3.weights)
 
 print("Exclude at 68% CL:")
 print("  F_r > {0:.0f}".format(10**yellow_line_radio))
 print("    Corresponds to L_R = {0:.3e}".format(1e22*(150/150)**-0.7*10**yellow_line_radio))
 print("  f_X < {0:.2f}".format(10**yellow_line_Xray))
 print("    Corresponds to L_X = {0:.3e}".format(3e40*10**yellow_line_Xray))
-#print("Constrain at 95% CL:")
-#print("  Posterior log10(Trad/TK) < {0:.1f}".format(posterior_limit_Trad_over_TK))
-#print("  Prior log10(Trad/TK) < {0:.1f}".format(prior_limit_Trad_over_TK))
 
 
 
 
 
-
-fig, ax = samples.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
-samples.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
-samples.plot_2d(ax.loc[[paramNames[-1]],[paramNames[-1]]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
-
+fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
+idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 # Yellow band
 y1 = yellow_line_Xray #0
 y2 = yellow_line_radio #3
-ax['log10fX'][paramNames[-1]].plot([priorDict_RadLyA["log10fX"][0],y1],[y2,y2], color=ccb[1], lw=4, alpha=0.4, linestyle='solid')
-ax['log10fX'][paramNames[-1]].plot([y1,y1],[y2,priorDict_RadLyA["log10Fr"][1]], color=ccb[1], lw=4, alpha=0.4, linestyle='solid', label='Excluded region')
+ax['log10fX']["log10Fr"].plot([priorDict_Sims["log10fX"][0],y1],[y2,y2], color=ccb[1], lw=4, alpha=0.4, linestyle='solid')
+ax['log10fX']["log10Fr"].plot([y1,y1],[y2,priorDict_Sims["log10Fr"][1]], color=ccb[1], lw=4, alpha=0.4, linestyle='solid', label='Excluded region')
 ax['log10fX']['log10fX'].axvline(y1, ls='solid', color=ccb[1], lw=4, alpha=0.4)
-ax[paramNames[-1]][paramNames[-1]].axvline(y2, ls='solid', color=ccb[1], lw=4, alpha=0.4)
-ax['log10fX'][paramNames[-1]].set_xticks([-2,0,2])
-
+ax["log10Fr"]["log10Fr"].axvline(y2, ls='solid', color=ccb[1], lw=4, alpha=0.4)
+ax['log10fX']["log10Fr"].set_xticks([-2,0,2])
+# Pandas magic
 lower_ax = {}
 for key in ax.keys():
     lower_ax[key] = {}
@@ -220,28 +226,187 @@ for key in ax.keys():
         else:
             lower_ax[key][key2] = None
 lower_ax = pd.DataFrame(lower_ax)
-
-samples.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None})
-
-handles, labels = ax['tau'][paramNames[-1]].get_legend_handles_labels()
-fig.set_size_inches(10,10)
-
-ax["log10fStar"]["log10fStar"].get_yaxis().set_visible(False)
+# KDE lines for lower part
+idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=5000)
+# Decorations
+handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
+fig.set_size_inches(5,4)
+ax["log10fX"]["log10fX"].get_yaxis().set_visible(False)
 leg = fig.legend(handles, labels, loc='center', bbox_to_anchor=(0.7, 0.84))
-
 plt.figure()
 img = plt.imshow(np.array([[0,1]]), cmap=LinearSegmentedColormap.from_list("CCB", ['#ffffff', ccb[0]]))
 img.set_visible(False)
-cax = fig.add_axes([0.6, 0.75, 0.2, 0.02])
+cax = fig.add_axes([0.6, 0.6, 0.2, 0.02])
 plt.colorbar(img, cax=cax, orientation='horizontal', ticks=[0,1])
 cax.set_title(r"Posterior PDF value", fontsize=10)
 cax.set_xticklabels(["0", "Max"], fontsize=8)
 
-#plt.tight_layout()
-#fig.savefig(figure_path+"triangle_posteriors_"+model_type+".pdf")
-
-
+fig.savefig("non-public/HERA_small_triangle.pdf")
 plt.show()
 
 
 
+
+
+
+
+fig, ax = idr3.plot_2d(["log10fStar", "log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
+idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
+idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
+# Yellow band
+y1 = yellow_line_Xray #0
+y2 = yellow_line_radio #3
+ax['log10fX']["log10Fr"].plot([priorDict_Sims["log10fX"][0],y1],[y2,y2], color=ccb[1], lw=4, alpha=0.4, linestyle='solid')
+ax['log10fX']["log10Fr"].plot([y1,y1],[y2,priorDict_Sims["log10Fr"][1]], color=ccb[1], lw=4, alpha=0.4, linestyle='solid', label='Excluded region')
+ax['log10fX']['log10fX'].axvline(y1, ls='solid', color=ccb[1], lw=4, alpha=0.4)
+ax["log10Fr"]["log10Fr"].axvline(y2, ls='solid', color=ccb[1], lw=4, alpha=0.4)
+ax['log10fX']["log10Fr"].set_xticks([-2,0,2])
+# Pandas magic
+lower_ax = {}
+for key in ax.keys():
+    lower_ax[key] = {}
+    axk = ax[key]
+    for key2 in axk.keys():
+        if key != key2:
+            lower_ax[key][key2] = ax[key][key2]
+        else:
+            lower_ax[key][key2] = None
+lower_ax = pd.DataFrame(lower_ax)
+# KDE lines for lower part
+idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=5000)
+# Decorations
+handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
+fig.set_size_inches(5,4)
+ax["log10fX"]["log10fX"].get_yaxis().set_visible(False)
+leg = fig.legend(handles, labels, loc='center', bbox_to_anchor=(0.7, 0.84))
+plt.figure()
+img = plt.imshow(np.array([[0,1]]), cmap=LinearSegmentedColormap.from_list("CCB", ['#ffffff', ccb[0]]))
+img.set_visible(False)
+cax = fig.add_axes([0.6, 0.7, 0.2, 0.02])
+plt.colorbar(img, cax=cax, orientation='horizontal', ticks=[0,1])
+cax.set_title(r"Posterior PDF value", fontsize=10)
+cax.set_xticklabels(["0", "Max"], fontsize=8)
+
+fig.savefig("non-public/HERA_medium_triangle.pdf")
+plt.show()
+
+
+
+fig, ax = idr3.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
+idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
+idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
+# Yellow band
+y1 = yellow_line_Xray #0
+y2 = yellow_line_radio #3
+ax['log10fX']["log10Fr"].plot([priorDict_Sims["log10fX"][0],y1],[y2,y2], color=ccb[1], lw=4, alpha=0.4, linestyle='solid')
+ax['log10fX']["log10Fr"].plot([y1,y1],[y2,priorDict_Sims["log10Fr"][1]], color=ccb[1], lw=4, alpha=0.4, linestyle='solid', label='Excluded region')
+ax['log10fX']['log10fX'].axvline(y1, ls='solid', color=ccb[1], lw=4, alpha=0.4)
+ax["log10Fr"]["log10Fr"].axvline(y2, ls='solid', color=ccb[1], lw=4, alpha=0.4)
+ax['log10fX']["log10Fr"].set_xticks([-2,0,2])
+# Pandas magic
+lower_ax = {}
+for key in ax.keys():
+    lower_ax[key] = {}
+    axk = ax[key]
+    for key2 in axk.keys():
+        if key != key2:
+            lower_ax[key][key2] = ax[key][key2]
+        else:
+            lower_ax[key][key2] = None
+lower_ax = pd.DataFrame(lower_ax)
+# KDE lines for lower part
+idr3.plot_2d(lower_ax, types={'lower':'kde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=5000)
+# Decorations
+handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
+fig.set_size_inches(10,10)
+ax["log10fX"]["log10fX"].get_yaxis().set_visible(False)
+leg = fig.legend(handles, labels, loc='center', bbox_to_anchor=(0.7, 0.84))
+plt.figure()
+img = plt.imshow(np.array([[0,1]]), cmap=LinearSegmentedColormap.from_list("CCB", ['#ffffff', ccb[0]]))
+img.set_visible(False)
+cax = fig.add_axes([0.6, 0.7, 0.2, 0.02])
+plt.colorbar(img, cax=cax, orientation='horizontal', ticks=[0,1])
+cax.set_title(r"Posterior PDF value", fontsize=10)
+cax.set_xticklabels(["0", "Max"], fontsize=8)
+
+fig.savefig("non-public/HERA_large_triangle.pdf")
+plt.show()
+
+
+
+
+
+
+
+
+
+psamples = []; plogModelWeights= []
+for i in range(51):
+    print(i)
+    priordata = {}
+    for key in paramNames_Sims_poly:
+        priordata[key] = np.random.uniform(low=priorDict_Sims[key][0], high=priorDict_Sims[key][1], size=10000)
+    tmp = anesthetic.samples.MCMCSamples(priordata)
+    tmp.tex = texDict
+    tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
+    tmp["log10TS"], tmp["log10TK"], tmp["log10TR"] = np.nan_to_num(np.log10(TS_TK_Trad_from_emus(tmp)), nan=-3)
+    psamples.append(tmp)
+    plogModelWeights.append(np.log(numinPrior(i)*powerIndPrior))
+#idr3 = mergeS()
+prior = mergeS(psamples, weights=np.exp(plogModelWeights))
+
+
+
+posterior_limit_Trad_over_TK = -fastCL(idr3["log10TK"]-idr3["log10TR"], weights=idr3.weights, method="lower-limit", level=0.95)
+prior_limit_Trad_over_TK = -fastCL(prior["log10TK"]-prior["log10TR"], weights=prior.weights, method="lower-limit", level=0.95)
+posterior_limit_Trad_over_TS = -fastCL(idr3["log10TS"]-idr3["log10TR"], weights=idr3.weights, method="lower-limit", level=0.95)
+prior_limit_Trad_over_TS = -fastCL(prior["log10TS"]-prior["log10TR"], weights=prior.weights, method="lower-limit", level=0.95)
+print("Constrain at 95% CL:")
+print("  Posterior log10(Trad/TS) < {0:.1f}".format(posterior_limit_Trad_over_TS))
+print("  Prior log10(Trad/TS) < {0:.1f}".format(prior_limit_Trad_over_TS))
+
+
+
+import getdist
+from getdist import plots
+settings = plots.GetDistPlotSettings()
+settings.legend_fontsize=11
+settings.axes_fontsize=11
+settings.axes_labelsize=9
+sett = {"smooth_scale_2D": -5}
+g = plots.get_single_plotter(width_inch=4, ratio=1, settings=settings)
+s = getdist.mcsamples.MCSamples(samples=np.array([prior["log10TS"],prior["log10TR"]]).T, weights=np.array(prior.weights), names=["log10TS","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+s2 = getdist.mcsamples.MCSamples(samples=np.array([idr3["log10TS"],idr3["log10TR"]]).T, weights=np.array(idr3.weights), names=["log10TS","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+g.plot_2d([s, s2], 'log10TS', 'log10TR', filled=True, colors=[ccb[1], ccb[0]])
+g.add_legend(['Prior', 'Posterior'], legend_loc='lower right')
+a2 = g.get_axes()
+a2.set_xlim(np.min(prior['log10TS']),np.max(prior['log10TS']))
+a2.set_ylim(np.min(prior['log10TR']),np.max(prior['log10TR']))
+
+Tplot = np.linspace(0,6,1000)
+a2.plot(Tplot, posterior_limit_Trad_over_TS+Tplot, ls='dashed', color=ccb[0])
+plt.savefig("non-public/HERA_TS_TRad.pdf")
+plt.show()
+
+
+settings = plots.GetDistPlotSettings()
+settings.legend_fontsize=11
+settings.axes_fontsize=11
+settings.axes_labelsize=9
+sett = {"smooth_scale_2D": -5}
+g = plots.get_single_plotter(width_inch=4, ratio=1, settings=settings)
+s = getdist.mcsamples.MCSamples(samples=np.array([prior["log10TK"],prior["log10TR"]]).T, weights=np.array(prior.weights), names=["log10TK","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+s2 = getdist.mcsamples.MCSamples(samples=np.array([idr3["log10TK"],idr3["log10TR"]]).T, weights=np.array(idr3.weights), names=["log10TK","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+g.plot_2d([s, s2], 'log10TK', 'log10TR', filled=True, colors=[ccb[1], ccb[0]])
+g.add_legend(['Prior', 'Posterior'], legend_loc='lower right')
+a2 = g.get_axes()
+a2.set_xlim(np.min(prior['log10TK']),np.max(prior['log10TK']))
+a2.set_ylim(np.min(prior['log10TR']),np.max(prior['log10TR']))
+
+Tplot = np.linspace(0,6,1000)
+a2.plot(Tplot, posterior_limit_Trad_over_TK+Tplot, ls='dashed', color=ccb[0])
+a2.plot(Tplot, prior_limit_Trad_over_TK+Tplot, ls='dashed', color=ccb[1])
+plt.savefig("non-public/HERA_TK_TRad.pdf")
+plt.show()
