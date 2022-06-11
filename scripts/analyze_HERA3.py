@@ -105,22 +105,23 @@ prior.tex["log10fsfR"] = r"$\log_{10} f_{\rm star}\cdot f_r$"
 venn_corrected_idr3.tex["log10fsfX"] = r"$\log_{10} f_{\rm star}\cdot f_X$"
 venn_corrected_idr3.tex["log10fsfR"] = r"$\log_{10} f_{\rm star}\cdot f_r$"
 
-venn_corrected_idr3.label="New Posterior"
-fig, ax = prior.plot_2d(["log10fsfX", "log10fsfR"], alpha=0.2, types={"lower": "kde"})
-idr3.plot_2d(ax, alpha=1, color="red", facecolor=None)
-venn_corrected_idr3.plot_2d(ax, alpha=0.6)
-fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels())
-plt.savefig("non-public/info_HERA_IDR3_LWA_Chandra.pdf")
-plt.close()
+#venn_corrected_idr3.label="New Posterior"
+#fig, ax = prior.plot_2d(["log10fsfX", "log10fsfR"], alpha=0.2, types={"lower": "kde"})
+#idr3.plot_2d(ax, alpha=1, color="red", facecolor=None)
+#venn_corrected_idr3.plot_2d(ax, alpha=0.6)
+#fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels())
+#plt.savefig("non-public/info_HERA_IDR3_LWA_Chandra.pdf")
+#plt.close()
 
 venn_corrected_idr3.label=None
 fig, ax = venn_corrected_idr3.plot_2d(["log10fsfX", "log10fsfR"], alpha=1, types={"lower": "kde"}, facecolor=None, lw=2, color="k")
 fig.set_size_inches(8,6)
 sigma1 = ((((fig.axes[0].collections[0].get_paths()[0]).vertices.T)))
 sigma2 = ((((fig.axes[0].collections[1].get_paths()[0]).vertices.T)))
+
 ax.log10fsfX.log10fsfR.fill_between(sigma2[0], y1=sigma2[1], y2=10*np.ones(len(sigma2[0])), where=sigma2[1]>-1, color=ccb[-1], alpha=1, label="Excluded by HERA (this work)\nat >68% confidence")
 ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-5,10,100), x1=-10, x2=-3, alpha=1, color=ccb[-1])
-ax.log10fsfX.log10fsfR.fill_between(sigma1[0], y1=sigma1[1], y2=10*np.ones(len(sigma1[0])), where=sigma1[1]>-1, color=ccb[0], alpha=1, label="Excluded by HERA (this work)\nat >68% confidence")
+ax.log10fsfX.log10fsfR.fill_between(sigma1[0], y1=sigma1[1], y2=10*np.ones(len(sigma1[0])), where=sigma1[1]>-1, color=ccb[0], alpha=1, label="at >95% confidence")
 ax.log10fsfX.log10fsfR.set_xlim(-6,2)
 ax.log10fsfX.log10fsfR.set_ylim(0,5)
 ax.log10fsfX.log10fsfR.set_xticks(np.linspace(-6,2,9), [r"$10^{-6}$", r"$10^{-5}$", r"$10^{-4}$", r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$10^{0}$", r"$10^1$", r"$10^2$"])
@@ -128,10 +129,10 @@ ax.log10fsfX.log10fsfR.set_yticks(np.linspace(0,5,6), [r"$10^0$", r"$10^1$", r"$
 ax.log10fsfX.log10fsfR.set_xlabel(r"$f_{\rm star} \cdot f_X$")
 ax.log10fsfX.log10fsfR.set_xlabel(r"$f_{\rm star} \cdot f_{\rm r}}$")
 ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, hatch="/", color=ccb[1], fc=(1,1,1,0), lw=2)
-ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, alpha=0.5, color=ccb[1], label="Exceeds extra-galactic\n radio background today", lw=2)
+ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, alpha=0.5, color=ccb[1], label="Exceeds LWA extra-galactic\n radio background today", lw=2)
 # 1.142 to make this 2 sigma "Computed using a total 0.5–2 keV CXB flux of 8.15 ± 0.58 × 10−12 erg cm−2 s−1 deg−2"
 ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, hatch="\\", color=ccb[4], fc=(1,1,1,0), lw=2)
-ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, alpha=0.5, color=ccb[4], label="Exceeds unresolved extra-galactic\nX-ray background today", lw=2)
+ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, alpha=0.5, color=ccb[4], label="Exceeds Chandra unresolved extra-\ngalactic X-ray background today", lw=2)
 fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels(), loc="lower right", bbox_to_anchor=(0,0.1,1,1))
 plt.tight_layout()
 plt.savefig("non-public/HERA_IDR3_LWA_Chandra.pdf")
@@ -372,14 +373,14 @@ print("  Prior log10(Trad/TS) < {0:.1f}".format(prior_limit_Trad_over_TS))
 import getdist
 from getdist import plots
 settings = plots.GetDistPlotSettings()
-settings.legend_fontsize=11
-settings.axes_fontsize=11
-settings.axes_labelsize=9
+settings.legend_fontsize=12
+settings.axes_fontsize=14
+settings.axes_labelsize=14
 sett = {"smooth_scale_2D": -5}
 g = plots.get_single_plotter(width_inch=4, ratio=1, settings=settings)
-s = getdist.mcsamples.MCSamples(samples=np.array([prior["log10TS"],prior["log10TR"]]).T, weights=np.array(prior.weights), names=["log10TS","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
-s2 = getdist.mcsamples.MCSamples(samples=np.array([idr3["log10TS"],idr3["log10TR"]]).T, weights=np.array(idr3.weights), names=["log10TS","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
-g.plot_2d([s, s2], 'log10TS', 'log10TR', filled=True, colors=[ccb[1], ccb[0]])
+s = getdist.mcsamples.MCSamples(samples=np.array([prior["log10TS"],prior["log10TR"]]).T, weights=np.array(prior.weights), names=["log10TS","log10TR"], labels=[r'\log_{10} \overline{T}_S', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+s2 = getdist.mcsamples.MCSamples(samples=np.array([idr3["log10TS"],idr3["log10TR"]]).T, weights=np.array(idr3.weights), names=["log10TS","log10TR"], labels=[r'\log_{10} \overline{T}_S', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+g.plot_2d([s, s2], 'log10TS', 'log10TR', filled=True, colors=["#505050", "#984ea3"], alphas=[1,0.5])
 g.add_legend(['Prior', 'Posterior'], legend_loc='lower right')
 a2 = g.get_axes()
 a2.set_xlim(np.min(prior['log10TS']),np.max(prior['log10TS']))
@@ -399,7 +400,7 @@ sett = {"smooth_scale_2D": -5}
 g = plots.get_single_plotter(width_inch=4, ratio=1, settings=settings)
 s = getdist.mcsamples.MCSamples(samples=np.array([prior["log10TK"],prior["log10TR"]]).T, weights=np.array(prior.weights), names=["log10TK","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
 s2 = getdist.mcsamples.MCSamples(samples=np.array([idr3["log10TK"],idr3["log10TR"]]).T, weights=np.array(idr3.weights), names=["log10TK","log10TR"], labels=[r'\log_{10} \overline{T}_K', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
-g.plot_2d([s, s2], 'log10TK', 'log10TR', filled=True, colors=[ccb[1], ccb[0]])
+g.plot_2d([s, s2], 'log10TK', 'log10TR', filled=True, colors=["#505050", "#984ea3"], alphas=[1,0.5])
 g.add_legend(['Prior', 'Posterior'], legend_loc='lower right')
 a2 = g.get_axes()
 a2.set_xlim(np.min(prior['log10TK']),np.max(prior['log10TK']))
