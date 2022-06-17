@@ -86,7 +86,9 @@ TS_emu1 = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m1.pkl", prep
 TK_emu1 = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m1.pkl", preprocesss_log_x=False, offset=1e-3)
 TR_emu1 = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m1.pkl", preprocesss_log_x=False, offset=1e-3)
 
+TS_emu2 = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m2.pkl", preprocesss_log_x=False, offset=1e-3)
 TK_emu2 = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m2.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu2 = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m2.pkl", preprocesss_log_x=False, offset=1e-3)
 
 # Training data
 #model_generation = "Sims"
@@ -171,10 +173,12 @@ layers = (100, 30, 10, 5)
 
 ## Adaptive. Temperature:
 emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
-    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5, tol=0.00001)
+    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
+    tol=0.00001, offset=1e-3)
+    # currently m2 converged runs forgot offset! Otherwise really good after ~75 it (TS)
 
 emu.train(train_x, train_y)
-emu.save("data/trained_emulators_poweremu/"+key+"emu_m2_converged.pkl")
+emu.save("data/trained_emulators_poweremu/"+key+"emu_m3_converged.pkl")
 
 ## Constant
 #emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam")
