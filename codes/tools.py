@@ -80,6 +80,32 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
     indices = np.random.choice(len(training_y), size=len(training_y), replace=False)
     return np.array(training_x)[indices], np.array(training_y)[indices,0]
 
+def Tinterp1d(z, Tarr, zarr=z_array):
+    f = sip.interp1d(zarr, Tarr)
+    return f(z)
+
+def gen_training_1d(n_over, params, data, fix_z=False, seed=None, flag=None,
+                    zlow=6, zhigh=31, zarr=z_array):
+    # n_over = number of random (z,k) samples per model
+    # params, data: Parameters and power spectra of models
+    # Returns n_over*len(params) samples
+    training_x = []
+    training_y = []
+    if seed is not None:
+        np.random.seed(seed)
+    for m in np.random.permutation(len(params)):
+        p = params[m]
+        z = [fix_z]*n_over if fix_z else np.random.uniform(low=zlow, high=zhigh, size=n_over)
+        Ti = Tinterp1d(z, data[m], zarr=zarr)
+        for j in range(n_over):
+            if flag is None:
+                training_x.append([z[j], *p])
+            else:
+                training_x.append([z[j], *p, flag])
+            training_y.append(Ti[j])
+    indices = np.random.choice(len(training_y), size=len(training_y), replace=False)
+    return np.array(training_x)[indices], np.array(training_y)[indices]
+
 
 paramNames_Sims_poly = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
 paramNames_Sims_full = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "powerInd", "numin", "tau", "log10Fr"]
