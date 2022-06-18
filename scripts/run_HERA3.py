@@ -72,8 +72,20 @@ like_hera = likelihood(
 
 
 paramNames = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
-nDerived = 2*5 #(selections, number of bands*fields)
+nDerived = 2 * 5 + 6 #(selections, number of bands*fields, +6 temperature outputs)
 nDims = len(paramNames)
+
+TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+
+def TS_TK_Trad_from_emulators(p, z=8):
+    emuCols = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "powerInd", "numin", "tau", "log10Fr"]
+    par0 = np.array([z, *p[0:4], powerInd, numin, *p[4:6]])
+    TS = TS_emu.predict(par0)
+    TK = TK_emu.predict(par0)
+    TR = TR_emu.predict(par0)
+    return TS, TK, TR
 
 
 # Polychord ingredients
@@ -92,7 +104,12 @@ def emulatorModel(z, karr, p):
 
 def loglikelihood(p):
     m = lambda z,karr,p=p: emulatorModel(z, karr, p)
-    return like_hera.loglike(m, return_individual_loglikes=True)
+    logL, extra = like_hera.loglike(m, return_individual_loglikes=True)
+
+    T8 = TS_TK_Trad_from_emulators(p, z=8)
+    T10 = TS_TK_Trad_from_emulators(p, z=10)
+
+    return logL, [*T8, *T10, *extra]
 
 
 settings = PolyChordSettings(nDims, nDerived)
@@ -102,13 +119,14 @@ settings.nlive = 2000
 settings.do_clustering = True
 settings.read_resume = False
 
-assert False, "Add TS etc. to data set!"
-
 if True:
     output = pypolychord.run_polychord(loglikelihood, nDims, nDerived, settings, prior, dumper)
     polychordnames = []
     for p in paramNames:
         polychordnames.append((p, texDict[p][1:-1]))
-    for i in range(nDerived):
-        polychordnames.append(("logL"+str(i), r"$\log L$"+str(i)))
+    for z in ["8", "10"]:
+        for T in ["TS", "TK", "TR"]:
+            polychordnames.append(T+z, r"T_"+T[1]+"\,(z="+z+")")
+    for i in range(nDerived - 6):
+        polychordnames.append(("logL"+str(i), r"\log L"+str(i)))
     output.make_paramnames_files(polychordnames)

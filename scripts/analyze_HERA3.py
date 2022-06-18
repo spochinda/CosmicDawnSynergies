@@ -33,11 +33,14 @@ def mergeAnesthetic(prior_samples, weights=None):
 
 print("=== Loading chains ===")
 # Old samples need to pass `columns` manually, should be automatic in new run
-columns = [*paramNames, *["ll"+str(i) for i in range(10)]]
+#columns = [*paramNames, *["ll"+str(i) for i in range(10)]]
 
 samples = []; logModelWeights= []
 for i in range(51):
-    tmp = anesthetic.anesthetic.samples.NestedSamples(root="/data/camHPC/May22/21cm_powerspectra_analysis/chains2/run_{:02}".format(i), columns=columns)
+    root = "idr3_chains_final1/run_IDR3_{:02}".format(i)
+    #root = "/data/camHPC/May22/21cm_powerspectra_analysis/chains2/run_{:02}".format(i)
+    #, columns=columns
+    tmp = anesthetic.anesthetic.samples.NestedSamples(root=root)
     tmp.tex = texDict
     tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
     samples.append(tmp)
