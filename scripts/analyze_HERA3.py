@@ -10,9 +10,9 @@ paramNames = paramNames_Sims_poly
 nDerived = 2*5
 nDims = len(paramNames)
 
-TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m2_converged.pkl", preprocesss_log_x=False)
-TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m2_converged.pkl", preprocesss_log_x=False, offset=1e-3)
-TR_emu = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m2_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 
 def TS_TK_Trad_from_emulators(df, z=8):
     emuCols = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "powerInd", "numin", "tau", "log10Fr"]
