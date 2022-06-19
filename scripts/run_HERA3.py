@@ -51,7 +51,9 @@ texDict = {"Rmfp": r"$R_{\rm mfp}$",
            "log10Ar": r"$\log_{10} A_{\rm r}$"}
 
 
-P = poweremu(loadfile="data/trained_emulators_poweremu/Sims_data_v03_150it_23.02.2022.pkl", tol=0, n_iter_no_change=99999, preprocesss_log_x=False)
+# Used for initial runs and "final1"
+#P = poweremu(loadfile="data/trained_emulators_poweremu/Sims_data_v03_150it_23.02.2022.pkl", tol=0, n_iter_no_change=99999, preprocesss_log_x=False)
+P = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl", tol=0, n_iter_no_change=99999, preprocesss_log_x=False)
 
 like_hera = likelihood(
     datapath='data/observations_HERA_IDR3_final/Deltasq_Band_{1:}_Field_{0:}.h5',
@@ -113,7 +115,7 @@ def loglikelihood(p):
 
 
 settings = PolyChordSettings(nDims, nDerived)
-settings.base_dir = '/tmp/testchains'
+settings.base_dir = 'non-public/idr3_chains_final2'
 settings.file_root = 'run_IDR3_{:02}'.format(index)
 settings.nlive = 2000
 settings.do_clustering = True
@@ -126,7 +128,7 @@ if True:
         polychordnames.append((p, texDict[p][1:-1]))
     for z in ["8", "10"]:
         for T in ["TS", "TK", "TR"]:
-            polychordnames.append(T+z, r"T_"+T[1]+"\,(z="+z+")")
+            polychordnames.append((T+z, r"T_"+T[1]+"\,(z="+z+")"))
     for i in range(nDerived - 6):
         polychordnames.append(("logL"+str(i), r"\log L"+str(i)))
     output.make_paramnames_files(polychordnames)

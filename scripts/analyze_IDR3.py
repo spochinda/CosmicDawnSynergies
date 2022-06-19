@@ -278,7 +278,7 @@ print("=== Corner plots -- check if look different from before ===")
 
 # Here are 3 blocks for the 3 sizes of the figure:
 
-fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 # Yellow band
@@ -301,7 +301,7 @@ for key in ax.keys():
             lower_ax[key][key2] = None
 lower_ax = pd.DataFrame(lower_ax)
 # KDE lines for lower part
-idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=5000)
+idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=3000)
 # Decorations
 handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
 fig.set_size_inches(5,4)
@@ -324,7 +324,7 @@ plt.show()
 
 
 
-fig, ax = idr3.plot_2d(["log10fStar", "log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+fig, ax = idr3.plot_2d(["log10fStar", "log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
@@ -348,7 +348,7 @@ for key in ax.keys():
             lower_ax[key][key2] = None
 lower_ax = pd.DataFrame(lower_ax)
 # KDE lines for lower part
-idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=5000)
+idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=3000)
 # Decorations
 handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
 fig.set_size_inches(5,4)
@@ -367,7 +367,7 @@ plt.show()
 
 
 
-fig, ax = idr3.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+fig, ax = idr3.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
@@ -391,7 +391,7 @@ for key in ax.keys():
             lower_ax[key][key2] = None
 lower_ax = pd.DataFrame(lower_ax)
 # KDE lines for lower part
-idr3.plot_2d(lower_ax, types={'lower':'kde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=5000)
+idr3.plot_2d(lower_ax, types={'lower':'kde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=3000)
 # Decorations
 handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
 fig.set_size_inches(10,10)
