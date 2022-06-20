@@ -43,14 +43,14 @@ P = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_RadLyA_adaptive.
 like_hera = likelihood(
     datapath='data/observations_HERA_IDR2/pspec_h1c_idr2_field{}.h5',
     decimation_factor=2,
-    selections={"1": {"1": {"kstart":0.256}, "2": {"kstart":0.320}, "3": {"kstart":0.256}},
-                "2": {"1": {"kstart":0.192}, "2": {"kstart":0.192}, "3": {"kstart":0.256}}}
+    selections={"1": {"1": {"kstart":0.256}},
+                "2": {"1": {"kstart":0.192}}}
 )
 
 
 
 paramNames = ["log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
-nDerived = 2 * 3 #+ 6 #(selections, number of bands*fields, +6 temperature outputs)
+nDerived = 2 * 1 #+ 6 #(selections, number of bands*fields, +6 temperature outputs)
 nDims = len(paramNames)
 
 #TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
@@ -92,8 +92,8 @@ def loglikelihood(p):
 
 
 settings = PolyChordSettings(nDims, nDerived)
-settings.base_dir = 'idr2_old_chains_final2'
-settings.file_root = 'run_IDR2_old'
+settings.base_dir = 'idr2_orig_chains_final2'
+settings.file_root = 'run_IDR2_orig'
 settings.nlive = 10000
 settings.do_clustering = True
 settings.read_resume = False

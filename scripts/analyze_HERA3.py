@@ -63,6 +63,22 @@ idr2 = mergeAnesthetic(samples2, weights=np.exp(logModelWeights2))
 idr2["log10TS_z8"], idr2["log10TK_z8"], idr2["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=8))
 idr2["log10TS_z10"], idr2["log10TK_z10"], idr2["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=10))
 
+
+root = "idr2_old_chains_final2/run_IDR2_old"
+idr2old = anesthetic.anesthetic.samples.NestedSamples(root=root, columns=[*paramNames_RadLyA, *["ll"+str(i) for i in range(6)]])
+idr2old.tex = texDict
+
+root = "idr2_orig_chains_final2/run_IDR2_orig"
+idr2orig = anesthetic.anesthetic.samples.NestedSamples(root=root)
+idr2orig.tex = texDict
+
+root = "idr3_old_chains_final2/run_IDR3_old"
+idr3old = anesthetic.anesthetic.samples.NestedSamples(root=root, columns=[*paramNames_RadLyA, *["ll"+str(i) for i in range(10)]])
+idr3old.tex = texDict
+#idr2["log10TS_z8"], idr2["log10TK_z8"], idr2["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=8))
+#idr2["log10TS_z10"], idr2["log10TK_z10"], idr2["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=10))
+
+
 print("=== Making priors ===")
 psamples = []; plogModelWeights= []
 for i in range(51):
@@ -229,7 +245,21 @@ yellow_line_Xray2 = fastCL(idr3.log10fX, weights=idr3.weights, method="lower-lim
 yellow_line_radio = fastCL(idr3["log10Fr"], weights=idr3.weights)[1]
 yellow_line_radio2 = fastCL(idr3["log10Fr"], weights=idr3.weights, method="upper-limit")
 
-print(10**fastCL(idr2.log10fX, weights=idr2.weights)[0])
+print("f_X >")
+print("      {0:.2f}".format(10**fastCL(idr2.log10fX, weights=idr2.weights)[0]), "(full idr2 new models)")
+print("      {0:.2f}".format(10**fastCL(idr2old.log10fX, weights=idr2old.weights)[0]), "(full idr2 old models)")
+print("      {0:.2f}".format(10**fastCL(idr2orig.log10fX, weights=idr2orig.weights)[0]), "(orig idr2 old models)")
+print("      {0:.2f}".format(10**fastCL(idr3.log10fX, weights=idr3.weights)[0]), "(full idr3 new models)")
+print("      {0:.2f}".format(10**fastCL(idr3old.log10fX, weights=idr3old.weights)[0]), "(full idr3 old models)")
+
+print("f_r <")
+print("      {0:.2f}".format(10**fastCL(idr2.log10Fr, weights=idr2.weights)[1]), "(full idr2 new models)")
+print("      {0:.2f}".format(10**fastCL(idr2old.log10Fr, weights=idr2old.weights)[1]), "(full idr2 old models)")
+print("      {0:.2f}".format(10**fastCL(idr2orig.log10Fr, weights=idr2orig.weights)[1]), "(orig idr2 old models)")
+print("      {0:.2f}".format(10**fastCL(idr3.log10Fr, weights=idr3.weights)[1]), "(full idr3 new models)")
+print("      {0:.2f}".format(10**fastCL(idr3old.log10Fr, weights=idr3old.weights)[1]), "(full idr3 old models)")
+
+print()
 print(10**fastCL(idr3.log10fX, weights=idr3.weights)[0])
 
 print(10**fastCL(idr2.log10Fr, weights=idr2.weights)[1])
@@ -252,6 +282,9 @@ print("=== Corner plots -- check if look different from before ===")
 
 fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
 idr2.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "red"})
+idr3old.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "cyan"})
+idr2old.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "orange"})
+idr2orig.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "yellow"})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 # Yellow band

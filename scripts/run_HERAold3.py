@@ -92,6 +92,6 @@ if True:
     polychordnames = []
     for p in paramNames:
         polychordnames.append((p, texDict[p][1:-1]))
-    for i in range(nDerived - 6):
+    for i in range(nDerived):
         polychordnames.append(("logL"+str(i), r"\log L"+str(i)))
     output.make_paramnames_files(polychordnames)
