@@ -37,7 +37,7 @@ print("=== Loading chains ===")
 
 samples = []; logModelWeights= []
 for i in range(51):
-    root = "idr3_chains_final2/run_IDR3_{:02}".format(i)
+    root = "data/chains/idr3_chains_final2/run_IDR3_{:02}".format(i)
     #root = "/data/camHPC/May22/21cm_powerspectra_analysis/chains2/run_{:02}".format(i)
     tmp = anesthetic.anesthetic.samples.NestedSamples(root=root)
     #, columns=columns
@@ -52,7 +52,7 @@ idr3["log10TS_z10"], idr3["log10TK_z10"], idr3["log10TR_z10"] = np.log10(TS_TK_T
 
 samples2 = []; logModelWeights2= []
 for i in range(51):
-    root = "idr2_chains_final2/run_IDR2_{:02}".format(i)
+    root = "data/chains/idr2_chains_final2/run_IDR2_{:02}".format(i)
     tmp = anesthetic.anesthetic.samples.NestedSamples(root=root)
     tmp.tex = texDict
     tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
@@ -64,15 +64,15 @@ idr2["log10TS_z8"], idr2["log10TK_z8"], idr2["log10TR_z8"] = np.log10(TS_TK_Trad
 idr2["log10TS_z10"], idr2["log10TK_z10"], idr2["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=10))
 
 
-root = "idr2_old_chains_final2/run_IDR2_old"
+root = "data/chains/idr2_old_chains_final2/run_IDR2_old"
 idr2old = anesthetic.anesthetic.samples.NestedSamples(root=root, columns=[*paramNames_RadLyA, *["ll"+str(i) for i in range(6)]])
 idr2old.tex = texDict
 
-root = "idr2_orig_chains_final2/run_IDR2_orig"
+root = "data/chains/idr2_orig_chains_final2/run_IDR2_orig"
 idr2orig = anesthetic.anesthetic.samples.NestedSamples(root=root)
 idr2orig.tex = texDict
 
-root = "idr3_old_chains_final2/run_IDR3_old"
+root = "data/chains/idr3_old_chains_final2/run_IDR3_old"
 idr3old = anesthetic.anesthetic.samples.NestedSamples(root=root, columns=[*paramNames_RadLyA, *["ll"+str(i) for i in range(10)]])
 idr3old.tex = texDict
 #idr2["log10TS_z8"], idr2["log10TK_z8"], idr2["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=8))
@@ -96,9 +96,7 @@ prior["log10TS_z8"], prior["log10TK_z8"], prior["log10TR_z8"] = np.log10(TS_TK_T
 prior["log10TS_z10"], prior["log10TK_z10"], prior["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(prior, z=10))
 
 # Save to files
-idr3.to_hdf("idr3.h5","idr3")
 idr3.reset_index().to_feather("non-public/idr3.feather")
-prior.to_hdf("prior.h5","prior")
 prior.reset_index().to_feather("non-public/prior.feather")
 
 
@@ -110,16 +108,23 @@ np.save("non-public/punchline_TS_TR_idr3.npy", save_npy_dict)
 
 save_npy_dict = {}
 for key in ["log10TS_z8", "log10TR_z8", "log10TS_z10", "log10TR_z10", "weights"]:
+    save_npy_dict[key] = np.array(idr2.weights) if key=="weights" else np.array(idr2[key])
+np.save("non-public/punchline_TS_TR_idr2.npy", save_npy_dict)
+
+save_npy_dict = {}
+for key in ["log10TS_z8", "log10TR_z8", "log10TS_z10", "log10TR_z10", "weights"]:
     save_npy_dict[key] = np.array(prior.weights) if key=="weights" else np.array(prior[key])
 np.save("non-public/punchline_TS_TR_prior.npy", save_npy_dict)
 
 ## Demo code for Jordan
 #import numpy as np
 #import matplotlib.pyplot as plt
-#s = np.load("TS_TR_weights_idr3.npy", allow_pickle=True).item()
-#p = np.load("TS_TR_weights_prior.npy", allow_pickle=True).item()
-#plt.hist(p["log10TS_z10"]-p["log10TR_z10"], weights=p["weights"], bins=100, alpha=0.5, density=True)
-#plt.hist(s["log10TS_z10"]-s["log10TR_z10"], weights=s["weights"], bins=100, alpha=0.5, density=True)
+#s = np.load("non-public/punchline_TS_TR_idr3.npy", allow_pickle=True).item()
+#s2 = np.load("non-public/punchline_TS_TR_idr2.npy", allow_pickle=True).item()
+#p = np.load("non-public/punchline_TS_TR_prior.npy", allow_pickle=True).item()
+#plt.hist(p["log10TS_z10"]-p["log10TR_z10"], weights=p["weights"], bins=100, alpha=0.5, density=True, histtype="step")
+#plt.hist(s["log10TS_z10"]-s["log10TR_z10"], weights=s["weights"], bins=100, alpha=0.5, density=True, histtype="step")
+#plt.hist(s2["log10TS_z10"]-s2["log10TR_z10"], weights=s2["weights"], bins=100, alpha=0.5, density=True, histtype="step")
 #plt.show()
 
 

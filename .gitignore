@@ -1,5 +1,6 @@
-# Models (just too large)
+# Models and Chains (just too large)
 data/models_21cmSim
+data/chains
 # Emulators (lots of them, only add selectively)
 data/trained_emulators_poweremu
 # Non-public HERA data
