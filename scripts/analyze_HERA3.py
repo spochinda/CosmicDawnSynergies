@@ -50,6 +50,19 @@ idr3 = mergeAnesthetic(samples, weights=np.exp(logModelWeights))
 idr3["log10TS_z8"], idr3["log10TK_z8"], idr3["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr3, z=8))
 idr3["log10TS_z10"], idr3["log10TK_z10"], idr3["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr3, z=10))
 
+samples2 = []; logModelWeights2= []
+for i in range(51):
+    root = "idr2_chains_final2/run_IDR2_{:02}".format(i)
+    tmp = anesthetic.anesthetic.samples.NestedSamples(root=root)
+    tmp.tex = texDict
+    tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
+    samples2.append(tmp)
+    logModelWeights2.append(tmp.logZ()+np.log(numinPrior(i)*powerIndPrior))
+    print("LogZ(",i,") =", tmp.logZ())
+idr2 = mergeAnesthetic(samples2, weights=np.exp(logModelWeights2))
+idr2["log10TS_z8"], idr2["log10TK_z8"], idr2["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=8))
+idr2["log10TS_z10"], idr2["log10TK_z10"], idr2["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=10))
+
 print("=== Making priors ===")
 psamples = []; plogModelWeights= []
 for i in range(51):
@@ -216,6 +229,12 @@ yellow_line_Xray2 = fastCL(idr3.log10fX, weights=idr3.weights, method="lower-lim
 yellow_line_radio = fastCL(idr3["log10Fr"], weights=idr3.weights)[1]
 yellow_line_radio2 = fastCL(idr3["log10Fr"], weights=idr3.weights, method="upper-limit")
 
+print(10**fastCL(idr2.log10fX, weights=idr2.weights)[0])
+print(10**fastCL(idr3.log10fX, weights=idr3.weights)[0])
+
+print(10**fastCL(idr2.log10Fr, weights=idr2.weights)[1])
+print(10**fastCL(idr3.log10Fr, weights=idr3.weights)[1])
+
 print("Exclude at 68% CL:")
 print("  F_r > {0:.0f}".format(10**yellow_line_radio))
 #print("  F_r > {0:.0f}".format(10**yellow_line_radio2))
@@ -231,7 +250,8 @@ print("=== Corner plots -- check if look different from before ===")
 
 # Here are 3 blocks for the 3 sizes of the figure:
 
-fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
+fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+idr2.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "red"})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 # Yellow band
@@ -255,6 +275,7 @@ for key in ax.keys():
 lower_ax = pd.DataFrame(lower_ax)
 # KDE lines for lower part
 idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=3000)
+idr2.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'red', "facecolor":None}, ncompress=3000)
 # Decorations
 handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
 fig.set_size_inches(5,4)
@@ -277,7 +298,7 @@ plt.show()
 
 
 
-fig, ax = idr3.plot_2d(["log10fStar", "log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
+fig, ax = idr3.plot_2d(["log10fStar", "log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
@@ -320,7 +341,7 @@ plt.show()
 
 
 
-fig, ax = idr3.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
+fig, ax = idr3.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
