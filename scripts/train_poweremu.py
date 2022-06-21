@@ -25,7 +25,10 @@ h=0.6704
 ## These models are without RSDs (9927+800-26):
 PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", model_type="Fr", model_generation="new")
 Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", model_type="Fr", model_generation="new")
-Pk_noRSD_Itamar, [PT] = remove_powerspectra_nans(Pk, [PT])
+Trad = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Trad", key="Tradout", model_type="Fr", model_generation="new")
+TK = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="TK", model_type="Fr", model_generation="new")
+T21 = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="T21", model_type="Fr", model_generation="new")
+Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21])
 PL_noRSD_Itamar = PT9_to_PL5(PT)
 ## And these with RSDs (2181-6):
 PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", endings=["fRad_RSDrand"], middle=None, key="PTout")
@@ -68,32 +71,31 @@ def score(emu, test_x, test_y):
 #emu07a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_June06_adaptive.pkl",preprocesss_log_x=False)
 #emu08f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025.pkl",preprocesss_log_x=False)
 #emu09f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025_v2.pkl",preprocesss_log_x=False)
-emu10m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl",preprocesss_log_x=False)
-## (100, 30, 10, 5) layers, with adaptive (SGD) or constant (Adam) learning rates
-#emu_c = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_constant.pkl",preprocesss_log_x=False)
-#emu_a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_adaptive.pkl",preprocesss_log_x=False)
-#emu_f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-emu_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-#emu_m2 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_evenmorez_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-#emu_m3 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m3_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-emu_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
 
-TS_emu0 = poweremu(loadfile="data/trained_emulators_poweremu/TS_emu_Sims_prelim_v2_31.05.2022.pkl", preprocesss_log_x=False)
-TK_emu0 = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_Sims_prelim_v2_31.05.2022.pkl", preprocesss_log_x=False, offset=1e-3)
-TR_emu0 = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_Sims_prelim_v2_31.05.2022.pkl", preprocesss_log_x=False, offset=1e-3)
+# HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
+Pk_emu_m_Sims = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl",preprocesss_log_x=False)
 
-TS_emu1 = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m1.pkl", preprocesss_log_x=False)
-TK_emu1 = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m1.pkl", preprocesss_log_x=False, offset=1e-3)
-TR_emu1 = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m1.pkl", preprocesss_log_x=False, offset=1e-3)
+# Fixed to z=8 and k=0.192
+Pk_emu_RadLyA_fixed = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+# HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
+Pk_emu_RadLyA_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+# SARAS-range zlow=7, zhigh=31, klow=0.1, khigh=0.5
+Pk_emu_RadLyA_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
 
-TS_emu2 = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m2.pkl", preprocesss_log_x=False, offset=1e-3)
-TK_emu2 = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m2.pkl", preprocesss_log_x=False, offset=1e-3)
-TR_emu2 = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m2.pkl", preprocesss_log_x=False, offset=1e-3)
+# T-range: z = 6..36
+TS_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TK_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+# T-range: z = 6..36
+TK_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+
 
 # Training data
 #model_generation = "Sims"
 #model_generation = "RadLyA"
-model_generation = "TS"
+#model_generation = "TS" "TK" "TR" for Sims
+model_generation = "TempRadLyA" #with manually setting TK or TR
 
 if model_generation == "Sims":
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
@@ -140,6 +142,23 @@ elif model_generation == "RadLyA":
     plt.hist(score(emu_f, ptest_x, ptest_y), bins=100, alpha=0.5, range=(-0.7, 0.4), label="Emulator for 'all' k and z")
     plt.legend()
     plt.show()
+elif model_generation == "TempRadLyA":
+    #T = Trad_noRSD_Itamar[:,:31]
+    #T = TK_noRSD_Itamar[:,:31]
+    T = T21_noRSD_Itamar[:,:31]
+    print(np.shape(T))
+    print(np.shape(PL_noRSD_Itamar))
+    zarr = z_array[:31]
+    mask = np.all(np.logical_not(np.logical_or(np.isnan(T), T==0)), axis=-1)
+    print("Using", np.sum(mask), "out of", len(mask), "samples")
+    print("Defaults zlow=6, zhigh=31")
+    print("with zarr in", np.min(zarr), np.max(zarr))
+    PL_train, PL_test, T_train, T_test = train_test_split(PL_noRSD_Itamar[mask], T[mask], test_size=0.2, random_state=42)
+    train_x, train_y = gen_training_1d(1000, PL_train, T_train, zarr=zarr)
+    ptrain_x, ptrain_y = gen_training_1d(1, PL_train, T_train, fix_z=8, zarr=zarr)
+    test_x, test_y = gen_training_1d(10, PL_test, T_test, seed=0, zarr=zarr)
+    ptest_x, ptest_y = gen_training_1d(1, PL_test, T_test, seed=1, fix_z=8, zarr=zarr)
+    pass
 else:
     key = model_generation
     print("Training key", key)
@@ -176,9 +195,16 @@ emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
     max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
     tol=0.00001, offset=1e-3)
     # currently m2 converged runs forgot offset! Otherwise really good after ~75 it (TS)
+    # emu_m3_converged done
+    #emu.save("data/trained_emulators_poweremu/"+key+"emu_m3_converged.pkl")
 
-emu.train(train_x, train_y)
-emu.save("data/trained_emulators_poweremu/"+key+"emu_m3_converged.pkl")
+#T21
+emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
+    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
+    tol=0.00001, offset=1e-3, preprocess_y=False)
+#emu.train(train_x, train_y)
+#emu.save("data/trained_emulators_poweremu/TK_emu_RayLyA_v1_unconverged.pkl")
+# v1 converged: Good models with 
 
 ## Constant
 #emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam")
