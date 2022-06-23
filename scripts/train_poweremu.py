@@ -158,7 +158,7 @@ elif model_generation == "TempRadLyA":
     ptrain_x, ptrain_y = gen_training_1d(1, PL_train, T_train, fix_z=8, zarr=zarr)
     test_x, test_y = gen_training_1d(10, PL_test, T_test, seed=0, zarr=zarr)
     ptest_x, ptest_y = gen_training_1d(1, PL_test, T_test, seed=1, fix_z=8, zarr=zarr)
-    pass
+    # Always no RSD
 else:
     key = model_generation
     print("Training key", key)
