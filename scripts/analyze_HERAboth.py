@@ -136,20 +136,29 @@ prior["log10fsfX"]=prior["log10fStar"]+prior["log10fX"]
 prior["log10fsfR"]=prior["log10fStar"]+prior["log10Fr"]
 idr3["log10fsfX"]=idr3["log10fStar"]+idr3["log10fX"]
 idr3["log10fsfR"]=idr3["log10fStar"]+idr3["log10Fr"]
+idr2["log10fsfX"]=idr2["log10fStar"]+idr2["log10fX"]
+idr2["log10fsfR"]=idr2["log10fStar"]+idr2["log10Fr"]
 
 print("Correcting weights to account for non-flat prior, might take a while (~ 10mins)")
 venn_corrected_idr3 = anesthetic.samples.MCMCSamples(idr3.copy())
+venn_corrected_idr2 = anesthetic.samples.MCMCSamples(idr2.copy())
 priorpdf = [sum_pdf_2d(venn_corrected_idr3.iloc[i]["log10fsfX"], venn_corrected_idr3.iloc[i]["log10fsfR"], -5,3, -1,6, -5,-0.3) for i in range(len(venn_corrected_idr3))]
+priorpdf2 = [sum_pdf_2d(venn_corrected_idr2.iloc[i]["log10fsfX"], venn_corrected_idr2.iloc[i]["log10fsfR"], -5,3, -1,6, -5,-0.3) for i in range(len(venn_corrected_idr2))]
 print("Done.")
 # Make sure to not divide by 0
 assert not np.any(np.array(priorpdf)<1e-10)
+assert not np.any(np.array(priorpdf2)<1e-10)
 venn_corrected_idr3.importance_sample(-np.log(priorpdf), inplace=True)
+venn_corrected_idr2.importance_sample(-np.log(priorpdf2), inplace=True)
 # Formatting
-venn_corrected_idr3.limits = {}
 prior.tex["log10fsfX"] = r"$\log_{10} f_{\rm star}\cdot f_X$"
 prior.tex["log10fsfR"] = r"$\log_{10} f_{\rm star}\cdot f_r$"
+venn_corrected_idr3.limits = {}
+venn_corrected_idr2.limits = {}
 venn_corrected_idr3.tex["log10fsfX"] = r"$\log_{10} f_{\rm star}\cdot f_X$"
 venn_corrected_idr3.tex["log10fsfR"] = r"$\log_{10} f_{\rm star}\cdot f_r$"
+venn_corrected_idr2.tex["log10fsfX"] = r"$\log_{10} f_{\rm star}\cdot f_X$"
+venn_corrected_idr2.tex["log10fsfR"] = r"$\log_{10} f_{\rm star}\cdot f_r$"
 
 # Code to make the info-plot
 #idr3.label="Old Posterior"
@@ -164,6 +173,7 @@ venn_corrected_idr3.tex["log10fsfR"] = r"$\log_{10} f_{\rm star}\cdot f_r$"
 
 # Code to make paper-plot
 venn_corrected_idr3.label=None
+venn_corrected_idr2.label=None
 # Make 2d contour plot
 fig, ax = venn_corrected_idr3.plot_2d(["log10fsfX", "log10fsfR"], alpha=1, types={"lower": "kde"}, facecolor=None, lw=2, color="k")
 fig.set_size_inches(8,6)
@@ -171,11 +181,13 @@ fig.set_size_inches(8,6)
 lineA = ((((fig.axes[0].collections[0].get_paths()[0]).vertices.T)))
 lineB = ((((fig.axes[0].collections[1].get_paths()[0]).vertices.T)))
 # Draw the exclusion plots correspondingly, here "region that lies outside of the HERA 1-sigma contour"
-ax.log10fsfX.log10fsfR.fill_between(lineB[0], y1=lineB[1], y2=10*np.ones(len(lineB[0])), where=lineB[1]>-1, color=ccb[-1], alpha=1, label="Excluded by HERA (this work)\nat >68% confidence")
+ax.log10fsfX.log10fsfR.fill_between(lineB[0], y1=lineB[1], y2=10*np.ones(len(lineB[0])), where=lineB[1]>-1, color="pink", alpha=1, label="Excluded by HERA (this work)\nat >68% confidence")
 # fill_between didn't do the left hand side automatically so do this manually:
-ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-5,10,100), x1=-10, x2=-3, alpha=1, color=ccb[-1])
+ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-5,10,100), x1=-10, x2=-3, alpha=1, color="pink")
 # And new the region that lies outside of HERA 2-sigma contour
-ax.log10fsfX.log10fsfR.fill_between(lineA[0], y1=lineA[1], y2=10*np.ones(len(lineA[0])), where=lineA[1]>-1, color=ccb[0], alpha=1, label="at >95% confidence")
+ax.log10fsfX.log10fsfR.fill_between(lineA[0], y1=lineA[1], y2=10*np.ones(len(lineA[0])), where=lineA[1]>-1, color="purple", alpha=1, label="at >95% confidence")
+# IDR2
+venn_corrected_idr2.plot_2d(ax, alpha=1, types={"lower": "kde"}, facecolor="none", lw=2, color="red", label="IDR2")
 # Formatting and axis labels
 ax.log10fsfX.log10fsfR.set_xlim(-6,2)
 ax.log10fsfX.log10fsfR.set_ylim(0,5)
@@ -184,11 +196,11 @@ ax.log10fsfX.log10fsfR.set_yticks(np.linspace(0,5,6), [r"$10^0$", r"$10^1$", r"$
 ax.log10fsfX.log10fsfR.set_xlabel(r"$f_{\rm star} \cdot f_X$")
 ax.log10fsfX.log10fsfR.set_xlabel(r"$f_{\rm star} \cdot f_{\rm r}}$")
 # LWA, with numbers read off from plot -- compare to old HERA paper but slightly more conservative taking the 2-sigma levels from LWA and Chandra
-ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, hatch="/", color=ccb[1], fc=(1,1,1,0), lw=2)
-ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, alpha=0.5, color=ccb[1], label="Exceeds LWA extra-galactic\n radio background today", lw=2)
+ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, hatch="/", color="orange", fc=(1,1,1,0), lw=2)
+ax.log10fsfX.log10fsfR.fill_between(np.linspace(-10,10, 10), np.log10(2e3), 7, alpha=0.5, color="orange", label="Exceeds LWA extra-galactic\n radio background today", lw=2)
 # Original limit (~1) computed with total 0.5–2 keV CXRB flux 8.15 erg cm−2 s−1, errorbar is 8.15 ± 0.58, scale up since fX proportional to X-Ray Background
-ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, hatch="\\", color=ccb[4], fc=(1,1,1,0), lw=2)
-ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, alpha=0.5, color=ccb[4], label="Exceeds Chandra unresolved extra-\ngalactic X-ray background today", lw=2)
+ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, hatch="\\", color="blue", fc=(1,1,1,0), lw=2)
+ax.log10fsfX.log10fsfR.fill_betweenx(np.linspace(-10,10, 10), np.log10(1*1.142), 5, alpha=0.5, color="blue", label="Exceeds Chandra unresolved extra-\ngalactic X-ray background today", lw=2)
 fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels(), loc="lower right", bbox_to_anchor=(0,0.1,1,1))
 plt.tight_layout()
 plt.savefig("non-public/HERA_IDR3_LWA_Chandra.pdf")

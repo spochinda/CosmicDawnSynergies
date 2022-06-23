@@ -1,130 +1,141 @@
-from codes.emulator_poweremu import *
-from codes.likelihood_hera import *
-from codes.loader_21cmSim import *
-from codes.plotlibs import *
-from codes.tools import *
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.ticker import AutoMinorLocator
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib as mpl
+import matplotlib.cm as cm
+import matplotlib.colors as mpc
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import seaborn as sns
+ccb = sns.color_palette("colorblind")
+# Matplotlib settings
+params = {'legend.fontsize':  12,
+          'figure.figsize': (6, 5),
+         'axes.labelsize':  14,
+         'axes.titlesize': 14,
+         'xtick.labelsize': 12,
+         'ytick.labelsize': 12}
+plt.rcParams.update(params)
+
 import pandas as pd
 import anesthetic
+import numpy as np
+import scipy.interpolate as sip
+import scipy.optimize as sop
+import scipy.integrate as sin
+from copy import deepcopy
+
+def trapezoidal_bump(a,b,c,d, peak=1):
+    return sip.interp1d([a,b,c,d], [0,peak,peak,0], fill_value=(0,0), bounds_error=False)
+
+def sum_pdf_1d(alpha, xmin, xmax, ymin, ymax):
+    # PDF for alpha which is the sum of two uniformly distributed
+    # random variables x and y, alpha = x + y
+    a = xmin+ymin
+    b = ymin+xmax#np.minimum(xmin+ymax, ymin+xmax)
+    c = xmin+ymax#np.maximum(xmin+ymax, ymin+xmax)
+    d = xmax+ymax
+    f = trapezoidal_bump(a,b,c,d)
+    norm = sin.quad(f,a,d)[0]
+    return f(alpha)/norm
+
+def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
+    # 2D PDF in (alpha, beta) where the alpha = x + z and beta = y + z
+    # where x, y and z are uniformly distributed random variables.
+    # Approach to calculate this: Compute the beta-1d-pdf for every alpha:
+    # There are (up to) 5 distinct regimes. Use empirical formulas. Proof: Todo.
+    alphamin = xmin+zmin 
+    betamin = ymin+zmin
+    alphamax = xmax+zmax
+    betamax = ymax+zmax
+    alphalow = np.minimum(xmax+zmin, xmin+zmax)
+    alphaup = np.maximum(xmax+zmin, xmin+zmax)
+    betalow = np.minimum(ymax+zmin, ymin+zmax)
+    betaup = np.maximum(ymax+zmin, ymin+zmax)
+    p1_prelim = xmax+zmin
+    p2_prelim = xmin+zmax
+    if p1_prelim>p2_prelim:
+        yellow = "rect"
+    else:
+        yellow = "diag"
+    if debug:
+        print("yellow =", yellow)
+    p1 = np.minimum(p1_prelim, p2_prelim)
+    p2 = np.maximum(p1_prelim, p2_prelim)
+    if debug:
+        print("p1", p1)
+        print("p2", p2)
+        print("alphamin", alphamin)
+    overallnorm = trapezoidal_bump(alphamin, p1, p2, alphamax)(alpha)
+    if yellow=="rect":
+        a = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin, betamin, betalow], fill_value=0, bounds_error=False)(alpha)
+        b = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betalow, betalow, betalow], fill_value=0, bounds_error=False)(alpha)
+        c = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betaup, betaup, betaup, betamax], fill_value=0, bounds_error=False)(alpha)
+        d = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betaup, betamax, betamax, betamax], fill_value=0, bounds_error=False)(alpha)
+        if debug:
+            print("a,b,c,d", a,b,c,d)
+        overallnorm = trapezoidal_bump(alphamin, alphalow, alphaup, alphamax)(alpha)
+        return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
+    elif yellow=="diag":
+        assert betalow+(alphaup-alphamin) == betamax
+        a = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin, betamin+(alphaup-alphalow), betamin+(alphamax-alphalow)], fill_value=0, bounds_error=False)(alpha)
+        b = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin+(alphalow-alphamin), betamin+(alphaup-alphamin), betamin+(alphaup-alphamin)], fill_value=0, bounds_error=False)(alpha)
+        c = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betalow, betalow, betalow+(alphaup-alphalow), betalow+(alphamax-alphalow)], fill_value=0, bounds_error=False)(alpha)
+        d = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betalow, betalow+(alphalow-alphamin), betalow+(alphaup-alphamin), betalow+(alphaup-alphamin)], fill_value=0, bounds_error=False)(alpha)
+        overallnorm = trapezoidal_bump(alphamin, alphalow, alphaup, alphamax)(alpha)
+        return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
+    else:
+        assert False, yellow
+
+def powerInd_and_numin_from_index(index):
+    powerInds = [1, 1.3, 1.5]
+    numins = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0]
+    powerInd = powerInds[int(index/len(numins))]
+    numin = numins[index % len(numins)]
+    return powerInd, numin
+
+paramNames_Sims_poly = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
+paramNames_Sims_full = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "powerInd", "numin", "tau", "log10Fr"]
+priorDict_Sims = {
+             "Rmfp": [10, 70],
+             "log10fStar": [-4, np.log10(0.5)],
+             "log10Vc": [np.log10(4.2), 2],
+             "log10fX": [-5, 3],
+             "powerInd": [1, 1.3, 1.5], #discrete
+             "numin": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 3.0], #discrete
+             "tau": [0.02, 0.1],
+             "log10Fr": [-1, 6]}
 
 paramNames = paramNames_Sims_poly
 nDerived = 2*5
 nDims = len(paramNames)
 
-TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
-TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
-TR_emu = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
-
-def TS_TK_Trad_from_emulators(df, z=8):
-    emuCols = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "powerInd", "numin", "tau", "log10Fr"]
-    s = np.shape(df)
-    arr = np.empty([s[0],len(emuCols)+1])
-    arr[:,0] = z
-    arr[:,1:] = df[emuCols]
-    TS = TS_emu.predict(arr)
-    TK = TK_emu.predict(arr)
-    TR = TR_emu.predict(arr)
-    return TS, TK, TR
-
-def mergeAnesthetic(prior_samples, weights=None):
-    merge_prior = anesthetic.samples.merge_samples_weighted(prior_samples, weights=weights)
-    merge_prior = merge_prior.reset_index().set_index("weights", append=True).drop(columns="#")
-    merge_prior.index.set_names(["#", "weights"], inplace=True)
-    return merge_prior
-
 print("=== Loading chains ===")
-# Old samples need to pass `columns` manually, should be automatic in new run
-#columns = [*paramNames, *["ll"+str(i) for i in range(10)]]
+tmp = pd.read_feather("non-public/idr3.feather")
+idr3 = anesthetic.samples.MCMCSamples(tmp, weights=tmp.weights)
+tmp = pd.read_feather("non-public/prior.feather")
+prior = anesthetic.samples.MCMCSamples(tmp, weights=tmp.weights)
 
-samples = []; logModelWeights= []
-for i in range(51):
-    root = "data/chains/idr3_chains_final2/run_IDR3_{:02}".format(i)
-    #root = "/data/camHPC/May22/21cm_powerspectra_analysis/chains2/run_{:02}".format(i)
-    tmp = anesthetic.anesthetic.samples.NestedSamples(root=root)
-    #, columns=columns
-    tmp.tex = texDict
-    tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
-    samples.append(tmp)
-    logModelWeights.append(tmp.logZ()+np.log(numinPrior(i)*powerIndPrior))
-    print("LogZ(",i,") =", tmp.logZ())
-idr3 = mergeAnesthetic(samples, weights=np.exp(logModelWeights))
-idr3["log10TS_z8"], idr3["log10TK_z8"], idr3["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr3, z=8))
-idr3["log10TS_z10"], idr3["log10TK_z10"], idr3["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr3, z=10))
-
-samples2 = []; logModelWeights2= []
-for i in range(51):
-    root = "data/chains/idr2_chains_final2/run_IDR2_{:02}".format(i)
-    tmp = anesthetic.anesthetic.samples.NestedSamples(root=root)
-    tmp.tex = texDict
-    tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
-    samples2.append(tmp)
-    logModelWeights2.append(tmp.logZ()+np.log(numinPrior(i)*powerIndPrior))
-    print("LogZ(",i,") =", tmp.logZ())
-idr2 = mergeAnesthetic(samples2, weights=np.exp(logModelWeights2))
-idr2["log10TS_z8"], idr2["log10TK_z8"], idr2["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=8))
-idr2["log10TS_z10"], idr2["log10TK_z10"], idr2["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=10))
-
-
-root = "data/chains/idr2_old_chains_final2/run_IDR2_old"
-idr2old = anesthetic.anesthetic.samples.NestedSamples(root=root, columns=[*paramNames_RadLyA, *["ll"+str(i) for i in range(6)]])
-idr2old.tex = texDict
-
-root = "data/chains/idr2_orig_chains_final2/run_IDR2_orig"
-idr2orig = anesthetic.anesthetic.samples.NestedSamples(root=root)
-idr2orig.tex = texDict
-
-root = "data/chains/idr3_old_chains_final2/run_IDR3_old"
-idr3old = anesthetic.anesthetic.samples.NestedSamples(root=root, columns=[*paramNames_RadLyA, *["ll"+str(i) for i in range(10)]])
-idr3old.tex = texDict
-#idr2["log10TS_z8"], idr2["log10TK_z8"], idr2["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=8))
-#idr2["log10TS_z10"], idr2["log10TK_z10"], idr2["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(idr2, z=10))
-
-
-print("=== Making priors ===")
-psamples = []; plogModelWeights= []
-for i in range(51):
-    print(i)
-    priordata = {}
-    for key in paramNames_Sims_poly:
-        priordata[key] = np.random.uniform(low=priorDict_Sims[key][0], high=priorDict_Sims[key][1], size=10000)
-    tmp = anesthetic.samples.MCMCSamples(priordata)
-    tmp.tex = texDict
-    tmp["powerInd"], tmp["numin"] = powerInd_and_numin_from_index(i)
-    psamples.append(tmp)
-    plogModelWeights.append(np.log(numinPrior(i)*powerIndPrior))
-prior = mergeAnesthetic(psamples, weights=np.exp(plogModelWeights))
-prior["log10TS_z8"], prior["log10TK_z8"], prior["log10TR_z8"] = np.log10(TS_TK_Trad_from_emulators(prior, z=8))
-prior["log10TS_z10"], prior["log10TK_z10"], prior["log10TR_z10"] = np.log10(TS_TK_Trad_from_emulators(prior, z=10))
-
-# Save to files
-idr3.reset_index().to_feather("non-public/idr3.feather")
-prior.reset_index().to_feather("non-public/prior.feather")
-
-
-print("=== Save TS and TR data for Punchline plot ===")
-save_npy_dict = {}
-for key in ["log10TS_z8", "log10TR_z8", "log10TS_z10", "log10TR_z10", "weights"]:
-    save_npy_dict[key] = np.array(idr3.weights) if key=="weights" else np.array(idr3[key])
-np.save("non-public/punchline_TS_TR_idr3.npy", save_npy_dict)
-
-save_npy_dict = {}
-for key in ["log10TS_z8", "log10TR_z8", "log10TS_z10", "log10TR_z10", "weights"]:
-    save_npy_dict[key] = np.array(idr2.weights) if key=="weights" else np.array(idr2[key])
-np.save("non-public/punchline_TS_TR_idr2.npy", save_npy_dict)
-
-save_npy_dict = {}
-for key in ["log10TS_z8", "log10TR_z8", "log10TS_z10", "log10TR_z10", "weights"]:
-    save_npy_dict[key] = np.array(prior.weights) if key=="weights" else np.array(prior[key])
-np.save("non-public/punchline_TS_TR_prior.npy", save_npy_dict)
+#print("=== Save TS and TR data for Punchline plot ===")
+#save_npy_dict = {}
+#for key in ["log10TS_z8", "log10TR_z8", "log10TS_z10", "log10TR_z10", "weights"]:
+#    save_npy_dict[key] = np.array(idr3.weights) if key=="weights" else np.array(idr3[key])
+#np.save("non-public/punchline_TS_TR_idr3.npy", save_npy_dict)
+#
+#save_npy_dict = {}
+#for key in ["log10TS_z8", "log10TR_z8", "log10TS_z10", "log10TR_z10", "weights"]:
+#    save_npy_dict[key] = np.array(prior.weights) if key=="weights" else np.array(prior[key])
+#np.save("non-public/punchline_TS_TR_prior.npy", save_npy_dict)
 
 ## Demo code for Jordan
 #import numpy as np
 #import matplotlib.pyplot as plt
 #s = np.load("non-public/punchline_TS_TR_idr3.npy", allow_pickle=True).item()
-#s2 = np.load("non-public/punchline_TS_TR_idr2.npy", allow_pickle=True).item()
 #p = np.load("non-public/punchline_TS_TR_prior.npy", allow_pickle=True).item()
-#plt.hist(p["log10TS_z10"]-p["log10TR_z10"], weights=p["weights"], bins=100, alpha=0.5, density=True, histtype="step")
-#plt.hist(s["log10TS_z10"]-s["log10TR_z10"], weights=s["weights"], bins=100, alpha=0.5, density=True, histtype="step")
-#plt.hist(s2["log10TS_z10"]-s2["log10TR_z10"], weights=s2["weights"], bins=100, alpha=0.5, density=True, histtype="step")
+#plt.hist(p["log10TS_z10"]-p["log10TR_z10"], weights=p["weights"], bins=100, alpha=0.5, density=True)
+#plt.hist(s["log10TS_z10"]-s["log10TR_z10"], weights=s["weights"], bins=100, alpha=0.5, density=True)
+#plt.hist(p["log10TS_z8"]-p["log10TR_z8"], weights=p["weights"], bins=100, alpha=0.5, density=True)
+#plt.hist(s["log10TS_z8"]-s["log10TR_z8"], weights=s["weights"], bins=100, alpha=0.5, density=True)
 #plt.show()
 
 
@@ -221,10 +232,12 @@ def fastCL(samples, weights=None, level=0.68, method="iso-probability"):
     weights = np.ones(len(samples)) if weights is None else weights
     # Sort and normalize
     order = np.argsort(samples)
-    samples = samples[order]
-    weights = weights[order]/np.sum(weights)
+    samples = np.array(samples[order])
+    weights = np.array(weights[order]/np.sum(weights))
     # Compute inverse cumulative distribution function
-    CDF = np.append(np.insert(np.cumsum(weights), 0, 0), 1)
+    c = np.cumsum(weights)
+    i = np.insert(c, 0, 0)
+    CDF = np.append(i, 1)
     S = np.array([np.min(samples), *samples, np.max(samples)])
     invcdf = sip.interp1d(CDF, S)
     if method=="iso-probability":
@@ -250,26 +263,6 @@ yellow_line_Xray2 = fastCL(idr3.log10fX, weights=idr3.weights, method="lower-lim
 yellow_line_radio = fastCL(idr3["log10Fr"], weights=idr3.weights)[1]
 yellow_line_radio2 = fastCL(idr3["log10Fr"], weights=idr3.weights, method="upper-limit")
 
-print("f_X >")
-print("      {0:.2f}".format(10**fastCL(idr2.log10fX, weights=idr2.weights)[0]), "(full idr2 new models)")
-print("      {0:.2f}".format(10**fastCL(idr2old.log10fX, weights=idr2old.weights)[0]), "(full idr2 old models)")
-print("      {0:.2f}".format(10**fastCL(idr2orig.log10fX, weights=idr2orig.weights)[0]), "(orig idr2 old models)")
-print("      {0:.2f}".format(10**fastCL(idr3.log10fX, weights=idr3.weights)[0]), "(full idr3 new models)")
-print("      {0:.2f}".format(10**fastCL(idr3old.log10fX, weights=idr3old.weights)[0]), "(full idr3 old models)")
-
-print("f_r <")
-print("      {0:.2f}".format(10**fastCL(idr2.log10Fr, weights=idr2.weights)[1]), "(full idr2 new models)")
-print("      {0:.2f}".format(10**fastCL(idr2old.log10Fr, weights=idr2old.weights)[1]), "(full idr2 old models)")
-print("      {0:.2f}".format(10**fastCL(idr2orig.log10Fr, weights=idr2orig.weights)[1]), "(orig idr2 old models)")
-print("      {0:.2f}".format(10**fastCL(idr3.log10Fr, weights=idr3.weights)[1]), "(full idr3 new models)")
-print("      {0:.2f}".format(10**fastCL(idr3old.log10Fr, weights=idr3old.weights)[1]), "(full idr3 old models)")
-
-print()
-print(10**fastCL(idr3.log10fX, weights=idr3.weights)[0])
-
-print(10**fastCL(idr2.log10Fr, weights=idr2.weights)[1])
-print(10**fastCL(idr3.log10Fr, weights=idr3.weights)[1])
-
 print("Exclude at 68% CL:")
 print("  F_r > {0:.0f}".format(10**yellow_line_radio))
 #print("  F_r > {0:.0f}".format(10**yellow_line_radio2))
@@ -285,11 +278,7 @@ print("=== Corner plots -- check if look different from before ===")
 
 # Here are 3 blocks for the 3 sizes of the figure:
 
-fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
-idr2.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "red"})
-idr3old.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "cyan"})
-idr2old.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "orange"})
-idr2orig.plot_2d(ax, types={'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': "yellow"})
+fig, ax = idr3.plot_2d(["log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 # Yellow band
@@ -313,7 +302,6 @@ for key in ax.keys():
 lower_ax = pd.DataFrame(lower_ax)
 # KDE lines for lower part
 idr3.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'black', "facecolor":None}, ncompress=3000)
-idr2.plot_2d(lower_ax, types={'lower':'fastkde'}, lower_kwargs={"levels":[0.95, 0.68], "linestyles":['dashed', "dotted"], "color":'red', "facecolor":None}, ncompress=3000)
 # Decorations
 handles, labels = ax["log10fX"]["log10Fr"].get_legend_handles_labels()
 fig.set_size_inches(5,4)
@@ -336,7 +324,7 @@ plt.show()
 
 
 
-fig, ax = idr3.plot_2d(["log10fStar", "log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+fig, ax = idr3.plot_2d(["log10fStar", "log10fX", "log10Fr"], types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
@@ -379,7 +367,7 @@ plt.show()
 
 
 
-fig, ax = idr3.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0]})
+fig, ax = idr3.plot_2d(paramNames, types={'lower':'hist', 'diagonal':'kde'}, lower_kwargs={"bins": 20, 'color': ccb[0], "vmin":0, "zorder":-10, "rasterized":True}, diagonal_kwargs={'edgecolor': ccb[0], "ncompress": 3000})
 idr3.plot_2d(ax.loc[['log10fX'],['log10fX']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[['log10fStar'],['log10fStar']], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])
 idr3.plot_2d(ax.loc[["log10Fr"],["log10Fr"]], types={'diagonal':'kde'}, diagonal_kwargs={"edgecolor": ccb[0], "facecolor": 'grey'}, color=ccb[0], levels=[0.68])

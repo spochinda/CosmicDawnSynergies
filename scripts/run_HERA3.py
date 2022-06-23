@@ -56,16 +56,25 @@ texDict = {"Rmfp": r"$R_{\rm mfp}$",
 P = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl", tol=0, n_iter_no_change=99999, preprocesss_log_x=False)
 
 like_hera = likelihood(
-    datapath='data/observations_HERA_IDR2/pspec_h1c_idr2_field{}.h5',
+    datapath='data/observations_HERA_IDR3_final/Deltasq_Band_{1:}_Field_{0:}.h5',
     decimation_factor=2,
-    selections={"1": {"1": {"kstart":0.256}, "2": {"kstart":0.320}, "3": {"kstart":0.256}},
-                "2": {"1": {"kstart":0.192}, "2": {"kstart":0.192}, "3": {"kstart":0.256}}}
-)
-
+    selections = {"1": {
+            "D": {"kstart":0.356},
+            "C": {"kstart":0.356},
+            "B": {"kstart":0.294},
+            "E": {"kstart":0.417},
+            "A": {"kstart":0.417}
+        }, "2": {
+            "C": {"kstart":0.337},
+            "D": {"kstart":0.266},
+            "B": {"kstart":0.266},
+            "E": {"kstart":0.337},
+            "A": {"kstart":0.478}
+    }})
 
 
 paramNames = ["Rmfp", "log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
-nDerived = 2 * 3 + 6 #(selections, number of bands*fields, +6 temperature outputs)
+nDerived = 2 * 5 + 6 #(selections, number of bands*fields, +6 temperature outputs)
 nDims = len(paramNames)
 
 TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
@@ -106,8 +115,8 @@ def loglikelihood(p):
 
 
 settings = PolyChordSettings(nDims, nDerived)
-settings.base_dir = 'idr2_chains_final2'
-settings.file_root = 'run_IDR2_{:02}'.format(index)
+settings.base_dir = 'non-public/idr3_chains_final2'
+settings.file_root = 'run_IDR3_{:02}'.format(index)
 settings.nlive = 2000
 settings.do_clustering = True
 settings.read_resume = False

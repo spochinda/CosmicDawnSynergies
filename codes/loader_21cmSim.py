@@ -41,7 +41,7 @@ def load_files(path, name=None, model_type=None, model_generation=None, endings=
             print(path+name+middle+ending+".mat", "-->", len(tmp[-1]))
         except KeyError:
             print(loadmat(path+name+middle+ending+".mat").keys(), key)
-            raise KeyError
+            raise KeyError(key)
     params = np.concatenate(tmp)
     
     # In the synchrotron case, the definition of Ar varies between conventions.

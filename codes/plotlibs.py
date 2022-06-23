@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 ccb = sns.color_palette("colorblind")
 # Matplotlib settings
-params = {'legend.fontsize':  11,
+params = {'legend.fontsize':  12,
           'figure.figsize': (6, 5),
-         'axes.labelsize':  11,
-         'axes.titlesize': 11,
-         'xtick.labelsize': 9,
-         'ytick.labelsize': 9}
+         'axes.labelsize':  14,
+         'axes.titlesize': 14,
+         'xtick.labelsize': 12,
+         'ytick.labelsize': 12}
 plt.rcParams.update(params)

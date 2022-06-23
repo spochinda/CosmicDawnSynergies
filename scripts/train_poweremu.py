@@ -2,7 +2,7 @@ from codes.emulator_poweremu import *
 from codes.loader_21cmSim import *
 from codes.tools import *
 import matplotlib.pyplot as plt
-
+from copy import deepcopy
 # Redshift and k ranges used in data, and load params and powerspectra
 ## 21cmSim uses these redshifts for all outputs, except xHI.
 z_array = np.arange(6,50.01,1)
@@ -25,7 +25,10 @@ h=0.6704
 ## These models are without RSDs (9927+800-26):
 PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", model_type="Fr", model_generation="new")
 Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", model_type="Fr", model_generation="new")
-Pk_noRSD_Itamar, [PT] = remove_powerspectra_nans(Pk, [PT])
+Trad = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Trad", key="Tradout", model_type="Fr", model_generation="new")
+TK = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="TK", model_type="Fr", model_generation="new")
+T21 = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="T21", model_type="Fr", model_generation="new")
+Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21])
 PL_noRSD_Itamar = PT9_to_PL5(PT)
 ## And these with RSDs (2181-6):
 PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", endings=["fRad_RSDrand"], middle=None, key="PTout")
@@ -58,62 +61,43 @@ def score(emu, test_x, test_y):
 # Emulator architectures:
 ## We dit a lot of manual optimization previously:
 ## Also the first two here are for one specific SED only
-emu01 = poweremu(loadfile="data/trained_emulators_poweremu/Sims_data_v03_150it_23.02.2022.pkl",preprocesss_log_x=False)
-emu02 = poweremu(loadfile="data/trained_emulators_poweremu/PK_emu_Sims_prelim_v3_01.06.2022.pkl",preprocesss_log_x=False)
-emu03 = poweremu(loadfile="data/trained_emulators_poweremu/PK_all_emu_Sims_prelim_v4_01.06.2022.pkl",preprocesss_log_x=False)
+#emu01 = poweremu(loadfile="data/trained_emulators_poweremu/Sims_data_v03_150it_23.02.2022.pkl",preprocesss_log_x=False)
+#emu02 = poweremu(loadfile="data/trained_emulators_poweremu/PK_emu_Sims_prelim_v3_01.06.2022.pkl",preprocesss_log_x=False)
+#emu03 = poweremu(loadfile="data/trained_emulators_poweremu/PK_all_emu_Sims_prelim_v4_01.06.2022.pkl",preprocesss_log_x=False)
 ## But actually the automatic settings work just fine
-emu04 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto100100100.pkl",preprocesss_log_x=False)
-emu05 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto10030105_better.pkl",preprocesss_log_x=False)
-emu06 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto100505_better.pkl",preprocesss_log_x=False)
-emu07a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_June06_adaptive.pkl",preprocesss_log_x=False)
-emu08f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025.pkl",preprocesss_log_x=False)
-emu09f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025_v2.pkl",preprocesss_log_x=False)
-emu10m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl",preprocesss_log_x=False)
-## (100, 30, 10, 5) layers, with adaptive (SGD) or constant (Adam) learning rates
-emu_c = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_constant.pkl",preprocesss_log_x=False)
-emu_a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_RadLyA_June06_adaptive.pkl",preprocesss_log_x=False)
-emu_f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-emu_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-emu_m2 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_evenmorez_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-emu_m3 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m3_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-emu_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+#emu04 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto100100100.pkl",preprocesss_log_x=False)
+#emu05 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto10030105_better.pkl",preprocesss_log_x=False)
+#emu06 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto100505_better.pkl",preprocesss_log_x=False)
+#emu07a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_June06_adaptive.pkl",preprocesss_log_x=False)
+#emu08f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025.pkl",preprocesss_log_x=False)
+#emu09f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025_v2.pkl",preprocesss_log_x=False)
+
+# HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
+Pk_emu_m_Sims = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl",preprocesss_log_x=False)
+
+# Fixed to z=8 and k=0.192
+Pk_emu_RadLyA_fixed = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+# HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
+Pk_emu_RadLyA_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+# SARAS-range zlow=7, zhigh=31, klow=0.1, khigh=0.5
+Pk_emu_RadLyA_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+
+# T-range: z = 6..36
+TS_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TK_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+# T-range: z = 6..36
+TK_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 
 
 # Training data
 #model_generation = "Sims"
-model_generation = "RadLyA"
+#model_generation = "RadLyA"
+#model_generation = "TS" "TK" "TR" for Sims
+model_generation = "TempRadLyA" #with manually setting TK or TR
 
 if model_generation == "Sims":
-    #TODO
-    if False:
-        for key in ["TS", "TR", "TK"]:
-            x = PL_Sims
-            y = {"TS":TS_Sims, "TK":TK_Sims, "TR":Trad_Sims}[key][:,2]
-            mask = np.logical_not(np.logical_or(np.isnan(y), y==0))
-            print(key, "using", np.sum(mask), "out of", len(mask))
-            x_train, x_test, y_train, y_test = train_test_split(x[mask], y[mask], test_size=0.2, random_state=42)
-            print("min:", np.min(y[mask]))
-            loadfile = None if train else "emulator_poweremu/trained_emulators/"+key+"_emu_Sims_prelim_v2_31.05.2022.pkl"
-            emu = poweremu(loadfile=loadfile, tol=0, n_iter_no_change=99999, preprocesss_log_x=False, offset=1)
-            if train:
-                for i in range(10):
-                    emu.train(x_train, y_train)
-            y_pred = emu.predict(x_test)
-            plt.scatter(y_test, y_pred)
-            plt.loglog()
-            plt.ylabel("Pred")
-            plt.xlabel("Test")
-            plt.figure()
-            limit95 = 10**confidence_level(np.log10(y_test/y_pred), level=0.95)
-            plt.hist(np.log10(y_test/y_pred), bins=50, label="95% samples within +{1:.0f} / {0:.0f} % of true".format(*(100*(limit95-1))))
-            plt.xlabel("log10(Test/Pred)")
-            plt.legend()
-            plt.show()
-            if train:
-               emu.save("emulator_poweremu/trained_emulators/"+key+"_emu_Sims_prelim_v2_31.05.2022.pkl")
-
-
-elif model_generation == "Sims":
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
     PL_Sims_train, PL_Sims_test, Pk_Sims_train, Pk_Sims_test = train_test_split(PL_Sims, Pk_Sims, test_size=0.2, random_state=42)
     train_x, train_y = gen_training(100, PL_Sims_train, Pk_Sims_train)
@@ -158,18 +142,74 @@ elif model_generation == "RadLyA":
     plt.hist(score(emu_f, ptest_x, ptest_y), bins=100, alpha=0.5, range=(-0.7, 0.4), label="Emulator for 'all' k and z")
     plt.legend()
     plt.show()
+elif model_generation == "TempRadLyA":
+    #T = Trad_noRSD_Itamar[:,:31]
+    #T = TK_noRSD_Itamar[:,:31]
+    T = T21_noRSD_Itamar[:,:31]
+    print(np.shape(T))
+    print(np.shape(PL_noRSD_Itamar))
+    zarr = z_array[:31]
+    mask = np.all(np.logical_not(np.logical_or(np.isnan(T), T==0)), axis=-1)
+    print("Using", np.sum(mask), "out of", len(mask), "samples")
+    print("Defaults zlow=6, zhigh=31")
+    print("with zarr in", np.min(zarr), np.max(zarr))
+    PL_train, PL_test, T_train, T_test = train_test_split(PL_noRSD_Itamar[mask], T[mask], test_size=0.2, random_state=42)
+    train_x, train_y = gen_training_1d(1000, PL_train, T_train, zarr=zarr)
+    ptrain_x, ptrain_y = gen_training_1d(1, PL_train, T_train, fix_z=8, zarr=zarr)
+    test_x, test_y = gen_training_1d(10, PL_test, T_test, seed=0, zarr=zarr)
+    ptest_x, ptest_y = gen_training_1d(1, PL_test, T_test, seed=1, fix_z=8, zarr=zarr)
+    # Always no RSD
+else:
+    key = model_generation
+    print("Training key", key)
+    T_Sims = {"TS":TS_Sims, "TK":TK_Sims, "TR":Trad_Sims}[key][:,:31]
+    zarr = z_array[:31]
+    mask = np.all(np.logical_not(np.logical_or(np.isnan(T_Sims), T_Sims==0)), axis=-1)
+    print("Using", np.sum(mask), "out of", len(mask), "samples")
+    PL = deepcopy(PL_Sims[mask])
+    T = T_Sims[mask]
+    print("Defaults zlow=6, zhigh=31")
+    print("with zarr in", np.min(zarr), np.max(zarr))
+    PL_Sims_train, PL_Sims_test, T_Sims_train, T_Sims_test = train_test_split(PL, T, test_size=0.2, random_state=42)
+    train_x, train_y = gen_training_1d(1000, PL_Sims_train, T_Sims_train, zarr=zarr)
+    ptrain_x, ptrain_y = gen_training_1d(1, PL_Sims_train, T_Sims_train, fix_z=8, zarr=zarr)
+
+    test_x, test_y = gen_training_1d(10, PL_Sims_test, T_Sims_test, seed=0, zarr=zarr)
+    ptest_x, ptest_y = gen_training_1d(1, PL_Sims_test, T_Sims_test, seed=1, fix_z=8, zarr=zarr)
+
+    score(TR_emu0, ptest_x[:,1:], ptest_y) #0.09
+    score(TR_emu1, ptest_x, ptest_y) #0.10
+    score(TR_emu1, test_x, test_y) #0.06
+    score(TS_emu0, ptest_x[:,1:], ptest_y) #0.10
+    score(TS_emu1, ptest_x, ptest_y) #0.16 0.12
+    score(TS_emu1, test_x, test_y) #0.10
+    score(TK_emu0, ptest_x[:,1:], ptest_y) #0.10
+    score(TK_emu1, ptest_x, ptest_y) #0.20 0.1...
+    score(TK_emu1, test_x, test_y) #0.09
 
 # Make a new emulator
 layers = (100, 30, 10, 5)
 
-## Adaptive
-emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, learning_rate="adaptive", solver="sgd")
+## Adaptive. Temperature:
+emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
+    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
+    tol=0.00001, offset=1e-3)
+    # currently m2 converged runs forgot offset! Otherwise really good after ~75 it (TS)
+    # emu_m3_converged done
+    #emu.save("data/trained_emulators_poweremu/"+key+"emu_m3_converged.pkl")
+
+#T21
+emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
+    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
+    tol=0.00001, offset=1e-3, preprocess_y=False)
+#emu.train(train_x, train_y)
+#emu.save("data/trained_emulators_poweremu/TK_emu_RayLyA_v1_unconverged.pkl")
+# v1 converged: Good models with 
 
 ## Constant
 #emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam")
 
 # Train & Save
-#emu.train(m3train_x, m3train_y)
 
 #emu.train(ptrain_x, ptrain_y)
 #emu.save("data/trained_emulators_poweremu/Pk_emu_fixkz_Sims_adaptive.pkl")
@@ -239,8 +279,6 @@ emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
 #                   68% samples within +14% / -10% of true --> 0.24
 #                   95% samples within +55% / -30% of true --> 0.85
 #                   99.7% samples within +229% / -75% of true --> 3.04
-
-
 
 
 
