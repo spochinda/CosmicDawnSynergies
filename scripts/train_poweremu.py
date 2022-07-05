@@ -28,7 +28,8 @@ Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", m
 Trad = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Trad", key="Tradout", model_type="Fr", model_generation="new")
 TK = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="TK", model_type="Fr", model_generation="new")
 T21 = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="T21", model_type="Fr", model_generation="new")
-Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21])
+xA = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="xA", model_type="Fr", model_generation="new")
+Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar, xA_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21, xA])
 PL_noRSD_Itamar = PT9_to_PL5(PT)
 ## And these with RSDs (2181-6):
 PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", endings=["fRad_RSDrand"], middle=None, key="PTout")
@@ -41,22 +42,38 @@ PT = load_files("data/models_21cmSim/Sims2021/", name="PT", middle="_sims_", end
 TS = load_files("data/models_21cmSim/Sims2021/", name="TS", middle="_sims_", endings=["fRad"])
 TK = load_files("data/models_21cmSim/Sims2021/", name="TK", middle="_sims_", endings=["fRad"])
 Trad = load_files("data/models_21cmSim/Sims2021/", name="Trad", key="Tradout", middle="_sims_", endings=["fRad"])
-Pk_Sims, [PT, TS_Sims, TK_Sims, Trad_Sims] = remove_powerspectra_nans(Pk, [PT, TS, TK, Trad])
+xA = load_files("data/models_21cmSim/Sims2021/", name="xA", middle="_sims_", endings=["fRad"])
+xHI = load_files("data/models_21cmSim/Sims2021/", name="xHI", middle="_sims_", endings=["fRad"])
+Pk_Sims, [PT, TS_Sims, TK_Sims, Trad_Sims, xA_Sims, xHI_Sims] = remove_powerspectra_nans(Pk, [PT, TS, TK, Trad, xA, xHI])
 PL_Sims = PT9_to_PL8(PT)
 
 # Judge emulator quality, checking 68 and 95% limits
 # Note: When saying which parameters you rule out, the emulator underestimating the
 #       powerspectrum (+..%) is "conservative", so rather large + tail than - tail.
 
-def score(emu, test_x, test_y):
-    pred_y = emu.predict(test_x)
+def calculate_accuracy(emu, test_x, test_y, add_rsd=None):
+    print(np.shape(test_x))
+    if add_rsd is None:
+        pred_y = emu.predict(test_x)
+    else:
+        pred_y = emu.predict(np.hstack((test_x, np.ones([len(test_x), 1])*add_rsd)))
+
     deltas = np.log10((test_y+10)/(pred_y+10))
+    return deltas
+
+def score(emu, test_x, test_y, add_rsd=None):
+    deltas = calculate_accuracy(emu, test_x, test_y, add_rsd=add_rsd)
     limit68 = 10**confidence_level(deltas, level=0.68)
     limit95 = 10**confidence_level(deltas, level=0.95)
     limit997 = 10**confidence_level(deltas, level=0.997)
     print("68% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit68-1)), np.sum(np.abs(limit68-1)))+"\n95% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit95-1)), np.sum(np.abs(limit95-1)))+"\n99.7% samples within +{1:.0f}% / {0:.0f}% of true --> {2:.2f}".format(*(100*(limit997-1)), np.sum(np.abs(limit997-1)))+"\n(assuming 10 mK² level threshold; +% means test>pred)")
-    return deltas
+    return limit68, limit95, limit997
 
+def hist(emu, test_x, test_y, add_rsd=None):
+    deltas = calculate_accuracy(emu, test_x, test_y, add_rsd=add_rsd)
+    plt.hist(deltas, bins=100)
+    plt.show()
+    return deltas
 
 # Emulator architectures:
 ## We dit a lot of manual optimization previously:
@@ -92,10 +109,10 @@ TR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA
 
 
 # Training data
-#model_generation = "Sims"
+model_generation = "Sims"
 #model_generation = "RadLyA"
 #model_generation = "TS" "TK" "TR" for Sims
-model_generation = "TempRadLyA" #with manually setting TK or TR
+#model_generation = "TempRadLyA" #with manually setting TK or TR
 
 if model_generation == "Sims":
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
@@ -108,9 +125,9 @@ if model_generation == "Sims":
     test_x, test_y = gen_training(10, PL_Sims_test, Pk_Sims_test, seed=0)
     ptest_x, ptest_y = gen_training(1, PL_Sims_test, Pk_Sims_test, seed=1, fix_k=0.192, fix_z=8)
 
-    for e in [emu03, emu04, emu05, emu06, emu07a]:
-        print(e.mlp[1].hidden_layer_sizes)
-        print(score(e, test_x, test_y))
+    #for e in [emu03, emu04, emu05, emu06, emu07a]:
+    #    print(e.mlp[1].hidden_layer_sizes)
+    #    print(score(e, test_x, test_y))
 
 elif model_generation == "RadLyA":
     # RadLyA training data: [z, k, log10fStar, log10Vc, log10fX, tau, log10Fr, flag (1 for RSD on, 0 for RSD off)]
@@ -186,6 +203,48 @@ else:
     score(TK_emu0, ptest_x[:,1:], ptest_y) #0.10
     score(TK_emu1, ptest_x, ptest_y) #0.20 0.1...
     score(TK_emu1, test_x, test_y) #0.09
+
+# Emulator error as function of z and k
+def zkmap(emu=Pk_emu_m_Sims, full_x=PL_Sims_test, full_y=Pk_Sims_test, zmin=7, zmax=11, add_rsd=None):
+    # Make a colormap showing emulator error as a function of k and z
+    def test_emu_kz(emu,z,k, PL=full_x, Pk=full_y):
+        test_x, test_y = gen_training(1, PL, Pk, seed=0, fix_k=k, fix_z=z)
+        limit68, limit95, limit997 = score(emu, test_x, test_y, add_rsd=add_rsd)
+        return (limit68[1]-limit68[0])/2, (limit95[1]-limit95[0])/2, (limit997[1]-limit997[0])/2
+    # Compute values
+    zarr = np.arange(zmin, zmax+0.1, 1)
+    karr = np.arange(0.1, 0.51, 0.1)
+    tarr1 = np.ones([len(zarr), len(karr)])
+    tarr2 = np.ones([len(zarr), len(karr)])
+    tarr3 = np.ones([len(zarr), len(karr)])
+    for i in range(len(zarr)):
+        for j in range(len(karr)):
+            tarr1[i,j], tarr2[i,j], tarr3[i,j] = test_emu_kz(emu,zarr[i],karr[j])
+    # Make plot
+    zax, kax = make_axes_pcolor(zarr, karr)
+    plt.subplot(311)
+    plt.suptitle("Emulator average CL sizes (e.g. +15/-5% is 0.1)")
+    plt.title("68% CLs")
+    plt.pcolormesh(zax, kax, tarr1.T)
+    plt.ylabel("Wavenumber k h/cMpc")
+    plt.colorbar()
+    plt.subplot(312)
+    plt.title("95% CLs")
+    plt.pcolormesh(zax, kax, tarr2.T)
+    plt.ylabel("Wavenumber k h/cMpc")
+    plt.colorbar()
+    plt.subplot(313)
+    plt.title("99.7% CLs")
+    plt.pcolormesh(zax, kax, tarr3.T)
+    plt.xlabel("Redshift z")
+    plt.ylabel("Wavenumber k h/cMpc")
+    plt.colorbar()
+    plt.show()
+
+#zkmap()
+#zkmap(emu=Pk_emu_RadLyA_m, full_x=PL_RSD_Itamar, full_y=Pk_RSD_Itamar, add_rsd=True)
+#zkmap(emu=Pk_emu_RadLyA_m4, full_x=PL_RSD_Itamar, full_y=Pk_RSD_Itamar, add_rsd=True, zmax=30)
+
 
 # Make a new emulator
 layers = (100, 30, 10, 5)
@@ -295,4 +354,3 @@ def model_of_z(zarr, k, p, emu=None):
     return emu.predict(params)
 
 #todo: make some plots of emulators
-#todo: make prior bounds plots

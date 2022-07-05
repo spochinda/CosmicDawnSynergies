@@ -142,7 +142,13 @@ texDict = {"Rmfp": r"$R_{\rm mfp}$",
            "log10TR": r"$\log_{10} T_{\rm rad}$",
            "log10Trad": r"$\log_{10} T_{\rm rad}$"}
 
-#todo show test
+def make_axes_pcolor(x,y):
+    # Expand x and y by 1 each
+    def add(z):
+        d = np.diff(z)/2
+        new = [z[0]-d[0]]+list(np.array(z[:-1])+d)+[z[-1]+d[-1]]
+        return new
+    return add(x), add(y)
 
 def trapezoidal_bump(a,b,c,d, peak=1):
     return sip.interp1d([a,b,c,d], [0,peak,peak,0], fill_value=(0,0), bounds_error=False)
@@ -185,8 +191,6 @@ def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
         print("p1", p1)
         print("p2", p2)
         print("alphamin", alphamin)
-    #line = lambda alpha, startalpha=4, startbeta=5: startbeta+(alpha-startalpha)
-    #abcd = lambda alpha: [betamin, line(alpha, startalpha=alphamin, startbeta=betamin), zmax, line(alpha, startalpha=alphamin, startbeta=zmax)]
     overallnorm = trapezoidal_bump(alphamin, p1, p2, alphamax)(alpha)
     if yellow=="rect":
         a = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin, betamin, betalow], fill_value=0, bounds_error=False)(alpha)
@@ -198,12 +202,6 @@ def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
         overallnorm = trapezoidal_bump(alphamin, alphalow, alphaup, alphamax)(alpha)
         return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
     elif yellow=="diag":
-        #beta1 = betamin
-        #beta2 = betalow
-        #beta3 = ymax
-        #beta4 = betaup - (alphaup-alphalow)
-        #beta5 = betaup
-        #beta6 = betamax
         assert betalow+(alphaup-alphamin) == betamax
         a = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin, betamin+(alphaup-alphalow), betamin+(alphamax-alphalow)], fill_value=0, bounds_error=False)(alpha)
         b = sip.interp1d([alphamin, alphalow, alphaup,alphamax],[betamin, betamin+(alphalow-alphamin), betamin+(alphaup-alphamin), betamin+(alphaup-alphamin)], fill_value=0, bounds_error=False)(alpha)
@@ -213,44 +211,67 @@ def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
         return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
     else:
         assert False, yellow
-    #if alpha<alphamin:
-    #    if debug:
-    #        print("Case 0")
-    #    return 0
-    #elif alpha <= p1:
-    #    if debug:
-    #        print("Case 1")
-    #    a,b,c,d = abcd(alpha)
-    #    if debug:
-    #        print("Returning step-pdf with steps", a,b,c,d, "at beta =", beta, "peak=", overallnorm)
-    #    return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
-    #elif alpha <= p2:
-    #    if debug:
-    #        print("Case 2")
-    #    a,b,c,d = abcd(p1)
-    #    if yellow=="diag":
-    #        a += (alpha-p1)
-    #        b += (alpha-p1)
-    #        c += (alpha-p1)
-    #        d += (alpha-p1)
-    #    if debug:
-    #        print("Returning step-pdf with steps", a,b,c,d, "at beta =", beta, "peak=", overallnorm)
-    #    return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
-    #elif alpha <= alphamax:
-    #    if debug:
-    #        print("Case 3")
-    #    a,_,c,_ = abcd(p2)
-    #    a += (alpha-p1)
-    #    c += (alpha-p1)
-    #    b = ymin+zmax
-    #    d = betamax
-    #    if debug:
-    #        print("Returning step-pdf with steps", a,b,c,d, "at beta =", beta, "peak=", overallnorm)
-    #    return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
-    #elif alpha>=alphamax:
-    #    if debug:
-    #        print("Case 4")
-    #    return 0
-    #else:
-    #    assert False
+ 
 
+def derive_TS_xRad(xA_Sims, xHI_Sims, TK_Sims, Trad_Sims):
+    def get_TS(TK, TR, xA, xRad, z):
+        Om=0.3168681398488275
+        Ob=0.04902142275334499
+        h=0.6704
+        delta=0
+        deltab=0
+        xC=0
+        Tse=0.402
+        xAeff = xA * (1+Tse/TK)**(-1)*np.exp(-2.06*(Ob*h/0.0327)**(1/3)*(Om/0.307)**(-1/6)*np.sqrt((1+z)/10)*(TK/Tse)**(-2/3)*(1+deltab)**(1/3)*(1+delta)**(1/9.))
+        xtot = xAeff+xC
+        Ts8_array = (xRad+xtot)/(xRad/TR+xtot/TK)
+        Ts8_array[TK==0]=0
+        return Ts8_array
+    def get_tau21(TS, xHI, z):
+        c = 3e5; # speed of light km/s
+        A10 = 2.85e-15; #1/s spontaneous emission coefficient
+        lambda21 = 21.106 #cm, code
+        h = 0.6704;
+        Oc = 0.12038/h**2;
+        Ob = 0.022032/h**2;
+        Om = Ob+Oc;
+        OLambda=1-Om;
+        hpl =  4.136e-15; #eV s
+        mp = 8.40969762e-58; #proton mass in M_sol
+        rhoc = 1.36e11*(h/0.7)**2; #M_sol/cMpc^3
+        rhob = Ob*rhoc;
+        #nb = rhob/mb;# 1/cMpc^3
+        Y = 0.247; # Helium abundance by mass
+        nH=(rhoc/mp)*(1-Y)*Ob*(1+z)**3; # 1/Mpc^3
+        nH *= (3.24e-25)**3.*xHI #1/cm^3 now
+        #nH = rhoc/mp*(1-0.247)*Ob*(1+z)**3
+        kBoltzmann = 8.617e-5;#eV K-1
+        H0=100*h; # in km/s/Mpc
+        pi = np.pi
+        H = H0*np.sqrt(Om*(1+z)**3+OLambda+8.5522e-05*(1+z)**4);
+        dvdr = H/(1+z)*1e5/3e24;
+        # this should be 3.08e24 to convert Mpc to cm, 
+        return (3*hpl*(c*1e5)*A10*(lambda21)**2.*nH)/(32*pi*kBoltzmann*(1+z)*dvdr)/TS
+    def get_xRad(TS, xHI, z=8):
+        tau21 = get_tau21(TS, xHI, z)
+        xRad = (1-np.exp(-tau21))/tau21
+        return xRad
+
+    # z_array for used everything except zHI
+    z_tile = np.tile(z_array, (len(xA_Sims),1))
+    # get xHI at z_array, filling high-z with 1 and double checking
+    # slope to make sure no values were forgotten to fill
+    xHI_normalz = np.ones(np.shape(xA_Sims))
+    for i in range(len(z_array)):
+        zi = z_array[i]
+        if zi in z_xHI_array:
+            xHI_normalz[:,i] = xHI_Sims[:,np.where(zi == z_xHI_array)[0][0]]
+    assert np.all(np.diff(xHI_normalz, axis=-1) >= -1e-5)
+    # Iteratively find xRad and TS
+    xRad_Sims = np.ones(np.shape(TK_Sims))
+    TS_initial_Sims = get_TS(TK_Sims, Trad_Sims, xA_Sims, xRad_Sims, z_tile)
+    for i in range(10):
+        TS_converged_Sims = get_TS(TK_Sims, Trad_Sims, xA_Sims, xRad_Sims, z_tile)
+        xRad_Sims = get_xRad(TS_converged_Sims, xHI_normalz, z_tile)
+
+    return xRad_Sims, TS_converged_Sims, TS_initial_Sims

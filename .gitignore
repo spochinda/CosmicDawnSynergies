@@ -1,11 +1,12 @@
 # Models and Chains (just too large)
 data/models_21cmSim
 data/chains
+data/saved_samples
 # Emulators (lots of them, only add selectively)
 data/trained_emulators_poweremu
 # Non-public HERA data
 data/observations_HERA_IDR3*
-non-public/
+images/non-public/
 # Python stuff
 __pycache__/
 .ipynb_checkpoints
