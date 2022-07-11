@@ -29,7 +29,7 @@ Pk_Sims, [PT, TS_Sims, TK_Sims, Trad_Sims, xA_Sims, xHI_Sims] = remove_powerspec
 PL_Sims = PT9_to_PL8(PT)
 
 
-_,converged,ini = derive_TS_xRad(xA_Sims, xHI_Sims, TK_Sims, Trad_Sims)
+converged,ini,_ = derive_TS_xRad(xA_Sims, xHI_Sims, TK_Sims, Trad_Sims)
 
 limits95 = []
 for i in range(45):

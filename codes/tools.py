@@ -274,4 +274,4 @@ def derive_TS_xRad(xA_Sims, xHI_Sims, TK_Sims, Trad_Sims):
         TS_converged_Sims = get_TS(TK_Sims, Trad_Sims, xA_Sims, xRad_Sims, z_tile)
         xRad_Sims = get_xRad(TS_converged_Sims, xHI_normalz, z_tile)
 
-    return xRad_Sims, TS_converged_Sims, TS_initial_Sims
+    return TS_converged_Sims, TS_initial_Sims, xRad_Sims

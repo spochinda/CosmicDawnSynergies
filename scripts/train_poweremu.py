@@ -29,13 +29,20 @@ Trad = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Trad
 TK = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="TK", model_type="Fr", model_generation="new")
 T21 = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="T21", model_type="Fr", model_generation="new")
 xA = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="xA", model_type="Fr", model_generation="new")
-Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar, xA_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21, xA])
+xHI = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="xHI", model_type="Fr", model_generation="new")
+SFR = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="SFR", model_type="Fr", model_generation="new", key="meanSFRout")
+meanSFR = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="meanSFR", model_type="Fr", model_generation="new", key="meanSFRout")
+assert np.all(meanSFR==SFR)
+Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar, xA_noRSD_Itamar, xHI_noRSD_Itamar, SFR_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21, xA, xHI, SFR])
 PL_noRSD_Itamar = PT9_to_PL5(PT)
+TS_noRSD_Itamar = derive_TS_xRad(xA_noRSD_Itamar, xHI_noRSD_Itamar, TK_noRSD_Itamar, Trad_noRSD_Itamar)[0]
+
 ## And these with RSDs (2181-6):
 PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", endings=["fRad_RSDrand"], middle=None, key="PTout")
 Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", endings=["fRad_RSDrand1"], middle=None, key="PKout1")
 Pk_RSD_Itamar, [PT] = remove_powerspectra_nans(Pk, [PT])
 PL_RSD_Itamar = PT9_to_PL5(PT)
+
 # Load Sims2021 models (8 parameters)
 Pk = load_files("data/models_21cmSim/Sims2021/", name="Pk", middle="_sims_", endings=["fRad"])
 PT = load_files("data/models_21cmSim/Sims2021/", name="PT", middle="_sims_", endings=["fRad"])
@@ -109,10 +116,11 @@ TR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA
 
 
 # Training data
-model_generation = "Sims"
+#model_generation = "Sims"
 #model_generation = "RadLyA"
 #model_generation = "TS" "TK" "TR" for Sims
-#model_generation = "TempRadLyA" #with manually setting TK or TR
+model_generation = "SFRRadLyA" #with manually setting TK or TR, or TS
+offset = 1e-3
 
 if model_generation == "Sims":
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
@@ -128,6 +136,44 @@ if model_generation == "Sims":
     #for e in [emu03, emu04, emu05, emu06, emu07a]:
     #    print(e.mlp[1].hidden_layer_sizes)
     #    print(score(e, test_x, test_y))
+
+    # Emulator error as function of z and k
+    def zkmap(emu=Pk_emu_m_Sims, full_x=PL_Sims_test, full_y=Pk_Sims_test, zmin=7, zmax=11, add_rsd=None):
+        # Make a colormap showing emulator error as a function of k and z
+        def test_emu_kz(emu,z,k, PL=full_x, Pk=full_y):
+            test_x, test_y = gen_training(1, PL, Pk, seed=0, fix_k=k, fix_z=z)
+            limit68, limit95, limit997 = score(emu, test_x, test_y, add_rsd=add_rsd)
+            return (limit68[1]-limit68[0])/2, (limit95[1]-limit95[0])/2, (limit997[1]-limit997[0])/2
+        # Compute values
+        zarr = np.arange(zmin, zmax+0.1, 1)
+        karr = np.arange(0.1, 0.51, 0.1)
+        tarr1 = np.ones([len(zarr), len(karr)])
+        tarr2 = np.ones([len(zarr), len(karr)])
+        tarr3 = np.ones([len(zarr), len(karr)])
+        for i in range(len(zarr)):
+            for j in range(len(karr)):
+                tarr1[i,j], tarr2[i,j], tarr3[i,j] = test_emu_kz(emu,zarr[i],karr[j])
+        # Make plot
+        zax, kax = make_axes_pcolor(zarr, karr)
+        plt.subplot(311)
+        plt.suptitle("Emulator average CL sizes (e.g. +15/-5% is 0.1)")
+        plt.title("68% CLs")
+        plt.pcolormesh(zax, kax, tarr1.T)
+        plt.ylabel("Wavenumber k h/cMpc")
+        plt.colorbar()
+        plt.subplot(312)
+        plt.title("95% CLs")
+        plt.pcolormesh(zax, kax, tarr2.T)
+        plt.ylabel("Wavenumber k h/cMpc")
+        plt.colorbar()
+        plt.subplot(313)
+        plt.title("99.7% CLs")
+        plt.pcolormesh(zax, kax, tarr3.T)
+        plt.xlabel("Redshift z")
+        plt.ylabel("Wavenumber k h/cMpc")
+        plt.colorbar()
+        plt.show()
+    
 
 elif model_generation == "RadLyA":
     # RadLyA training data: [z, k, log10fStar, log10Vc, log10fX, tau, log10Fr, flag (1 for RSD on, 0 for RSD off)]
@@ -160,9 +206,32 @@ elif model_generation == "RadLyA":
     plt.legend()
     plt.show()
 elif model_generation == "TempRadLyA":
+    layers = (100, 30, 10, 5)
     #T = Trad_noRSD_Itamar[:,:31]
     #T = TK_noRSD_Itamar[:,:31]
-    T = T21_noRSD_Itamar[:,:31]
+    T = TS_noRSD_Itamar[:,:31]
+    #layers = (100, 50, 5) #For TS only, and also change 1k to 500
+    #T = T21_noRSD_Itamar[:,:31]
+    print(np.shape(T))
+    print(np.shape(PL_noRSD_Itamar))
+    zarr = z_array[:31]
+    mask = np.all(np.logical_not(np.logical_or(np.isnan(T), T==0)), axis=-1)
+    print("Using", np.sum(mask), "out of", len(mask), "samples")
+    print("Defaults zlow=6, zhigh=31")
+    print("with zarr in", np.min(zarr), np.max(zarr))
+    PL_train, PL_test, T_train, T_test = train_test_split(PL_noRSD_Itamar[mask], T[mask], test_size=0.2, random_state=42)
+    train_x, train_y = gen_training_1d(1000, PL_train, T_train, zarr=zarr)
+    ptrain_x, ptrain_y = gen_training_1d(1, PL_train, T_train, fix_z=8, zarr=zarr)
+    test_x, test_y = gen_training_1d(10, PL_test, T_test, seed=0, zarr=zarr)
+    ptest_x, ptest_y = gen_training_1d(1, PL_test, T_test, seed=1, fix_z=8, zarr=zarr)
+    # Always no RSD
+elif model_generation == "SFRRadLyA":
+    layers = (100, 30, 10, 5)
+    #T = Trad_noRSD_Itamar[:,:31]
+    #T = TK_noRSD_Itamar[:,:31]
+    T = SFR_noRSD_Itamar[:,:31]
+    offset = 1e-25
+    #T = T21_noRSD_Itamar[:,:31]
     print(np.shape(T))
     print(np.shape(PL_noRSD_Itamar))
     zarr = z_array[:31]
@@ -204,42 +273,6 @@ else:
     score(TK_emu1, ptest_x, ptest_y) #0.20 0.1...
     score(TK_emu1, test_x, test_y) #0.09
 
-# Emulator error as function of z and k
-def zkmap(emu=Pk_emu_m_Sims, full_x=PL_Sims_test, full_y=Pk_Sims_test, zmin=7, zmax=11, add_rsd=None):
-    # Make a colormap showing emulator error as a function of k and z
-    def test_emu_kz(emu,z,k, PL=full_x, Pk=full_y):
-        test_x, test_y = gen_training(1, PL, Pk, seed=0, fix_k=k, fix_z=z)
-        limit68, limit95, limit997 = score(emu, test_x, test_y, add_rsd=add_rsd)
-        return (limit68[1]-limit68[0])/2, (limit95[1]-limit95[0])/2, (limit997[1]-limit997[0])/2
-    # Compute values
-    zarr = np.arange(zmin, zmax+0.1, 1)
-    karr = np.arange(0.1, 0.51, 0.1)
-    tarr1 = np.ones([len(zarr), len(karr)])
-    tarr2 = np.ones([len(zarr), len(karr)])
-    tarr3 = np.ones([len(zarr), len(karr)])
-    for i in range(len(zarr)):
-        for j in range(len(karr)):
-            tarr1[i,j], tarr2[i,j], tarr3[i,j] = test_emu_kz(emu,zarr[i],karr[j])
-    # Make plot
-    zax, kax = make_axes_pcolor(zarr, karr)
-    plt.subplot(311)
-    plt.suptitle("Emulator average CL sizes (e.g. +15/-5% is 0.1)")
-    plt.title("68% CLs")
-    plt.pcolormesh(zax, kax, tarr1.T)
-    plt.ylabel("Wavenumber k h/cMpc")
-    plt.colorbar()
-    plt.subplot(312)
-    plt.title("95% CLs")
-    plt.pcolormesh(zax, kax, tarr2.T)
-    plt.ylabel("Wavenumber k h/cMpc")
-    plt.colorbar()
-    plt.subplot(313)
-    plt.title("99.7% CLs")
-    plt.pcolormesh(zax, kax, tarr3.T)
-    plt.xlabel("Redshift z")
-    plt.ylabel("Wavenumber k h/cMpc")
-    plt.colorbar()
-    plt.show()
 
 #zkmap()
 #zkmap(emu=Pk_emu_RadLyA_m, full_x=PL_RSD_Itamar, full_y=Pk_RSD_Itamar, add_rsd=True)
@@ -247,20 +280,19 @@ def zkmap(emu=Pk_emu_m_Sims, full_x=PL_Sims_test, full_y=Pk_Sims_test, zmin=7, z
 
 
 # Make a new emulator
-layers = (100, 30, 10, 5)
 
 ## Adaptive. Temperature:
 emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
     max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
-    tol=0.00001, offset=1e-3)
+    tol=0.00001, offset=offset)
     # currently m2 converged runs forgot offset! Otherwise really good after ~75 it (TS)
     # emu_m3_converged done
     #emu.save("data/trained_emulators_poweremu/"+key+"emu_m3_converged.pkl")
-
+#emu.train(train_x, train_y)
 #T21
-emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
-    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
-    tol=0.00001, offset=1e-3, preprocess_y=False)
+#emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
+#    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
+#    tol=0.00001, offset=1e-3, preprocess_y=False)
 #emu.train(train_x, train_y)
 #emu.save("data/trained_emulators_poweremu/TK_emu_RayLyA_v1_unconverged.pkl")
 # v1 converged: Good models with 
