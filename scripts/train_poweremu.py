@@ -96,7 +96,7 @@ TR_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m3_conver
 
 # RadLyA Itamar emulators
 ## PS HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
-Pk_emu_RadLyA_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+Pk_emu_RadLyA_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_RadLyA_adaptive.pkl",preprocesss_log_x=False)
 ## PS SARAS-range zlow=7, zhigh=31, klow=0.1, khigh=0.5
 Pk_emu_RadLyA_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
 ## PS fixed to z=8 and k=0.192
