@@ -29,6 +29,13 @@ The data can be found on `AFdata/21cmDATA/` (?), containing 3 directories:
 All data sets have some NaNs and zeros in places where they should not have zeros (e.g. temperatures) as shown here for the latest `Sims2021` data set
 ![Sims2021 NaNs and Zeros](https://github.com/CosmicDawnLab/powerspectra_analysis/blob/main/images/gaps_Sims2021.png)
 
+## Emulators
+These colormaps show the width/2 of the confidence intervals for different z and k, i.e. a value of 0.1 means a confidence interval of +/-10%, or +15%/-5% etc.
+### Sims2021 data
+![Sims2021 image](https://github.com/CosmicDawnLab/powerspectra_analysis/blob/main/images/emulator_zkmap_Sims2021.png)
+### Radio_and_LyAheating_Itamar data
+![Radio_and_LyAheating_Itamar image](https://github.com/CosmicDawnLab/powerspectra_analysis/blob/main/images/emulator_zkmap_Radio_and_LyAheating_Itamar_m4.png)
+
 ## Observational data
 HERA IDR2 (Public Data Release 1), IDR3 not yet public.
 ![IDR2 image](https://github.com/CosmicDawnLab/powerspectra_analysis/blob/main/images/data_HERA_IDR2.png)
