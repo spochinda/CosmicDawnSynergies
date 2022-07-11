@@ -82,47 +82,43 @@ def hist(emu, test_x, test_y, add_rsd=None):
     plt.show()
     return deltas
 
-# Emulator architectures:
-## We dit a lot of manual optimization previously:
-## Also the first two here are for one specific SED only
-#emu01 = poweremu(loadfile="data/trained_emulators_poweremu/Sims_data_v03_150it_23.02.2022.pkl",preprocesss_log_x=False)
-#emu02 = poweremu(loadfile="data/trained_emulators_poweremu/PK_emu_Sims_prelim_v3_01.06.2022.pkl",preprocesss_log_x=False)
-#emu03 = poweremu(loadfile="data/trained_emulators_poweremu/PK_all_emu_Sims_prelim_v4_01.06.2022.pkl",preprocesss_log_x=False)
-## But actually the automatic settings work just fine
-#emu04 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto100100100.pkl",preprocesss_log_x=False)
-#emu05 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto10030105_better.pkl",preprocesss_log_x=False)
-#emu06 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_auto100505_better.pkl",preprocesss_log_x=False)
-#emu07a = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_Sims_June06_adaptive.pkl",preprocesss_log_x=False)
-#emu08f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025.pkl",preprocesss_log_x=False)
-#emu09f = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025_v2.pkl",preprocesss_log_x=False)
 
-# HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
+# Sims emulators
+## PS HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
 Pk_emu_m_Sims = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl",preprocesss_log_x=False)
+## PS fixed to z=8 and k=0.192
+Pk_emu_fixed_Sims = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emuL_fixkz_Sims_adam_2001005025_v2.pkl",preprocesss_log_x=False)
 
-# Fixed to z=8 and k=0.192
-Pk_emu_RadLyA_fixed = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-# HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
-Pk_emu_RadLyA_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-# SARAS-range zlow=7, zhigh=31, klow=0.1, khigh=0.5
-Pk_emu_RadLyA_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-
-# T-range: z = 6..36
+## T, range: z = 6..31
 TS_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TSemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 TK_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TKemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 TR_emu_Sims = poweremu(loadfile="data/trained_emulators_poweremu/TRemu_m3_converged.pkl", preprocesss_log_x=False, offset=1e-3)
-# T-range: z = 6..36
+
+# RadLyA Itamar emulators
+## PS HERA-range zlow=7, zhigh=11, klow=0.02, khigh=3
+Pk_emu_RadLyA_m = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_moarkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+## PS SARAS-range zlow=7, zhigh=31, klow=0.1, khigh=0.5
+Pk_emu_RadLyA_m4 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+## PS fixed to z=8 and k=0.192
+Pk_emu_RadLyA_fixed = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_fixkz_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+## T, range: z = 6..31
 TK_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 TR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TS_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TS_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+SFR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/SFR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+
 
 
 # Training data
-#model_generation = "Sims"
+model_generation = "Sims"
 #model_generation = "RadLyA"
 #model_generation = "TS" "TK" "TR" for Sims
-model_generation = "SFRRadLyA" #with manually setting TK or TR, or TS
+#model_generation = "TempRadLyA" #with manually setting TK or TR, or TS
+#model_generation = "SFRRadLyA" #different offset
 offset = 1e-3
 
 if model_generation == "Sims":
+    layers = (100, 30, 10, 5)
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
     PL_Sims_train, PL_Sims_test, Pk_Sims_train, Pk_Sims_test = train_test_split(PL_Sims, Pk_Sims, test_size=0.2, random_state=42)
     train_x, train_y = gen_training(100, PL_Sims_train, Pk_Sims_train)
@@ -176,6 +172,8 @@ if model_generation == "Sims":
     
 
 elif model_generation == "RadLyA":
+    #m: (100, 30, 10, 5)
+    #m4: (150, 50, 15, 5)
     # RadLyA training data: [z, k, log10fStar, log10Vc, log10fX, tau, log10Fr, flag (1 for RSD on, 0 for RSD off)]
     PL_RSD_Itamar_train, PL_RSD_Itamar_test, Pk_RSD_Itamar_train, Pk_RSD_Itamar_test = train_test_split(PL_RSD_Itamar, Pk_RSD_Itamar, test_size=0.2, random_state=42)
     train0_x, train0_y = gen_training(10, PL_noRSD_Itamar, Pk_noRSD_Itamar, seed=0, flag=0)
