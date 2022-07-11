@@ -105,7 +105,7 @@ Pk_emu_RadLyA_fixed = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_
 TK_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 TR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 TS_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/TS_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
-SFR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/SFR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+SFR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/SFR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-25)
 
 
 

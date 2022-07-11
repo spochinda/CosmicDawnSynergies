@@ -6,36 +6,39 @@ import numpy as np
 import anesthetic
 from margarine.maf import MAF
 import tensorflow as tf
-
+# Basics
 paramNames = paramNames_RadLyA
-N = int(1e4)
+N_sample_MAF = int(1e4)
 np.random.seed(0)
 tf.random.set_seed(1)
+
+
+################ Load samples ################
 
 # Prior samples
 priordata = {}
 for key in paramNames:
-    priordata[key] = np.random.uniform(low=priorDict_Sims[key][0], high=priorDict_Sims[key][1], size=N)
+    priordata[key] = np.random.uniform(low=priorDict_Sims[key][0], high=priorDict_Sims[key][1], size=N_sample_MAF)
 prior = anesthetic.samples.MCMCSamples(priordata, columns=paramNames, label="prior", tex=texDict)
 
 # MAF samples
 hera_maf = MAF.load('/data/highz2/HBdata2/harry_stefan_joint_analysis/HERA.pkl')
-hera_data = hera_maf.sample(N)
-hera = anesthetic.samples.MCMCSamples(hera_data, columns=paramNames, label="hera MAF", tex=texDict)
+hera_data = hera_maf.sample(N_sample_MAF)
+hera = anesthetic.samples.MCMCSamples(hera_data, columns=paramNames, label="HERA (MAF)", tex=texDict)
 hera.limits["tau"] = [hera.limits["tau"][0], 0.077]
 tmp = hera.weights
 tmp[hera.tau>0.077]=0
 hera.weights = tmp
 saras3_maf = MAF.load('/data/highz2/HBdata2/harry_stefan_joint_analysis/saras3.pkl')
-saras3_data = saras3_maf.sample(N)
-saras3 = anesthetic.samples.MCMCSamples(saras3_data, columns=paramNames, label="saras3", tex=texDict)
+saras3_data = saras3_maf.sample(N_sample_MAF)
+saras3 = anesthetic.samples.MCMCSamples(saras3_data, columns=paramNames, label="SARAS3", tex=texDict)
 saras3_hera_maf = MAF.load('/data/highz2/HBdata2/harry_stefan_joint_analysis/saras3_hera.pkl')
-saras3_hera_data = saras3_hera_maf.sample(N)
-saras3_hera = anesthetic.samples.MCMCSamples(saras3_hera_data, columns=paramNames, label="saras3_hera", tex=texDict)
+saras3_hera_data = saras3_hera_maf.sample(N_sample_MAF)
+saras3_hera = anesthetic.samples.MCMCSamples(saras3_hera_data, columns=paramNames, label="SARAS3 + HERA", tex=texDict)
 
 # Original HERA samples
 orig_hera_data=np.load("/data/highz/SHdata/HERA_nov_v2/chains/Fr/emcee_flatchain.npy").T[::211]
-orig_hera = anesthetic.samples.MCMCSamples(data=orig_hera_data, columns=paramNames, tex=texDict, label='HERA original samples')
+orig_hera = anesthetic.samples.MCMCSamples(data=orig_hera_data, columns=paramNames, tex=texDict, label='HERA (original)')
 tmp = orig_hera.weights
 tmp[orig_hera.tau>0.077]=0
 orig_hera.weights = tmp
@@ -64,40 +67,16 @@ assert not np.any(np.isinf(saras3_hera))
 assert not np.any(np.isnan(hera))
 assert not np.any(np.isinf(hera))
 
-# Load emulator
-#P1 = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_RadLyA_adaptive.pkl",preprocesss_log_x=False)
+
+################ Load emulators ################
+
 P = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m4_RadLyA_adaptive.pkl",preprocesss_log_x=False)
-#Psims = poweremu(loadfile="data/trained_emulators_poweremu/Pk_emu_m_Sims_adaptive.pkl",preprocesss_log_x=False)
-TR_emu = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA_v1_unconverged.pkl", preprocesss_log_x=False, offset=1e-3)
-TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_RayLyA_v1_unconverged.pkl", preprocesss_log_x=False, offset=1e-3)
+TR_emu = poweremu(loadfile="data/trained_emulators_poweremu/TR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TS_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
+SFR_emu = poweremu(loadfile="data/trained_emulators_poweremu/SFR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-25)
 
-def log10TK_over_TR_of_z(zarr, p, rsd=1):
-    par0 = np.array([np.NaN, *p])
-    s=np.tile(par0, (len(zarr), 1))
-    s[:,0] = zarr
-    return np.log10(TR_emu.predict(s)) - np.log10(TK_emu.predict(s))
-
-fig, ax = plt.subplots()
-fig.suptitle("TR/TK (z) for SARAS (blue), HERA (orange), and combined (green)")
-kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.5}
-#cbar_post = plot_contours(log10model_of_z, np.linspace(8,30,10), np.array(orig_hera), weights=orig_hera.weights, ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/fgivenx2y/2hera", **kwargs)
-#cbar_post = plot_lines(log10model_of_z, np.linspace(8,30,10), np.array(orig_hera), weights=orig_hera.weights, ax=ax, color="red", lw=1, alpha=0.5)
-#cbar_post = plot_lines(log10model_of_z, np.linspace(8,30,10), np.array(saras3), ax=ax, color="blue", lw=1, alpha=0.5)
-saras3.label="Saras"
-cbar_post = plot_contours(log10TK_over_TR_of_z, np.linspace(7,30,10), np.array(hera), weights=hera.weights, ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/fgivenx2y/3hera", **kwargs)
-colorbar = fig.colorbar(cbar_post, ticks=[0,1,2], label='Posterior', pad=0.1)
-cbar_post = plot_contours(log10TK_over_TR_of_z, np.linspace(7,30,10), np.array(saras3), weights=saras3.weights, ax=ax, colors=plt.cm.Blues_r, cache="/tmp/fgivenx2y/2hesarasfra", **kwargs)
-#cbar_post = plot_contours(log10TK_over_TR_of_z, np.linspace(7,30,10), np.array(saras3_hera), weights=saras3_hera.weights, ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/fgivenx2y/2hesaffrasfra", **kwargs)
-#colorbar = fig.colorbar(cbar_post, ticks=[0,1,2], label='SARAS', pad=0)
-#cbar_post = plot_lines(log10TK_over_TR_of_z, np.linspace(8,30,10), np.array(saras3_hera), ax=ax, color="darkgreen", lw=1, alpha=0.5)
-ax.set_xlabel("z")
-ax.set_ylabel("log10 (T_rad/T_K)")
-#ax.set_ylim(0,5)
-ax.set_xlim(7,30)
-plt.show()
-
-
-def add_TK_Trad_from_emulators(df, z=20):
+def add_vals_from_emulators(df, z=20):
     emuCols = ["log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
     s = np.shape(df)
     arr = np.empty([s[0],len(emuCols)+1])
@@ -105,41 +84,131 @@ def add_TK_Trad_from_emulators(df, z=20):
     arr[:,1:] = df[emuCols]
     TK = TK_emu.predict(arr)
     TR = TR_emu.predict(arr)
+    TS = TS_emu.predict(arr)
+    SFR = SFR_emu.predict(arr)
     df["log10TK"] = np.log10(TK)
     df["log10TR"] = np.log10(TR)
+    df["log10TS"] = np.log10(TR)
+    df["log10SFR"] = np.log10(SFR)
     df["log10_TK_over_TR"] = np.log10(TR) - np.log10(TK)
+add_vals_from_emulators(prior)
+add_vals_from_emulators(saras3)
+add_vals_from_emulators(hera)
+add_vals_from_emulators(saras3_hera)
 
+def TK_adiabatic(z):
+    T30 = 19.68131
+    return T30/31**2*(1+z)**2
 
-def model_of_z(zarr, p, k=0.2, rsd=1):
-    #print("zarr =", zarr)
-   # assert np.,shape(5) == (5)
+def Tcmb(z):
+    T0 = 2.725
+    return T0*(1+z)
+
+def log10SFR_of_z(zarr, p):
+    par0 = np.array([np.NaN, *p])
+    s=np.tile(par0, (len(zarr), 1))
+    s[:,0] = zarr
+    return np.log10(SFR_emu.predict(s))
+
+def log10TR_over_TK_of_z(zarr, p):
+    par0 = np.array([np.NaN, *p])
+    s=np.tile(par0, (len(zarr), 1))
+    s[:,0] = zarr
+    return np.log10(TS_emu.predict(s)) - np.log10(TK_emu.predict(s))
+
+def log10TR_over_TK_adiabatic(zarr):
+    return np.log10(Tcmb(zarr)) - np.log10(TK_adiabatic(zarr))
+
+def log10TR_over_TS_of_z(zarr, p):
+    par0 = np.array([np.NaN, *p])
+    s=np.tile(par0, (len(zarr), 1))
+    s[:,0] = zarr
+    return np.log10(TR_emu.predict(s)) - np.log10(TS_emu.predict(s))
+
+def log10TK_of_z(zarr, p):
+    par0 = np.array([np.NaN, *p])
+    s=np.tile(par0, (len(zarr), 1))
+    s[:,0] = zarr
+    return np.log10(TK_emu.predict(s))
+
+def PS_of_z(zarr, p, k=0.2, rsd=1):
     par0 = np.array([np.NaN, k, *p, rsd])
     s=np.tile(par0, (len(zarr), 1))
     s[:,0] = zarr
-    #print("shape", np.shape(s))
-    #print(s[0])
-    #print(s[1])
     return np.minimum(1e10, P.predict(s))
 
-def log10model_of_z(zarr, p, k=0.2, rsd=1):
+def log10PS_of_z(zarr, p, k=0.2, rsd=1):
     par0 = np.array([np.NaN, k, *p, rsd])
     s=np.tile(par0, (len(zarr), 1))
     s[:,0] = zarr
     return np.log10(P.predict(s)+1)
 
-#Debug:
+#######################################
+################ Plots ################
+#######################################
+
+################ TS ################
 fig, ax = plt.subplots()
-fig.suptitle("Constraints at k=0.2 h/Mpc\nPrior(grey), SARAS3(blue), HERA(orange), both(green)")
+fig.suptitle("TS (z) for SARAS (blue), HERA (orange), and combined (green)")
 kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.5}
-#cbar_post = plot_contours(log10model_of_z, np.linspace(8,30,10), np.array(orig_hera), weights=orig_hera.weights, ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/fgivenx2y/2hera", **kwargs)
-cbar_post = plot_lines(log10model_of_z, np.linspace(8,30,10), np.array(orig_hera), weights=orig_hera.weights, ax=ax, color="red", lw=1, alpha=0.5)
-#cbar_post = plot_lines(log10model_of_z, np.linspace(8,30,10), np.array(saras3), ax=ax, color="blue", lw=1, alpha=0.5)
-#cbar_post = plot_lines(log10model_of_z, np.linspace(8,30,10), np.array(saras3_hera), ax=ax, color="darkgreen", lw=1, alpha=0.5)
+cachefolder = "fgivenx_TS"
+zarr = np.linspace(7,30,10)
+cbar_post = plot_contours(log10TR_over_TS_of_z, zarr, prior[paramNames], weights=prior.weights, ax=ax, colors=plt.cm.Greys_r, cache="/tmp/"+cachefolder+"/prior", **kwargs)
+cbar_post = plot_contours(log10TR_over_TS_of_z, np.linspace(7,30,10), hera[paramNames], weights=hera.weights, ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/"+cachefolder+"/hera", **kwargs)
+cbar_post = plot_contours(log10TR_over_TS_of_z, np.linspace(7,30,10), saras3[paramNames], weights=saras3.weights, ax=ax, colors=plt.cm.Blues_r, cache="/tmp/"+cachefolder+"/saras3", **kwargs)
+cbar_post = plot_contours(log10TR_over_TS_of_z, np.linspace(7,30,10), saras3_hera[paramNames], weights=saras3_hera.weights, ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/"+cachefolder+"/saras3_hera", **kwargs)
+ax.plot(zarr, log10TR_over_TK_adiabatic(zarr), lw=3, ls="dotted", color="black", label="Tcmb/Tadiabatic")
+colorbar = fig.colorbar(cbar_post, ticks=[0,1,2], label='Posterior', pad=0.1)
 ax.set_xlabel("z")
-ax.set_ylabel("Power spectrum Delta²2 [mK²]")
-ax.set_ylim(0,5)
+ax.set_ylabel(r"$\log10 (T_{\rm radio}/T_{\rm spin})$")
+ax.set_xlim(7,30)
+ax.set_ylim(-3,3)
+plt.legend()
+plt.show()
+
+################ TK ################
+fig, ax = plt.subplots()
+fig.suptitle("TK (z) for SARAS (blue), HERA (orange), and combined (green)")
+kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.5}
+cachefolder = "fgivenx_TK"
+zarr = np.linspace(7,30,10)
+cbar_post = plot_contours(log10TR_over_TK_of_z, zarr, prior[paramNames], weights=prior.weights, ax=ax, colors=plt.cm.Greys_r, cache="/tmp/"+cachefolder+"/prior", **kwargs)
+cbar_post = plot_contours(log10TR_over_TK_of_z, zarr, hera[paramNames], weights=hera.weights, ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/"+cachefolder+"/hera", **kwargs)
+cbar_post = plot_contours(log10TR_over_TK_of_z, zarr, saras3[paramNames], weights=saras3.weights, ax=ax, colors=plt.cm.Blues_r, cache="/tmp/"+cachefolder+"/saras3", **kwargs)
+cbar_post = plot_contours(log10TR_over_TK_of_z, zarr, saras3_hera[paramNames], weights=saras3_hera.weights, ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/"+cachefolder+"/saras3_hera", **kwargs)
+ax.plot(zarr, log10TR_over_TK_adiabatic(zarr), lw=3, color="black", label="Tcmb/Tadiabatic")
+colorbar = fig.colorbar(cbar_post, ticks=[0,1,2], label='Posterior', pad=0.1)
+ax.set_xlabel("z")
+ax.set_ylabel(r"$\log10 (T_{\rm radio}/T_{\rm gas})$")
+ax.set_xlim(7,30)
+ax.set_ylim(-2,3)
+plt.legend()
+plt.show()
+
+################ SFR ################
+fig, ax = plt.subplots()
+fig.suptitle("SFR (z) for SARAS (blue), HERA (orange), and combined (green)")
+kwargs = {"fineness": 1, "contour_color_levels": [0,2], "lines": False, "alpha": 0.5}
+#kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": True, "alpha": 1, "linewidths": 2, "facecolors": None}
+cachefolder = "fgivenx_SFR"
+zarr = np.linspace(7,30,10)
+cbar_post = plot_contours(log10SFR_of_z, np.linspace(7,30,10), prior[paramNames], weights=prior.weights, ax=ax, colors=plt.cm.Greys_r, cache="/tmp/"+cachefolder+"/prior", **kwargs)
+cbar_post = plot_contours(log10SFR_of_z, np.linspace(7,29,10), hera[paramNames], weights=hera.weights, ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/"+cachefolder+"/hera", **kwargs)
+cbar_post = plot_contours(log10SFR_of_z, np.linspace(7,28,10), saras3[paramNames], weights=saras3.weights, ax=ax, colors=plt.cm.Blues_r, cache="/tmp/"+cachefolder+"/saras3", **kwargs)
+cbar_post = plot_contours(log10SFR_of_z, np.linspace(7,27,10), saras3_hera[paramNames], weights=saras3_hera.weights, ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/"+cachefolder+"/saras3_hera", **kwargs)
+colorbar = fig.colorbar(cbar_post, ticks=kwargs["contour_color_levels"], label='Posterior', pad=0.1)
+ax.set_ylim(-10,0)
+ax.set_xlabel("z")
+ax.set_ylabel(r"$\log10 (SFR)$")
 ax.set_xlim(7,30)
 plt.show()
+
+
+assert False
+
+
+
+
 
 from codes.emulator_poweremu import *
 from codes.loader_21cmSim import *
@@ -204,10 +273,10 @@ ax.set_xlim(7,30)
 plt.show()
 
 
-add_TK_Trad_from_emulators(prior)
-add_TK_Trad_from_emulators(saras3)
-add_TK_Trad_from_emulators(hera)
-add_TK_Trad_from_emulators(saras3_hera)
+
+
+
+
 
 prior.log10_TK_over_TR.hist(bins=100, histtype="step", label="prior", color="grey", lw=2, density=True)
 hera.log10_TK_over_TR.hist(bins=100, histtype="step", label="HERA", color="orange", lw=2, density=True)
@@ -257,82 +326,6 @@ ax.set_ylabel("Power spectrum Delta²2 [mK²]")
 #cbar = plt.colorbar(cbar_prior,ticks=[0,1,2], label="Posterior")
 #cbar.set_ticklabels(['',r'$1\sigma$',r'$2\sigma$'])
 ax.set_ylim(0,7)
-ax.set_xlim(7,30)
-plt.show()
-
-def f(z, p):
-    return 1e2/z*np.random.uniform(0,1,size=len(z))
-
-
-assert False
-
-# Plot contours
-
-fig, ax = plt.subplots()
-fig.suptitle("Constraints at k=0.2 h/Mpc HERA")
-cbar_post = plot_contours(model_of_z, np.linspace(7,12,10), np.array(orig_hera), weights=orig_hera.weights, ax=ax, colors=plt.cm.Blues_r, fineness=1, contour_color_levels=[0,1,2,3], lines=False, alpha=0.7)
-cbar_post = plot_contours(model_of_z, np.linspace(7,30,10), np.array(orig_hera), weights=orig_hera.weights, ax=ax, colors=plt.cm.Reds_r, fineness=1, contour_color_levels=[0,1,2,3], lines=False, alpha=0.7)
-ax.set_yscale("log")
-ax.set_xlabel("Redshift z")
-ax.set_ylabel("Power spectrum Delta²2 [mK²]")
-ax.set_ylim(1,1e5)
-ax.set_xlim(7,30)
-plt.show()
-
-
-
-# Plot contours
-
-fig, ax = plt.subplots()
-fig.suptitle("Constraints at k=0.2 h/Mpc\nPrior(grey), SARAS3(blue), HERA(orange), both(green)")
-kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.5}
-cbar_prior = plot_contours(model_of_z, np.linspace(7,30,100), np.array(prior), y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.Greys_r, cache="/tmp/fgivenx2y/prior", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(8,30,100), np.array(saras3), y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.Blues_r, cache="/tmp/fgivenx2y/s", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(8,30,100), np.array(hera), y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/fgivenx2y/hera", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(7,30,100), np.array(saras3_hera), y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/fgivenx2y/sh", **kwargs)
-ax.set_yscale("log")
-ax.set_xlabel("k")
-ax.set_ylabel("Power spectrum Delta²2 [mK²]")
-#cbar = plt.colorbar(cbar_prior,ticks=[0,1,2], label="Posterior")
-#cbar.set_ticklabels(['',r'$1\sigma$',r'$2\sigma$'])
-ax.set_ylim(1,1e6)
-ax.set_xlim(7,30)
-plt.show()
-
-
-fig, ax = plt.subplots()
-fig.suptitle("Constraints at k=0.2 h/Mpc\nPrior(grey), SARAS3(blue), HERA(orange), both(green)")
-kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.5}
-cbar_prior = plot_contours(model_of_z, np.linspace(7,30,100), np.array(prior), y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.Greys_r, cache="/tmp/fgivenx2y/prior", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(7,30,100), np.array(saras3), y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.Blues_r, cache="/tmp/fgivenx2y/hera", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(7,30,100), np.array(orig_hera), weights=orig_hera.weights, y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/fgivenx2y/herah", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(7,30,100), np.array(saras3_hera), y=np.geomspace(10,1e5,100), ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/fgivenx2y/sh", **kwargs)
-ax.set_yscale("log")
-ax.set_xlabel("k")
-ax.set_ylabel("Power spectrum Delta²2 [mK²]")
-#cbar = plt.colorbar(cbar_prior,ticks=[0,1,2], label="Posterior")
-#cbar.set_ticklabels(['',r'$1\sigma$',r'$2\sigma$'])
-ax.set_ylim(1,1e6)
-ax.set_xlim(7,30)
-plt.show()
-
-
-
-# Plot contours
-
-fig, ax = plt.subplots()
-fig.suptitle("Constraints at k=0.2 h/Mpc\nPrior(grey), SARAS3(blue), HERA(orange), both(green)")
-kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.5}
-cbar_prior = plot_contours(model_of_z, np.linspace(7,30,100), np.array(prior), ax=ax, colors=plt.cm.Greys_r, cache="/tmp/fgivenx2log2/prior", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(8,30,100), np.array(saras3), ax=ax, colors=plt.cm.Blues_r, cache="/tmp/fgivenx2log2/s", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(7,30,100), np.array(orig_hera), weights=orig_hera.weights, ax=ax, colors=plt.cm.Oranges_r, cache="/tmp/fgivenx2y/hera2h", **kwargs)
-cbar_post = plot_contours(model_of_z, np.linspace(7,30,100), np.array(saras3_hera), ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/fgivenx2log2/sh", **kwargs)
-ax.set_xlabel("z")
-ax.set_ylabel("Power spectrum Delta²2 [mK²]")
-cbar = plt.colorbar(cbar_prior,ticks=[0,1,2], label="Posterior")
-cbar.set_ticklabels(['',r'$1\sigma$',r'$2\sigma$'])
-ax.set_ylim(1,1e5)
-ax.set_yscale("log")
 ax.set_xlim(7,30)
 plt.show()
 
