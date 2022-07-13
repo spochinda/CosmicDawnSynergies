@@ -76,7 +76,7 @@ TK_emu = poweremu(loadfile="data/trained_emulators_poweremu/TK_emu_RayLyA_v1_con
 TS_emu = poweremu(loadfile="data/trained_emulators_poweremu/TS_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-3)
 SFR_emu = poweremu(loadfile="data/trained_emulators_poweremu/SFR_emu_RayLyA_v1_converged.pkl", preprocesss_log_x=False, offset=1e-25)
 
-def add_vals_from_emulators(df, z=20):
+def add_vals_from_emulators(df, z=30):
     emuCols = ["log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
     s = np.shape(df)
     arr = np.empty([s[0],len(emuCols)+1])
@@ -86,18 +86,22 @@ def add_vals_from_emulators(df, z=20):
     TR = TR_emu.predict(arr)
     TS = TS_emu.predict(arr)
     SFR = SFR_emu.predict(arr)
-    df["log10TK"] = np.log10(TK)
-    df["log10TR"] = np.log10(TR)
-    df["log10TS"] = np.log10(TR)
-    df["log10SFR"] = np.log10(SFR)
-    df["log10_TK_over_TR"] = np.log10(TR) - np.log10(TK)
-add_vals_from_emulators(prior)
-add_vals_from_emulators(saras3)
-add_vals_from_emulators(hera)
-add_vals_from_emulators(saras3_hera)
+    df["log10TK_z="+str(z)] = np.log10(TK)
+    df["log10TR_z="+str(z)] = np.log10(TR)
+    df["log10TS_z="+str(z)] = np.log10(TR)
+    df["log10TS_over_TR_z="+str(z)] = np.log10(TS) - np.log10(TR)
+    df["log10SFR_z="+str(z)] = np.log10(SFR)
+    df["log10_TK_over_TR_z="+str(z)] = np.log10(TK) - np.log10(TR)
+add_vals_from_emulators(prior, z=30)
+add_vals_from_emulators(saras3, z=20)
+add_vals_from_emulators(saras3, z=25)
+add_vals_from_emulators(hera, z=8)
+add_vals_from_emulators(hera, z=10)
+add_vals_from_emulators(hera, z=20)
+add_vals_from_emulators(hera, z=25)
 
 def TK_adiabatic(z):
-    T30 = 19.68131
+    T30 = 15.0024 #10**np.min(prior["log10TK_z=30"])
     return T30/31**2*(1+z)**2
 
 def Tcmb(z):
@@ -125,6 +129,9 @@ def log10TR_over_TS_of_z(zarr, p):
     s[:,0] = zarr
     return np.log10(TR_emu.predict(s)) - np.log10(TS_emu.predict(s))
 
+def log10TS_over_TR_of_z(zarr, p):
+    return -log10TR_over_TS_of_z(zarr, p)
+
 def log10TK_of_z(zarr, p):
     par0 = np.array([np.NaN, *p])
     s=np.tile(par0, (len(zarr), 1))
@@ -146,6 +153,53 @@ def log10PS_of_z(zarr, p, k=0.2, rsd=1):
 #######################################
 ################ Plots ################
 #######################################
+
+################ TS HERA-like ################
+
+prop_cycle = plt.rcParams['axes.prop_cycle']
+colors = prop_cycle.by_key()['color']
+
+fig, ax = plt.subplots()
+#fig.suptitle("TS for HERA IDR2, SARAS3, and combined (red)")
+kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.8}
+cachefolder = "fgivenx_TS"
+zarr = np.linspace(7,30,10)
+#cbar_post = plot_contours(log10TS_over_TR_of_z, zarr, prior[paramNames], weights=prior.weights, ax=ax, colors=plt.cm.Greys_r, cache="/tmp/"+cachefolder+"/prior", **kwargs)
+#cbar_post = plot_contours(log10TS_over_TR_of_z, np.linspace(7,30,10), hera[paramNames], weights=hera.weights, ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/"+cachefolder+"/hera", **kwargs)
+#cbar_post = plot_contours(log10TS_over_TR_of_z, np.linspace(7,30,10), saras3[paramNames], weights=saras3.weights, ax=ax, colors=plt.cm.Blues_r, cache="/tmp/"+cachefolder+"/saras3", **kwargs)
+cbar_post = plot_contours(log10TS_over_TR_of_z, np.linspace(7,30,10), saras3_hera[paramNames], weights=saras3_hera.weights, ax=ax, colors=plt.cm.Reds_r, cache="/tmp/"+cachefolder+"/saras3_hera", **kwargs)
+
+# HERA arrows
+ax.errorbar(10, confidence_level(hera["log10TS_over_TR_z=10"], weights=hera.weights, level=0.68)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="green")
+ax.errorbar(10, confidence_level(hera["log10TS_over_TR_z=10"], weights=hera.weights, level=0.95)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="darkgreen")
+ax.errorbar(8, confidence_level(hera["log10TS_over_TR_z=8"], weights=hera.weights, level=0.68)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="green")
+ax.errorbar(8, confidence_level(hera["log10TS_over_TR_z=8"], weights=hera.weights, level=0.95)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="darkgreen")
+#plt.scatter(10, confidence_level(hera["log10TS_over_TR_z=10"], weights=hera.weights, level=0.68)[0], marker="^", color="orange")
+#plt.scatter(10, confidence_level(hera["log10TS_over_TR_z=10"], weights=hera.weights, level=0.95)[0], marker="^", color="darkorange")
+#lt.scatter(8, confidence_level(hera["log10TS_over_TR_z=8"], weights=hera.weights, level=0.68)[0], marker="^", color="orange")
+#lt.scatter(8, confidence_level(hera["log10TS_over_TR_z=8"], weights=hera.weights, level=0.95)[0], marker="^", color="darkorange")
+
+# SARAS arrows
+#ax.errorbar(25, confidence_level(saras3["log10TS_over_TR_z=25"], weights=saras3.weights, level=0.68)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="orange")
+#ax.errorbar(25, confidence_level(saras3["log10TS_over_TR_z=25"], weights=saras3.weights, level=0.95)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="darkorange")
+#ax.errorbar(25, confidence_level(hera["log10TS_over_TR_z=25"], weights=hera.weights, level=0.95)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="darkgreen")
+ax.errorbar(20, confidence_level(saras3["log10TS_over_TR_z=20"], weights=saras3.weights, level=0.68)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="orange")
+ax.errorbar(20, confidence_level(saras3["log10TS_over_TR_z=20"], weights=saras3.weights, level=0.95)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="darkorange")
+#ax.errorbar(20, confidence_level(hera["log10TS_over_TR_z=20"], weights=hera.weights, level=0.95)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="darkgreen")
+#plt.scatter(25, confidence_level(saras3["log10TS_over_TR_z=25"], weights=saras3.weights, level=0.68)[0], marker="^", color="lightblue")
+#plt.scatter(25, confidence_level(saras3["log10TS_over_TR_z=25"], weights=saras3.weights, level=0.95)[0], marker="^", color="blue")
+
+ax.plot(zarr, -log10TR_over_TK_adiabatic(zarr), lw=3, ls="dotted", color="black", label=r"$T_{\rm CMB}/T_{\rm Adiabatic}$")
+#colorbar = fig.colorbar(cbar_post, ticks=[0,1,2], label='Posterior', pad=0.1)
+ax.set_xlabel("z")
+ax.set_ylabel(r"$\log10 (T_{\rm s}/T_{\rm r})$")
+ax.set_xlim(7,30)
+ax.set_ylim(-2,1)
+ax.set_yticks(np.log10(np.geomspace(1e-2,10,13)))
+ax.set_yticklabels([r"$10^{{{:.1f}}}$".format(a) for a in np.log10(np.geomspace(1e-2,10,13))])
+plt.legend()
+plt.tight_layout()
+plt.show()
 
 ################ TS ################
 fig, ax = plt.subplots()
@@ -204,9 +258,8 @@ ax.set_xlim(7,30)
 plt.show()
 
 
-assert False
-
-
+assert False, "That's all the relevant code"
+### LEGACY CODE BELOW ###
 
 
 
