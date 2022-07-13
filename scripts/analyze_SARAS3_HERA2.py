@@ -160,6 +160,7 @@ prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = prop_cycle.by_key()['color']
 
 fig, ax = plt.subplots()
+fig.set_size_inches(3,3)
 #fig.suptitle("TS for HERA IDR2, SARAS3, and combined (red)")
 kwargs = {"fineness": 1, "contour_color_levels": [0,1,2], "lines": False, "alpha": 0.8}
 cachefolder = "fgivenx_TS"
@@ -167,7 +168,7 @@ zarr = np.linspace(7,30,10)
 #cbar_post = plot_contours(log10TS_over_TR_of_z, zarr, prior[paramNames], weights=prior.weights, ax=ax, colors=plt.cm.Greys_r, cache="/tmp/"+cachefolder+"/prior", **kwargs)
 #cbar_post = plot_contours(log10TS_over_TR_of_z, np.linspace(7,30,10), hera[paramNames], weights=hera.weights, ax=ax, colors=plt.cm.YlGn_r, cache="/tmp/"+cachefolder+"/hera", **kwargs)
 #cbar_post = plot_contours(log10TS_over_TR_of_z, np.linspace(7,30,10), saras3[paramNames], weights=saras3.weights, ax=ax, colors=plt.cm.Blues_r, cache="/tmp/"+cachefolder+"/saras3", **kwargs)
-cbar_post = plot_contours(log10TS_over_TR_of_z, np.linspace(7,30,10), saras3_hera[paramNames], weights=saras3_hera.weights, ax=ax, colors=plt.cm.Reds_r, cache="/tmp/"+cachefolder+"/saras3_hera", **kwargs)
+cbar_post = plot_contours(log10TS_over_TR_of_z, np.linspace(7,30,100), saras3_hera[paramNames], ny=1000, weights=saras3_hera.weights, ax=ax, colors=plt.cm.Reds_r, cache="/tmp/"+cachefolder+"/saras3_hera", **kwargs)
 
 # HERA arrows
 ax.errorbar(10, confidence_level(hera["log10TS_over_TR_z=10"], weights=hera.weights, level=0.68)[0], yerr=0.1, capsize=6, markeredgewidth=3, lolims=True, color="green")
