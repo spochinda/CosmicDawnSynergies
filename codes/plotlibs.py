@@ -8,6 +8,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import seaborn as sns
 ccb = sns.color_palette("colorblind")
+cdefault = plt.rcParams['axes.prop_cycle'].by_key()['color']
 # Matplotlib settings
 params = {'legend.fontsize':  12,
           'figure.figsize': (6, 5),
