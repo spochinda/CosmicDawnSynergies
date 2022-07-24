@@ -122,10 +122,32 @@ np.save("non-public/punchline_TS_TR_prior.npy", save_npy_dict)
 #s = np.load("non-public/punchline_TS_TR_idr3.npy", allow_pickle=True).item()
 #s2 = np.load("non-public/punchline_TS_TR_idr2.npy", allow_pickle=True).item()
 #p = np.load("non-public/punchline_TS_TR_prior.npy", allow_pickle=True).item()
-#plt.hist(p["log10TS_z10"]-p["log10TR_z10"], weights=p["weights"], bins=100, alpha=0.5, density=True, histtype="step")
-#plt.hist(s["log10TS_z10"]-s["log10TR_z10"], weights=s["weights"], bins=100, alpha=0.5, density=True, histtype="step")
-#plt.hist(s2["log10TS_z10"]-s2["log10TR_z10"], weights=s2["weights"], bins=100, alpha=0.5, density=True, histtype="step")
+#plt.hist(p["log10TS_z10"]-p["log10TR_z10"], weights=p["weights"], bins=100, alpha=0.5, density=True, histtype="step", label="Prior")
+#plt.hist(s["log10TS_z10"]-s["log10TR_z10"], weights=s["weights"], bins=100, alpha=0.5, density=True, histtype="step", label="IDR3")
+#plt.hist(s2["log10TS_z10"]-s2["log10TR_z10"], weights=s2["weights"], bins=100, alpha=0.5, density=True, histtype="step", label="IDR2")
+#plt.legend()
 #plt.show()
+#import scipy.interpolate as sip
+#import scipy.optimize as sop
+#def confidence_level(samples, weights=None, level=0.95):
+#    assert level<1, "Level >= 1!"
+#    weights = np.ones(len(samples)) if weights is None else weights
+#    # Sort and normalize
+#    order = np.argsort(samples)
+#    samples = np.array(samples)[order]
+#    weights = np.array(weights)[order]/np.sum(weights)
+#    # Compute inverse cumulative distribution function
+#    cumsum = np.cumsum(weights)
+#    S = np.array([np.min(samples), *samples, np.max(samples)])
+#    CDF = np.append(np.insert(np.cumsum(weights), 0, 0), 1)
+#    invcdf = sip.interp1d(CDF, S)
+#    # Find smallest interval
+#    distance = lambda a, level=level: invcdf(a+level)-invcdf(a)
+#    res = sop.minimize(distance, (1-level)/2, bounds=[(0,1-level)], method="Nelder-Mead")
+#    return np.array([invcdf(res.x[0]), invcdf(res.x[0]+level)])
+#print(confidence_level(p["log10TS_z10"]-p["log10TR_z10"], weights=p["weights"]))
+#print(confidence_level(s["log10TS_z10"]-s["log10TR_z10"], weights=s["weights"]))
+#print(confidence_level(s2["log10TS_z10"]-s2["log10TR_z10"], weights=s2["weights"]))
 
 
 
