@@ -182,7 +182,7 @@ venn_corrected_idr3.tex["log10fsfR"] = r"$\log_{10} f_{\rm star}\cdot f_r$"
 #venn_corrected_idr3.plot_2d(ax, alpha=0.6)
 #fig.legend(*ax.log10fsfX.log10fsfR.get_legend_handles_labels())
 #plt.savefig("non-public/info_HERA_IDR3_LWA_Chandra.pdf")
-#plt.close()
+#plt.show()
 
 # Code to make paper-plot
 venn_corrected_idr3.label=None
@@ -468,6 +468,108 @@ settings.legend_fontsize=12
 settings.axes_fontsize=14
 settings.axes_labelsize=14
 sett = {"smooth_scale_2D": -5}
+g = plots.get_single_plotter(width_inch=4, ratio=1, settings=settings)
+s = getdist.mcsamples.MCSamples(samples=np.array([prior["log10TS_z8"],prior["log10TR_z8"]]).T, weights=np.array(prior.weights), names=["log10TS_z8","log10TR_z8"], labels=[r'\log_{10} \overline{T}_S', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+s2 = getdist.mcsamples.MCSamples(samples=np.array([idr3["log10TS_z8"],idr3["log10TR_z8"]]).T, weights=np.array(idr3.weights), names=["log10TS_z8","log10TR_z8"], labels=[r'\log_{10} \overline{T}_S', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
+g.plot_2d([s, s2], 'log10TS_z8', 'log10TR_z8', filled=True, colors=["#505050", "#984ea3"], alphas=[1,0.5])
+g.add_legend(['Prior', 'Posterior'], legend_loc='lower right')
+a2 = g.get_axes()
+a2.set_xlim(np.min(prior['log10TS_z8']),np.max(prior['log10TS_z8']))
+a2.set_ylim(np.min(prior['log10TR_z8']),np.max(prior['log10TR_z8']))
+
+Tplot = np.linspace(0,6,1000)
+a2.plot(Tplot, posterior_limit_Trad_over_TS+Tplot, ls='dashed', color="#984ea3")
+plt.savefig("non-public/HERA_TS_TRad.pdf")
+plt.show()
+
+
+# TS prior explainer
+fig, ax = prior.plot_2d(["log10TS_z8", "log10TR_z8"], types={"lower": "scatter", "diagonal": "hist"}, ncompress=10000, color="grey")
+#mask = np.where(prior.log10fStar<-2)
+#prior.iloc[mask].plot_2d(ax, types={"lower": "scatter", "diagonal": "hist"}, ncompress=1000, color="red")
+fig.set_size_inches(12,12)
+plt.savefig("1_TS-TR_show.png", dpi=600)
+plt.show()
+
+# Todo where does the low-TK leg in TS come from? Assume TS more coupled to radio due to low TK reducing collisional coupling?
+fig, ax = prior.plot_2d(["log10TK_z8", "log10TS_z8"], types={"lower": "scatter", "diagonal": "hist"}, ncompress=1000, color="grey")
+fig.set_size_inches(12,12)
+plt.show()
+plt.scatter(prior.iloc[::23].log10TK_z8, (prior.iloc[::23].log10TS_z8-prior.iloc[::23].log10TK_z8), label="TS/TK")
+plt.scatter(prior.iloc[::23].log10TK_z8, (prior.iloc[::23].log10TR_z8-prior.iloc[::23].log10TK_z8), label="TR/TK", alpha=0.2, color="orange")
+plt.xlabel("log10TK")
+plt.ylabel("log10(TS/TK)")
+plt.axhline(0, label="TS=TK", color="red")
+plt.legend()
+plt.xlim(0,1.3)
+plt.ylim(-1,1)
+plt.show()
+mask = np.where(np.logical_and(prior.log10TK_z8<1.2, prior.log10TS_z8-prior.log10TK_z8<0))
+fig, ax = prior.iloc[mask].plot_2d(paramNames, types={"lower": "scatter", "diagonal": "hist"}, ncompress=1000, color="grey")
+plt.show()
+
+# TR prior explainer
+fig, ax = prior.plot_2d(["log10Fr", "log10fStar", "log10TR_z8"], types={"lower": "scatter", "diagonal": "hist"}, ncompress=10000, color="grey")
+fig.set_size_inches(12,12)
+plt.savefig("2_TR_explain.png", dpi=600)
+
+plt.figure(figsize=(12, 12))
+plt.scatter(prior.iloc[::23].log10Fr, prior.iloc[::23].log10fStar, c=prior.iloc[::23].log10TR_z8, marker=".")
+plt.colorbar()
+plt.savefig("2b_TR_explain.png", dpi=600)
+plt.show()
+# TK prior explainer
+fig, ax = prior.plot_2d(["log10fX", "log10fStar", "log10TK_z8"], types={"lower": "scatter", "diagonal": "hist"}, ncompress=10000, color="grey")
+fig.set_size_inches(12,12)
+plt.savefig("3_TS_explain.png", dpi=600)
+plt.show()
+
+
+plt.figure(figsize=(12,12))
+plt.scatter(prior[::23].log10TS_z8, prior[::23].log10TR_z8, c=prior[::23].log10fStar, marker=".")
+plt.colorbar(label="$\log10{f_*}$")
+plt.xlabel("log10TS")
+plt.ylabel("log10TR")
+plt.savefig("4_TS-TR+explain_fStar.png", dpi=600)
+plt.show()
+
+plt.figure(figsize=(12,12))
+plt.scatter(prior[::23].log10TS_z8, prior[::23].log10TR_z8, c=prior[::23].log10TK_z8, marker=".")
+plt.colorbar(label="log10TK")
+plt.xlabel("log10TS")
+plt.ylabel("log10TR")
+plt.savefig("5_TS-TR+explain_TK.png", dpi=600)
+plt.show()
+
+
+# TS prior explainer -- unclear
+fig, ax = prior.plot_2d(["log10TK_z8", "log10TR_z8", "log10TS_z8"], types={"lower": "scatter", "diagonal": "hist"}, ncompress=10000, color="grey")
+#fig, ax = prior.plot_2d(["log10TS_z8", "log10TK_z8", "log10TR_z8"], types={"lower": "scatter", "diagonal": "hist"}, ncompress=10000, color="grey")
+fig.set_size_inches(12,12)
+xplot = np.geomspace(1e-10, 1e10, 100)
+def TK_adiabatic(z):
+    T30 = 15.0024 #10**np.min(prior["log10TK_z=30"])
+    return T30/31**2*(1+z)**2
+ax["log10TR_z8"]["log10TS_z8"].axhline(np.log10(TK_adiabatic(8)))
+ax["log10TK_z8"]["log10TR_z8"].axvline(np.log10(TK_adiabatic(8)))
+plt.show()
+
+ax.plot(zarr, -log10TR_over_TK_adiabatic(zarr), lw=3, ls="dotted", color="black", label=r"$T_{\rm Adiabatic}/T_{\rm CMB}$")
+
+
+
+prior.plot_2d(["log10TS_z8", "log10TR_z8"], types={"lower": "scatter", "diagonal": "hist"}, ncompress=10000, color="grey")
+plt.show()
+
+import getdist
+from getdist import plots
+settings = plots.GetDistPlotSettings()
+settings.legend_fontsize=12
+settings.axes_fontsize=14
+settings.axes_labelsize=14
+sett = {"smooth_scale_2D": -5}
+
+
 g = plots.get_single_plotter(width_inch=4, ratio=1, settings=settings)
 s = getdist.mcsamples.MCSamples(samples=np.array([prior["log10TS_z8"],prior["log10TR_z8"]]).T, weights=np.array(prior.weights), names=["log10TS_z8","log10TR_z8"], labels=[r'\log_{10} \overline{T}_S', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
 s2 = getdist.mcsamples.MCSamples(samples=np.array([idr3["log10TS_z8"],idr3["log10TR_z8"]]).T, weights=np.array(idr3.weights), names=["log10TS_z8","log10TR_z8"], labels=[r'\log_{10} \overline{T}_S', r'\log_{10} \overline{T}_{\rm rad}'], settings=sett)
