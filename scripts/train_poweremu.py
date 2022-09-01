@@ -207,10 +207,10 @@ elif model_generation == "TempRadLyA":
     layers = (100, 30, 10, 5)
     #T = Trad_noRSD_Itamar[:,:31]
     #T = TK_noRSD_Itamar[:,:31]
-    T = Trad_noRSD_Itamar[:,:31]
+    T = TS_noRSD_Itamar[:,:31]
     #layers = (100, 50, 5) #For TS only, and also change 1k to 500
     #T = T21_noRSD_Itamar[:,:31]
-    def zmap(emu=TR_emu_RadLyA, full_x=PL_noRSD_Itamar, full_y=T, zmin=6, zmax=36):
+    def zmap(emu=TS_emu_RadLyA, full_x=PL_noRSD_Itamar, full_y=T, zmin=6, zmax=36):
         # Make a colormap showing emulator error as a function of k and z
         zarr = np.arange(zmin, zmax+0.1, 1)
         def test_emu_z(emu, z, PL=full_x, Pk=full_y):
@@ -224,7 +224,7 @@ elif model_generation == "TempRadLyA":
         for i in range(len(zarr)):
             tarr1[i,0], tarr2[i,0], tarr3[i,0] = test_emu_z(emu,zarr[i])
         # Make plot
-        zax, kax = make_axes_pcolor(zarr, [0])
+        zax, kax = make_axes_pcolor_1d(zarr, [0])
         plt.subplot(311)
         plt.suptitle("Emulator average CL sizes (e.g. +15/-5% is 0.1)")
         plt.ylabel("68% CLs")
@@ -250,8 +250,8 @@ elif model_generation == "TempRadLyA":
     ptrain_x, ptrain_y = gen_training_1d(1, PL_train, T_train, fix_z=8, zarr=zarr)
     test_x, test_y = gen_training_1d(10, PL_test, T_test, seed=0, zarr=zarr)
     ptest_x, ptest_y = gen_training_1d(1, PL_test, T_test, seed=1, fix_z=8, zarr=zarr)
-    score(TR_emu_RadLyA, test_x, test_y)
-    zmap(TR_emu_RadLyA); plt.savefig("accuracy_TR_emu_RadLyA.png", dpi=600); plt.close()
+    score(TS_emu_RadLyA, test_x, test_y)
+    zmap(TS_emu_RadLyA); plt.savefig("accuracy_TS_emu_RadLyA.png", dpi=600); plt.close()
     # Always no RSD
 elif model_generation == "SFRRadLyA":
     layers = (100, 30, 10, 5)
