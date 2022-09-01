@@ -110,10 +110,10 @@ SFR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/SFR_emu_RayL
 
 
 # Training data
-model_generation = "Sims"
+#model_generation = "Sims"
 #model_generation = "RadLyA"
 #model_generation = "TS" "TK" "TR" for Sims
-#model_generation = "TempRadLyA" #with manually setting TK or TR, or TS
+model_generation = "TempRadLyA" #with manually setting TK or TR, or TS
 #model_generation = "SFRRadLyA" #different offset
 offset = 1e-3
 
@@ -207,9 +207,37 @@ elif model_generation == "TempRadLyA":
     layers = (100, 30, 10, 5)
     #T = Trad_noRSD_Itamar[:,:31]
     #T = TK_noRSD_Itamar[:,:31]
-    T = TS_noRSD_Itamar[:,:31]
+    T = Trad_noRSD_Itamar[:,:31]
     #layers = (100, 50, 5) #For TS only, and also change 1k to 500
     #T = T21_noRSD_Itamar[:,:31]
+    def zmap(emu=TR_emu_RadLyA, full_x=PL_noRSD_Itamar, full_y=T, zmin=6, zmax=36):
+        # Make a colormap showing emulator error as a function of k and z
+        zarr = np.arange(zmin, zmax+0.1, 1)
+        def test_emu_z(emu, z, PL=full_x, Pk=full_y):
+            test_x, test_y = gen_training_1d(1, PL, Pk, seed=0, fix_z=z, zarr=zarr)
+            limit68, limit95, limit997 = score(emu, test_x, test_y)
+            return (limit68[1]-limit68[0])/2, (limit95[1]-limit95[0])/2, (limit997[1]-limit997[0])/2
+        # Compute values
+        tarr1 = np.ones([len(zarr), 1])
+        tarr2 = np.ones([len(zarr), 1])
+        tarr3 = np.ones([len(zarr), 1])
+        for i in range(len(zarr)):
+            tarr1[i,0], tarr2[i,0], tarr3[i,0] = test_emu_z(emu,zarr[i])
+        # Make plot
+        zax, kax = make_axes_pcolor(zarr, [0])
+        plt.subplot(311)
+        plt.suptitle("Emulator average CL sizes (e.g. +15/-5% is 0.1)")
+        plt.ylabel("68% CLs")
+        plt.pcolormesh(zax, kax, tarr1.T)
+        plt.colorbar()
+        plt.subplot(312)
+        plt.ylabel("95% CLs")
+        plt.pcolormesh(zax, kax, tarr2.T)
+        plt.colorbar()
+        plt.subplot(313)
+        plt.ylabel("99.7% CLs")
+        plt.pcolormesh(zax, kax, tarr3.T)
+        plt.colorbar()
     print(np.shape(T))
     print(np.shape(PL_noRSD_Itamar))
     zarr = z_array[:31]
@@ -222,6 +250,8 @@ elif model_generation == "TempRadLyA":
     ptrain_x, ptrain_y = gen_training_1d(1, PL_train, T_train, fix_z=8, zarr=zarr)
     test_x, test_y = gen_training_1d(10, PL_test, T_test, seed=0, zarr=zarr)
     ptest_x, ptest_y = gen_training_1d(1, PL_test, T_test, seed=1, fix_z=8, zarr=zarr)
+    score(TR_emu_RadLyA, test_x, test_y)
+    zmap(TR_emu_RadLyA); plt.savefig("accuracy_TR_emu_RadLyA.png", dpi=600); plt.close()
     # Always no RSD
 elif model_generation == "SFRRadLyA":
     layers = (100, 30, 10, 5)
@@ -280,9 +310,9 @@ else:
 # Make a new emulator
 
 ## Adaptive. Temperature:
-emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
-    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
-    tol=0.00001, offset=offset)
+#emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers,
+#    max_iter=9999, learning_rate="adaptive", solver="sgd", n_iter_no_change=5,
+#    tol=0.00001, offset=offset)
     # currently m2 converged runs forgot offset! Otherwise really good after ~75 it (TS)
     # emu_m3_converged done
     #emu.save("data/trained_emulators_poweremu/"+key+"emu_m3_converged.pkl")

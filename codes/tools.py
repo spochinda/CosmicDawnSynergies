@@ -150,6 +150,14 @@ def make_axes_pcolor(x,y):
         return new
     return add(x), add(y)
 
+def make_axes_pcolor_1d(x,y):
+    # Expand x and y by 1 each
+    def add(z):
+        d = np.diff(z)/2
+        new = [z[0]-d[0]]+list(np.array(z[:-1])+d)+[z[-1]+d[-1]]
+        return new
+    return add(x), [0,1]
+
 def trapezoidal_bump(a,b,c,d, peak=1):
     return sip.interp1d([a,b,c,d], [0,peak,peak,0], fill_value=(0,0), bounds_error=False)
 
