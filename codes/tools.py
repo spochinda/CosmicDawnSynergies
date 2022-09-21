@@ -48,14 +48,14 @@ k_array = load_files('data/models_21cmSim/Sims2021/', middle="_sims_", name="K",
 h=0.6704
 
 # Tools useful for emulator training data sampling
-def powerspec_of_z_k_hovercMpc(data, z_array=z_array, k_array_over_h=k_array/h):
+def powerspec_of_z_k_hovercMpc(data, z_array=z_array, k_array_over_h=k_array/h, fill_value=0, offset=1):
     # Interpolate a given power spectrum (data) at z and k within the respective bounds
     # Make sure to convert to h/cMpc and never use non-h units anywhere anymore
-    f = sip.interp2d(z_array, np.log(k_array_over_h), np.log(data+1).T, kind="linear", fill_value=0, bounds_error=False)
-    return lambda z,k: np.exp(f(z, np.log(k)))-1
+    f = sip.interp2d(z_array, np.log(k_array_over_h), np.log(data+offset).T, kind="linear", fill_value=fill_value, bounds_error=False)
+    return lambda z,k: np.exp(f(z, np.log(k)))-offset
 
 def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag=None,
-                 zlow=7, zhigh=11, klow=0.02, khigh=3):
+                 zlow=6, zhigh=36, klow=0.0445, khigh=1.633, fill_value=0, progress=False):
     # Sample random z and k from the power spectra interpolations
     # Note: Use k in h/cMpc !
     # n_over = number of random (z,k) samples per model
@@ -65,11 +65,15 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
     training_y = []
     if seed is not None:
         np.random.seed(seed)
+    counter = 0
     for m in np.random.permutation(len(params)):
+        if progress and counter%10==0:
+            print("Progress:", counter,"/", len(params))
+        counter += 1
         p = params[m]
         z = [fix_z]*n_over if fix_z else np.random.uniform(low=zlow, high=zhigh, size=n_over)
         k = [fix_k]*n_over if fix_k else np.random.uniform(low=klow, high=khigh, size=n_over)
-        f = powerspec_of_z_k_hovercMpc(data=data[m])
+        f = powerspec_of_z_k_hovercMpc(data=data[m], fill_value=fill_value)
         for j in range(n_over):
             if flag is None:
                 training_x.append([z[j],k[j], *p])

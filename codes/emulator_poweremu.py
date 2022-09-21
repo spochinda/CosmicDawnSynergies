@@ -20,6 +20,7 @@ def benchmark(PS_of_params, test_PS, test_params):
 class poweremu():
     def __init__(self, loadfile=None, hidden_layer_sizes=None, preprocesss_log_x=False,
                  preprocess_y=True, offset=1, max_iter=10, **kwargs):
+        self.offset = offset
         if hidden_layer_sizes is None:
             hidden_layer_sizes = (100,100,100,100)
         self.mlp = make_pipeline(StandardScaler(), MLPRegressor(
@@ -38,8 +39,8 @@ class poweremu():
             self.preprocess_x = lambda x: x
             self.inv_preprocess_x = lambda x: x
         if preprocess_y:
-            self.preprocess_y = lambda y: np.log(y+offset)
-            self.inv_preprocess_y = lambda y: np.exp(y)-offset
+            self.preprocess_y = lambda y: np.log(y+self.offset)
+            self.inv_preprocess_y = lambda y: np.exp(y)-self.offset
         else:
             self.preprocess_y = lambda y: y
             self.inv_preprocess_y = lambda y: y

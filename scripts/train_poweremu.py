@@ -168,6 +168,8 @@ if model_generation == "Sims":
         plt.xlabel("Redshift z")
         plt.ylabel("Wavenumber k h/cMpc")
         plt.colorbar()
+        plt.tight_layout()
+        plt.savefig("zkmap.png", dpi=600)
         plt.show()
     
 
