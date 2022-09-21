@@ -100,7 +100,7 @@ nsample = 1000
 offset = 10
 
 # Train emulator or load from file?
-run_training = False
+run_training = True
 
 PL_Sims_train, PL_Sims_test, Pk_Sims_train, Pk_Sims_test = train_test_split(PL_Sims, Pk_Sims, test_size=0.2, random_state=42)
 print("Generating training data ...")
@@ -113,15 +113,16 @@ ptest_x, ptest_y = gen_training(1, PL_Sims_test, Pk_Sims_test, seed=1, fix_k=0.1
 
 # Emulator. Use SGD so we can do adaptive learning rate. Use preprocessing as required.
 if run_training:
-    emu = poweremu(learning_rate="adaptive", solver="sgd", hidden_layer_sizes = layers,
+    emu = poweremu(loadfile="data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v3.pkl",
+                   learning_rate="adaptive", solver="sgd", hidden_layer_sizes = layers,
     			   preprocesss_log_x=False, preprocess_y=True, offset=offset,
     			   n_iter_no_change=5, max_iter=9999, batch_size=200)
     
     
     emu.train(train_x, train_y)
-    emu.save("data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v2.pkl")
+    emu.save("data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v4.pkl")
 else:
-    emu = poweremu(loadfile="data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v1.pkl",
+    emu = poweremu(loadfile="data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v3.pkl",
                    preprocesss_log_x=False, preprocess_y=True, offset=offset)
     score(emu, test_x, test_y)
     zkmap(emu, PL_Sims_test, Pk_Sims_test)
