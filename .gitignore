@@ -1,3 +1,5 @@
+# Plots based on IDR3 non-released data
+non-public/
 # Models and Chains (just too large)
 data/models_21cmSim
 data/chains

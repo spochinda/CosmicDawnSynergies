@@ -1,7 +1,7 @@
 # Load the emulator wrapper
 from codes.emulator_poweremu import *
 # And a particular emulator file
-emu = poweremu(loadfile="data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v1.pkl",
+emu = poweremu(loadfile="data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v2.pkl",
                    preprocesss_log_x=False, preprocess_y=True, offset=10)
 
 # Simple wrappers to explain which parameter is what
