@@ -1,7 +1,7 @@
 # Load the emulator wrapper
 from codes.emulator_poweremu import *
 # And a particular emulator file
-emu = poweremu(loadfile="data/trained_emulators_poweremu/pk_emu_sims_5x100_offset10_nsample1000_v2.pkl",
+emu = poweremu(loadfile="pk_complete_emu_8param.pkl",
                    preprocesss_log_x=False, preprocess_y=True, offset=10)
 
 # Simple wrappers to explain which parameter is what
@@ -17,6 +17,7 @@ def model_of_z_and_k(z, k, Rmfp=50, log10fStar=-1, log10Vc=1.3, log10fX=-1, powe
     else:
         return emu.predict([z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd, numin, tau, log10fradio])
 
+# Calling model at some z, some k, and some parameters
 model_of_z_and_k(z=10, k=0.2, Rmfp=50, log10fStar=np.log10(0.3), log10Vc=np.log10(16.5), log10fX=np.log10(0.1), powerInd=1, numin=0.8, tau=0.0561, log10fradio=np.log10(100))
 
 # Note: These are the priors we place on the parameters / extends of the training data:
@@ -45,6 +46,7 @@ def model_of_z_array(z_array, k, Rmfp=50, log10fStar=-1, log10Vc=1.3, log10fX=-1
     params[:,0] = z_array
     return emu.predict(params)
 
+
 # Plot demos
 import matplotlib.pyplot as plt
 plt.figure(constrained_layout=True)
@@ -66,8 +68,6 @@ plt.xlabel("Wavenumber k [h/Mpc]")
 plt.savefig("images/demo_k.png", dpi=600)
 plt.show()
 
-# Plot demo
-import matplotlib.pyplot as plt
 plt.figure(constrained_layout=True)
 zplot = np.linspace(7,30,100)
 for log10fStar in np.linspace(-3, np.log10(0.5), 10):

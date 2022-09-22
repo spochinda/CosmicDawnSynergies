@@ -3,20 +3,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-#from sklearn.model_selection import GridSearchCV
 import joblib
 import numpy as np
 
 
-def benchmark(PS_of_params, test_PS, test_params):
-    # Main benchmark z = 8 at k = 0.192 h/Mpc
-    # Other benchmark: "all 78 numbers from old emulator",
-    # or all HERA-k at all HERA-z, or something likelihood
-    # related such as L_true vs L_emu.
-    # Also consider TS emulator etc.
-    raise NotImplementedError
-
-# The main power spectrum emulator, also for RSD ratios
 class poweremu():
     def __init__(self, loadfile=None, hidden_layer_sizes=None, preprocesss_log_x=False,
                  preprocess_y=True, offset=1, max_iter=10, **kwargs):
