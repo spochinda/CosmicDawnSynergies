@@ -62,7 +62,7 @@ plt.legend()
 plt.ylabel(r"Dimensionless power spectrum $\Delta^2$ [mK²]")
 plt.ylim(1,4e3)
 plt.title("Extrapolation in dotted, do not use for inference")
-plt.xlabel("Redshift z")
+plt.xlabel("Wavenumber k [h/Mpc]")
 plt.savefig("images/demo_k.png", dpi=600)
 plt.show()
 
