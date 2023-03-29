@@ -101,14 +101,13 @@ def loglikelihood(p):
 
     T8 = TS_TK_Trad_from_emulators(p, z=8)
     T10 = TS_TK_Trad_from_emulators(p, z=10)
-
     return logL, [*T8, *T10, *extra]
 
 
 settings = PolyChordSettings(nDims, nDerived)
 settings.base_dir = 'idr2_chains_final2'
 settings.file_root = 'run_IDR2_{:02}'.format(index)
-settings.nlive = 2000
+settings.nlive = 2000#2000
 settings.do_clustering = True
 settings.read_resume = False
 

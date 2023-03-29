@@ -1,0 +1,4 @@
+nprior =        10000
+ndiscarded =        10000
+nprior =          400
+ndiscarded =          400

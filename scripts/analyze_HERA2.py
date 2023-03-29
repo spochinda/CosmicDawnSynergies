@@ -47,8 +47,8 @@ paramNames = ["log10fStar", "log10Vc", "log10fX", "tau", "log10Fr"]
 nDerived = 2
 nDims = len(paramNames)
 
-samples = anesthetic.NestedSamples(root="/tmp/testchains/run_IDR2")
-assert np.all(samples.logL0+samples.logL1-samples.logL < 1e-12)
+samples = anesthetic.NestedSamples(root="idr2_chains_final2/run_IDR2_01")#/tmp/testchains/run_IDR2")
+#assert np.all(samples.logL0+samples.logL1-samples.logL < 1e-12)
 
 
 

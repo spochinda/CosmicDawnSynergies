@@ -94,7 +94,7 @@ def loglikelihood(p):
 settings = PolyChordSettings(nDims, nDerived)
 settings.base_dir = 'idr2_old_chains_final2'
 settings.file_root = 'run_IDR2_old'
-settings.nlive = 10000
+settings.nlive = 400#10000
 settings.do_clustering = True
 settings.read_resume = False
 

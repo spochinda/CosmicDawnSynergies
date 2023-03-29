@@ -14,7 +14,7 @@ def extract_data(field="1", band=1,
     """
     Extract data decimated data for a specific field and band from the files.
     Adapted for IDR2 and IDR3.
-    
+
     Args:
         field : integer or string
             Which field to use. Field 1 used to give the best constraints in IDR2.
@@ -32,7 +32,7 @@ def extract_data(field="1", band=1,
         decimation_factor : integer
             Set to 2 to use every other k, set to 100 to use only the
             specified wave number.
-    
+
     Returns:
         dsq : N-dimensional array
             The data delta^2 (set to 0 if negative)
@@ -46,37 +46,47 @@ def extract_data(field="1", band=1,
         z : float
             Redshift at which the corresponding model/theory must be evaluated
     """
-    assert field in ["1","2","3"] or field in ['A', 'B', 'C', 'D', 'E'], "field name not recognized"
-    assert band in [1,2], "band must be 1 or 2."
-    if field in ["1","2","3"]:
-        data_type = "idr2"
-    else:
-        data_type = "idr3"
-    # Read the hdf5 file
-    uvp = hp.UVPSpec()
-    if data_type == "idr2":
-        uvp.read_hdf5(datapath.format(field))
-    else:
-        uvp.read_hdf5(datapath.format(field, band))
-    # Access the right band
-    if data_type == "idr2":
-        band_key = uvp.get_all_keys()[band-1]
-        spw_index = uvp.spw_array[band-1]
-    else:
-        band_key = uvp.get_all_keys()[0]
-        spw_index = uvp.spw_array[0]
-    # Get redshift (i.e. spherical window)
-    spw_frequencies = uvp.get_spw_ranges()[spw_index][:2] #:2 because we only want frequency range
-    z = uvp.cosmo.f2z(np.mean(spw_frequencies))
-    # Get wave number, data, error, and (k-space) window functions
-    kbins_data = uvp.get_kparas(spw_index)
-    kbins_model = uvp.get_kparas(spw_index)
-    dsq = uvp.get_data(band_key)[0].real.copy()
-    std = np.sqrt(uvp.get_cov(band_key)[0].diagonal().real.copy())
-    wfn = uvp.get_window_function(band_key)[0]
-    # Negative power spectra values are physically impossible
-    if set_negative_to_zero:
-        dsq[dsq < 0] = 0
+    if ("idr2" in datapath) or ("idr3" in datapath):
+        assert field in ["1","2","3"] or field in ['A', 'B', 'C', 'D', 'E'], "field name not recognized"
+        assert band in [1,2], "band must be 1 or 2."
+        if field in ["1","2","3"]:
+            data_type = "idr2"
+        else:
+            data_type = "idr3"
+        # Read the hdf5 file
+        uvp = hp.UVPSpec()
+        if data_type == "idr2":
+            uvp.read_hdf5(datapath.format(field))
+        else:
+            uvp.read_hdf5(datapath.format(field, band))
+        # Access the right band
+        if data_type == "idr2":
+            band_key = uvp.get_all_keys()[band-1]
+            spw_index = uvp.spw_array[band-1]
+        else:
+            band_key = uvp.get_all_keys()[0]
+            spw_index = uvp.spw_array[0]
+        # Get redshift (i.e. spherical window)
+        spw_frequencies = uvp.get_spw_ranges()[spw_index][:2] #:2 because we only want frequency range
+        z = uvp.cosmo.f2z(np.mean(spw_frequencies))
+        # Get wave number, data, error, and (k-space) window functions
+        kbins_data = uvp.get_kparas(spw_index)
+        kbins_model = uvp.get_kparas(spw_index)
+        dsq = uvp.get_data(band_key)[0].real.copy()
+        std = np.sqrt(uvp.get_cov(band_key)[0].diagonal().real.copy())
+        wfn = uvp.get_window_function(band_key)[0]
+        # Negative power spectra values are physically impossible
+        if set_negative_to_zero:
+            dsq[dsq < 0] = 0
+    elif ('idr4' in datapath) or ('idr6' in datapath): #added by SP
+        band = str(band)
+        data = np.load(datapath, allow_pickle=True).item()
+        z = data[band][field]["z"]
+        kbins_data = data[band][field]["k_data"]
+        kbins_model = data[band][field]["k_model"]
+        dsq = data[band][field]["dsq"]
+        std = data[band][field]["std"]
+        wfn = data[band][field]["wfn"]
     # Decimate data to assume diagonal covariance matrix
     if decimation_factor is not None:
         initial_index = (np.argmin(np.abs(kbins_data - kstart)))
@@ -91,8 +101,9 @@ def extract_data(field="1", band=1,
         wfn = wfn[kbins_indices]
         kbins_data = kbins_data[kbins_indices] # just for plots
     # Cutoff k=0 model point
-    wfn = wfn[:,1:]
-    kbins_model = kbins_model[1:]
+    if ("idr2" in datapath) or ("idr3" in datapath):
+        wfn = wfn[:,1:]
+        kbins_model = kbins_model[1:]
     return {"z": z, "k_model": kbins_model, "dsq": dsq, "std": std, "wfn": wfn, "k_data": kbins_data}
 
 def compare_data(datapath='IDR3/Deltasq_Band_{1:}_Field_{0:}.h5', theory_err=0.2,
@@ -136,18 +147,21 @@ class likelihood:
         self.set_negative_to_zero = set_negative_to_zero
         self.zero_fill = zero_fill
         self.data = {}
-        for band, selection in selections.items():
-            self.data[band] = {}
-            for field, sel in selection.items():
-                self.data[band][field] = extract_data(datapath=self.datapath,
-                         band=int(band),
-                         field=field,
-                         kstart=sel["kstart"],
-                         kstart_modulo=kstart_modulo,
-                         decimation_factor=self.decimation_factor,
-                         set_negative_to_zero=self.set_negative_to_zero)
+        if ('idr4' in self.datapath) or ('idr6' in self.datapath): #added by SP
+            self.data = np.load(self.datapath, allow_pickle=True).item()
+        elif "idr2" in self.datapath:
+            for band, selection in selections.items():
+                self.data[band] = {}
+                for field, sel in selection.items():
+                    self.data[band][field] = extract_data(datapath=self.datapath,
+                             band=int(band),
+                             field=field,
+                             kstart=sel["kstart"],
+                             kstart_modulo=kstart_modulo,
+                             decimation_factor=self.decimation_factor,
+                             set_negative_to_zero=self.set_negative_to_zero)
         self.logL0, self.logL0_individual = self.loglike(lambda z,k: np.zeros(len(k)), return_individual_loglikes=True)
-    
+
     def loglike(self, model, debug=False, return_individual_loglikes=False):
         # Important: model must take k as h/cMpc!
         loglike = 0
@@ -161,7 +175,7 @@ class likelihood:
                 z = self.data[band][field]["z"]
                 k = self.data[band][field]["k_model"]
                 m = model(z,k)
-                theory = wfn @ m
+                theory = wfn @ m #theory=model for diag(wfn), @=matrix multiplication
                 r = dsq - theory
                 l = 0.5 * (1 + ssp.erf(r / np.sqrt(2) / np.sqrt(std**2+(self.theory_err*theory)**2)))
                 assert np.shape(theory) == np.shape(dsq), "Shape mismatch"
@@ -170,6 +184,8 @@ class likelihood:
                     l[l == 0.0] = self.zero_fill
                 loglike += np.sum(np.log(l))
                 if return_individual_loglikes:
+                    #kweight = np.sum( np.log(l)*self.data[band][field]["k_data"]/np.sum(np.log(l)) )
+                    #print("z, kweight: ", z, kweight)
                     individual_loglikes.append(np.sum(np.log(l)))
 
                 if debug:
@@ -182,7 +198,7 @@ class likelihood:
             return loglike, individual_loglikes
         else:
             return loglike
-    
+
     def plot_data(self, axes=None, color="green"):
         data = self.data
         if axes is None:

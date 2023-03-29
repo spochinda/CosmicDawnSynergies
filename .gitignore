@@ -2,12 +2,12 @@
 non-public/
 # Models and Chains (just too large)
 data/models_21cmSim
-data/chains
-data/saved_samples
+data/observations_H1C_IDR2
+data/observations_H4C_IDR2
 # Emulators (lots of them, only add selectively)
 data/trained_emulators_poweremu
 # Non-public HERA data
-images/non-public/
+images/
 # Python stuff
 __pycache__/
 .ipynb_checkpoints

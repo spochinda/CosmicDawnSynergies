@@ -3,7 +3,7 @@ import scipy.optimize as sop
 import scipy.integrate as sin
 import numpy as np
 
-def confidence_level(samples, weights=None, level=0.68):
+def confidence_level(samples, weights=None, level=0.68, method="iso-probability"):
     assert level<1, "Level >= 1!"
     weights = np.ones(len(samples)) if weights is None else weights
     # Sort and normalize
@@ -15,10 +15,20 @@ def confidence_level(samples, weights=None, level=0.68):
     S = np.array([np.min(samples), *samples, np.max(samples)])
     CDF = np.append(np.insert(np.cumsum(weights), 0, 0), 1)
     invcdf = sip.interp1d(CDF, S)
-    # Find smallest interval
-    distance = lambda a, level=level: invcdf(a+level)-invcdf(a)
-    res = sop.minimize(distance, (1-level)/2, bounds=[(0,1-level)], method="Nelder-Mead")
-    return np.array([invcdf(res.x[0]), invcdf(res.x[0]+level)])
+    if method=="iso-probability":
+        # Find smallest interval
+        distance = lambda a, level=level: invcdf(a+level)-invcdf(a)
+        res = sop.minimize(distance, (1-level)/2, bounds=[(0,1-level)], method="Nelder-Mead")
+        interval =  np.array([invcdf(res.x[0]), invcdf(res.x[0]+level)])
+    elif method=="lower-limit":
+        # Get value from which we reach the desired level
+        interval = invcdf(1-level)
+    elif method=="upper-limit":
+        # Get value to which we reach the desired level
+        interval = invcdf(level)
+    else:
+        assert False, method 
+    return interval
 
 def powerInd_and_numin_from_index(index):
     powerInds = [1, 1.3, 1.5]
@@ -38,24 +48,34 @@ def numinPrior(index):
 
 from codes.loader_21cmSim import *
 ## 21cmSim uses these redshifts for all outputs, except xHI.
-z_array = np.arange(6,50.01,1)
+#z_array = np.arange(6,50.01,1)
+path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
+z_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_z_", name="hera", key='z21cm', endings=["mat"])[0] #Added by SP
+zmask = np.array(z_array >= 7) & (z_array <= 26)
+z_array = z_array[zmask]
 ## And these ones for xHI.
-z_xHI_array = np.arange(0,30.001,0.1)
-# Get the wavenumbers [1/cMpc] from the files. They
-# should be all identical but double check for new data.
-k_array = load_files('data/models_21cmSim/Sims2021/', middle="_sims_", name="K", key='Kout', endings=["fRad"])[0]
+#z_xHI_array = np.arange(0,30.001,0.1)
 # Little h for wave number conversions, use h from simulation
 h=0.6704
+# Get the wavenumbers [1/cMpc] from the files. They
+# should be all identical but double check for new data.
+
+#k_array = load_files('data/models_21cmSim/Sims2021/', middle="_sims_", name="K", key='Kout', endings=["fRad"])[0]
+k_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_k_", name="hera", key='ks', endings=["mat"])[0] #Added by SP
+kmask = np.array(k_array >= 8.5e-2) & (k_array <= 1)
+k_array = k_array[kmask]
+
 
 # Tools useful for emulator training data sampling
-def powerspec_of_z_k_hovercMpc(data, z_array=z_array, k_array_over_h=k_array/h, fill_value=0, offset=1):
+def powerspec_of_z_k_hovercMpc(data, z_array=z_array, k_array_over_h=k_array/h):
     # Interpolate a given power spectrum (data) at z and k within the respective bounds
     # Make sure to convert to h/cMpc and never use non-h units anywhere anymore
-    f = sip.interp2d(z_array, np.log(k_array_over_h), np.log(data+offset).T, kind="linear", fill_value=fill_value, bounds_error=False)
-    return lambda z,k: np.exp(f(z, np.log(k)))-offset
+    #print("zarray, log(karray): ", np.shape(z_array), np.log(k_array_over_h).shape)
+    f = sip.interp2d(z_array, np.log(k_array_over_h), np.log(data+1).T, kind="linear", fill_value=0, bounds_error=False)
+    return lambda z,k: np.exp(f(z, np.log(k)))-1
 
 def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag=None,
-                 zlow=6, zhigh=36, klow=0.0445, khigh=1.633, fill_value=0, progress=False):
+                 zlow=7, zhigh=11, klow=0.02, khigh=3):
     # Sample random z and k from the power spectra interpolations
     # Note: Use k in h/cMpc !
     # n_over = number of random (z,k) samples per model
@@ -65,15 +85,15 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
     training_y = []
     if seed is not None:
         np.random.seed(seed)
-    counter = 0
-    for m in np.random.permutation(len(params)):
-        if progress and counter%10==0:
-            print("Progress:", counter,"/", len(params))
-        counter += 1
+    print("Starting loop",flush=True)
+    for i,m in enumerate( np.random.permutation(len(params)) ):
+        if (i%round( len(params)*60/100 )==0) | (i==0):
+            print( "Index {0}/{1}: {2}% ".format(i, len(params), round(100*i/len(params)) ),flush=True )
+
         p = params[m]
         z = [fix_z]*n_over if fix_z else np.random.uniform(low=zlow, high=zhigh, size=n_over)
         k = [fix_k]*n_over if fix_k else np.random.uniform(low=klow, high=khigh, size=n_over)
-        f = powerspec_of_z_k_hovercMpc(data=data[m], fill_value=fill_value)
+        f = powerspec_of_z_k_hovercMpc(data=data[m])
         for j in range(n_over):
             if flag is None:
                 training_x.append([z[j],k[j], *p])
@@ -84,8 +104,8 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
     indices = np.random.choice(len(training_y), size=len(training_y), replace=False)
     return np.array(training_x)[indices], np.array(training_y)[indices,0]
 
-def Tinterp1d(z, Tarr, zarr=z_array):
-    f = sip.interp1d(zarr, Tarr)
+def Tinterp1d(z, Tarr, zarr):#=z_array):
+    f = sip.interp1d(zarr, Tarr, kind="linear")
     return f(z)
 
 def gen_training_1d(n_over, params, data, fix_z=False, seed=None, flag=None,
@@ -181,7 +201,7 @@ def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
     # where x, y and z are uniformly distributed random variables.
     # Approach to calculate this: Compute the beta-1d-pdf for every alpha:
     # There are (up to) 5 distinct regimes. Use empirical formulas. Proof: Todo.
-    alphamin = xmin+zmin 
+    alphamin = xmin+zmin
     betamin = ymin+zmin
     alphamax = xmax+zmax
     betamax = ymax+zmax
@@ -223,7 +243,7 @@ def sum_pdf_2d(alpha, beta, xmin, xmax, ymin, ymax, zmin, zmax, debug=False):
         return trapezoidal_bump(a,b,c,d,peak=overallnorm)(beta)
     else:
         assert False, yellow
- 
+
 
 def derive_TS_xRad(xA_Sims, xHI_Sims, TK_Sims, Trad_Sims):
     def get_TS(TK, TR, xA, xRad, z):
@@ -262,7 +282,7 @@ def derive_TS_xRad(xA_Sims, xHI_Sims, TK_Sims, Trad_Sims):
         pi = np.pi
         H = H0*np.sqrt(Om*(1+z)**3+OLambda+8.5522e-05*(1+z)**4);
         dvdr = H/(1+z)*1e5/3e24;
-        # this should be 3.08e24 to convert Mpc to cm, 
+        # this should be 3.08e24 to convert Mpc to cm,
         return (3*hpl*(c*1e5)*A10*(lambda21)**2.*nH)/(32*pi*kBoltzmann*(1+z)*dvdr)/TS
     def get_xRad(TS, xHI, z=8):
         tau21 = get_tau21(TS, xHI, z)

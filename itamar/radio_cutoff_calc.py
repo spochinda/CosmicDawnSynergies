@@ -7,7 +7,7 @@ from tqdm import trange
 import json
 
 def get_cosmo():
-    f = open("cosmo.json","r")
+    f = open("itamar/cosmo.json","r")
     cosmo = json.load(f)
     f.close()
     return cosmo
@@ -179,7 +179,7 @@ def get_zmin_all(sfrs,  frs, print_flag = False):
     return zoffs
 
 def get_z_all(sfrs,  frs, z=8, print_flag = False):
-    [nu_obs, T_obs, dT_obs] = numpy.load('LWA1_with_err.npy')
+    [nu_obs, T_obs, dT_obs] = numpy.load('itamar/LWA1_with_err.npy')
     T_obs = T_obs+2*dT_obs
     z_sfrs = numpy.arange(6,51)
     zoffs = []

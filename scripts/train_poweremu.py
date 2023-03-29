@@ -20,28 +20,28 @@ k_array = k_array[0]
 # Little h for wave number conversions, use h from simulation
 h=0.6704
 
+if False:
+    # Load Radio_and_LyAheating_Itamar models (5 parameters)
+    ## These models are without RSDs (9927+800-26):
+    PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", model_type="Fr", model_generation="new") #Deltak
+    Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", model_type="Fr", model_generation="new") #parameters mat
+    Trad = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Trad", key="Tradout", model_type="Fr", model_generation="new")
+    TK = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="TK", model_type="Fr", model_generation="new")
+    T21 = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="T21", model_type="Fr", model_generation="new")
+    xA = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="xA", model_type="Fr", model_generation="new")
+    xHI = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="xHI", model_type="Fr", model_generation="new")
+    SFR = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="SFR", model_type="Fr", model_generation="new", key="meanSFRout")
+    meanSFR = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="meanSFR", model_type="Fr", model_generation="new", key="meanSFRout")
+    assert np.all(meanSFR==SFR)
+    Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar, xA_noRSD_Itamar, xHI_noRSD_Itamar, SFR_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21, xA, xHI, SFR])
+    PL_noRSD_Itamar = PT9_to_PL5(PT)
+    TS_noRSD_Itamar = derive_TS_xRad(xA_noRSD_Itamar, xHI_noRSD_Itamar, TK_noRSD_Itamar, Trad_noRSD_Itamar)[0]
 
-# Load Radio_and_LyAheating_Itamar models (5 parameters)
-## These models are without RSDs (9927+800-26):
-PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", model_type="Fr", model_generation="new")
-Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", model_type="Fr", model_generation="new")
-Trad = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Trad", key="Tradout", model_type="Fr", model_generation="new")
-TK = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="TK", model_type="Fr", model_generation="new")
-T21 = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="T21", model_type="Fr", model_generation="new")
-xA = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="xA", model_type="Fr", model_generation="new")
-xHI = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="xHI", model_type="Fr", model_generation="new")
-SFR = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="SFR", model_type="Fr", model_generation="new", key="meanSFRout")
-meanSFR = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="meanSFR", model_type="Fr", model_generation="new", key="meanSFRout")
-assert np.all(meanSFR==SFR)
-Pk_noRSD_Itamar, [PT, Trad_noRSD_Itamar, TK_noRSD_Itamar, T21_noRSD_Itamar, xA_noRSD_Itamar, xHI_noRSD_Itamar, SFR_noRSD_Itamar] = remove_powerspectra_nans(Pk, [PT, Trad, TK, T21, xA, xHI, SFR])
-PL_noRSD_Itamar = PT9_to_PL5(PT)
-TS_noRSD_Itamar = derive_TS_xRad(xA_noRSD_Itamar, xHI_noRSD_Itamar, TK_noRSD_Itamar, Trad_noRSD_Itamar)[0]
-
-## And these with RSDs (2181-6):
-PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", endings=["fRad_RSDrand"], middle=None, key="PTout")
-Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", endings=["fRad_RSDrand1"], middle=None, key="PKout1")
-Pk_RSD_Itamar, [PT] = remove_powerspectra_nans(Pk, [PT])
-PL_RSD_Itamar = PT9_to_PL5(PT)
+    ## And these with RSDs (2181-6):
+    PT = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="PT", endings=["fRad_RSDrand"], middle=None, key="PTout")
+    Pk = load_files("data/models_21cmSim/Radio_and_LyAheating_Itamar/", name="Pk", endings=["fRad_RSDrand1"], middle=None, key="PKout1")
+    Pk_RSD_Itamar, [PT] = remove_powerspectra_nans(Pk, [PT])
+    PL_RSD_Itamar = PT9_to_PL5(PT)
 
 # Load Sims2021 models (8 parameters)
 Pk = load_files("data/models_21cmSim/Sims2021/", name="Pk", middle="_sims_", endings=["fRad"])
@@ -51,6 +51,7 @@ TK = load_files("data/models_21cmSim/Sims2021/", name="TK", middle="_sims_", end
 Trad = load_files("data/models_21cmSim/Sims2021/", name="Trad", key="Tradout", middle="_sims_", endings=["fRad"])
 xA = load_files("data/models_21cmSim/Sims2021/", name="xA", middle="_sims_", endings=["fRad"])
 xHI = load_files("data/models_21cmSim/Sims2021/", name="xHI", middle="_sims_", endings=["fRad"])
+
 Pk_Sims, [PT, TS_Sims, TK_Sims, Trad_Sims, xA_Sims, xHI_Sims] = remove_powerspectra_nans(Pk, [PT, TS, TK, Trad, xA, xHI])
 PL_Sims = PT9_to_PL8(PT)
 
@@ -110,10 +111,10 @@ SFR_emu_RadLyA = poweremu(loadfile="data/trained_emulators_poweremu/SFR_emu_RayL
 
 
 # Training data
-#model_generation = "Sims"
+model_generation = "Sims"
 #model_generation = "RadLyA"
 #model_generation = "TS" "TK" "TR" for Sims
-model_generation = "TempRadLyA" #with manually setting TK or TR, or TS
+#model_generation = "TempRadLyA" #with manually setting TK or TR, or TS
 #model_generation = "SFRRadLyA" #different offset
 offset = 1e-3
 
@@ -121,6 +122,7 @@ if model_generation == "Sims":
     layers = (100, 30, 10, 5)
     # Sims training data: [z, k, Rmfp, log10fStar, log10Vc, log10fX, powerInd (discrete), numin (discrete), tau, log10Fr]
     PL_Sims_train, PL_Sims_test, Pk_Sims_train, Pk_Sims_test = train_test_split(PL_Sims, Pk_Sims, test_size=0.2, random_state=42)
+    print(PL_Sims_train.shape, Pk_Sims_train.shape)
     train_x, train_y = gen_training(100, PL_Sims_train, Pk_Sims_train)
     ptrain_x, ptrain_y = gen_training(1, PL_Sims_train, Pk_Sims_train, fix_k=0.192, fix_z=8)
     #mtrain_x, mtrain_y = gen_training(1000, PL_Sims_train, Pk_Sims_train)
@@ -168,10 +170,8 @@ if model_generation == "Sims":
         plt.xlabel("Redshift z")
         plt.ylabel("Wavenumber k h/cMpc")
         plt.colorbar()
-        plt.tight_layout()
-        plt.savefig("zkmap.png", dpi=600)
         plt.show()
-    
+
 
 elif model_generation == "RadLyA":
     #m: (100, 30, 10, 5)
@@ -325,7 +325,7 @@ else:
 #    tol=0.00001, offset=1e-3, preprocess_y=False)
 #emu.train(train_x, train_y)
 #emu.save("data/trained_emulators_poweremu/TK_emu_RayLyA_v1_unconverged.pkl")
-# v1 converged: Good models with 
+# v1 converged: Good models with
 
 ## Constant
 #emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam")

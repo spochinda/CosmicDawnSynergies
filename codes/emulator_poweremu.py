@@ -3,14 +3,23 @@ from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+#from sklearn.model_selection import GridSearchCV
 import joblib
 import numpy as np
 
 
+def benchmark(PS_of_params, test_PS, test_params):
+    # Main benchmark z = 8 at k = 0.192 h/Mpc
+    # Other benchmark: "all 78 numbers from old emulator",
+    # or all HERA-k at all HERA-z, or something likelihood
+    # related such as L_true vs L_emu.
+    # Also consider TS emulator etc.
+    raise NotImplementedError
+
+# The main power spectrum emulator, also for RSD ratios
 class poweremu():
     def __init__(self, loadfile=None, hidden_layer_sizes=None, preprocesss_log_x=False,
                  preprocess_y=True, offset=1, max_iter=10, **kwargs):
-        self.offset = offset
         if hidden_layer_sizes is None:
             hidden_layer_sizes = (100,100,100,100)
         self.mlp = make_pipeline(StandardScaler(), MLPRegressor(
@@ -19,7 +28,7 @@ class poweremu():
             # Mandatory non-defaults
             verbose=True, validation_fraction=0, warm_start=True,
             # Defaults
-            #activation='relu', early_stopping=False, 
+            #activation='relu', early_stopping=False,
             #alpha=1e-4, solver='adam', learning_rate='constant',
             **kwargs))
         if preprocesss_log_x:
@@ -29,8 +38,8 @@ class poweremu():
             self.preprocess_x = lambda x: x
             self.inv_preprocess_x = lambda x: x
         if preprocess_y:
-            self.preprocess_y = lambda y: np.log(y+self.offset)
-            self.inv_preprocess_y = lambda y: np.exp(y)-self.offset
+            self.preprocess_y = lambda y: np.log(y+offset)
+            self.inv_preprocess_y = lambda y: np.exp(y)-offset
         else:
             self.preprocess_y = lambda y: y
             self.inv_preprocess_y = lambda y: y
@@ -52,6 +61,7 @@ class poweremu():
         # Step 1: Take the ln of y+1
         output_1 = self.preprocess_y(output_0)
         # Step 2: Train emulator incl. scaler
+        print("train_x min/max:", input_1[:,0].min(), input_1[:,0].max(),"\ntrain_y min/max:", output_1.min(), output_1.max())
         return self.mlp.fit(input_1, output_1)
     def predict(self, x):
         single_point = True if len(np.shape(x))==1 else False
