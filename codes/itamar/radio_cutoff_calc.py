@@ -119,7 +119,7 @@ def get_radio_sed(sed_type, power=-0.7):
     return numpy.log10(nu), log_sed
         
 def get_T_radio_today(z_dense, sfr_dense):
-    nu_today = numpy.logspace(-2, 1, 100)*10**9 * u.Hz # Hz
+    nu_today = numpy.logspace(-2, 1.1, 100)*10**9 * u.Hz # Hz
     lambda_today  = c.c/nu_today
     log_nu, log_sed = get_radio_sed('power_law')
     dz = abs(z_dense[1] - z_dense[0])
@@ -179,7 +179,7 @@ def get_zmin_all(sfrs,  frs, print_flag = False):
     return zoffs
 
 def get_z_all(sfrs,  frs, z=8, print_flag = False):
-    [nu_obs, T_obs, dT_obs] = numpy.load('LWA1_with_err.npy')
+    [nu_obs, T_obs, dT_obs] = numpy.load('codes/itamar/LWA1_with_err.npy')
     T_obs = T_obs+2*dT_obs
     z_sfrs = numpy.arange(6,51)
     zoffs = []
