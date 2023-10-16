@@ -140,7 +140,7 @@ def get_T_radio_today(z_dense, sfr_dense):
 
 def get_zmin_all(sfrs,  frs, print_flag = False):
 
-    [nu_obs, T_obs, dT_obs] = numpy.load('LWA1_with_err.npy')
+    [nu_obs, T_obs, dT_obs] = numpy.load('codes/itamar/LWA1_with_err.npy')
     T_obs = T_obs+2*dT_obs
     z_sfrs = numpy.arange(6,51)
     zoffs = []
