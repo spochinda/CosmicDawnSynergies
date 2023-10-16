@@ -228,7 +228,7 @@ class likelihood:
                     print("Std:", std)
                     print("Adding logL", loglike, "from", np.shape(l), "likelihoods:", np.log(l))
         if self.return_individual_loglikes:
-            return loglike, individual_loglikes
+            return [loglike, *individual_loglikes]
         else:
             return loglike
 

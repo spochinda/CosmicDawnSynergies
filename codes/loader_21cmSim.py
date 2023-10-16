@@ -38,7 +38,7 @@ def load_files(path, name=None, model_type=None, model_generation=None, endings=
     for ending in endings:
         try:
             tmp.append(loadmat(path+name+middle+ending+".mat")[key])
-            print(path+name+middle+ending+".mat", "-->", len(tmp[-1]))
+            #print(path+name+middle+ending+".mat", "-->", len(tmp[-1]))
         except KeyError:
             print(loadmat(path+name+middle+ending+".mat").keys(), key)
             raise KeyError(key)
