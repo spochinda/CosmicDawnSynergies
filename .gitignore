@@ -3,6 +3,7 @@ non-public/
 data/models_21cmSim
 data/SARAS3
 data/observations_H1C_IDR2
+data/observations_H1C_IDR3
 data/observations_H4C_IDR2
 data/globalemu
 data/margarine
@@ -10,6 +11,7 @@ data/fgivenx
 data/trained_emulators_poweremu
 images/
 Untitled.ipynb
+T_model.npz
 fgivenx_constraints.py
 # Python stuff
 __pycache__/
