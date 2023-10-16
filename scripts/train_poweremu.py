@@ -1,4 +1,3 @@
-print("In script")
 from codes.emulator_poweremu import *
 from codes.loader_21cmSim import *
 from codes.tools import *
