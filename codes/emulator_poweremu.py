@@ -51,7 +51,7 @@ class poweremu():
             assert False, ("loadfile", loadfile, "not found.")
     def load(self, loadfile):
         self.mlp = joblib.load(loadfile)
-        print("Loaded from", loadfile)
+        #print("Loaded from", loadfile)
     def save(self, loadfile):
         joblib.dump(self.mlp, loadfile)
         print("Saved to", loadfile)
@@ -61,7 +61,6 @@ class poweremu():
         # Step 1: Take the ln of y+1
         output_1 = self.preprocess_y(output_0)
         # Step 2: Train emulator incl. scaler
-        print("train_x min/max:", input_1[:,0].min(), input_1[:,0].max(),"\ntrain_y min/max:", output_1.min(), output_1.max())
         return self.mlp.fit(input_1, output_1)
     def predict(self, x):
         single_point = True if len(np.shape(x))==1 else False

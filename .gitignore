@@ -1,14 +1,19 @@
-# Plots based on IDR3 non-released data
+#Plots, chains, emulators, jupyter notebooks
 non-public/
-# Models and Chains (just too large)
 data/models_21cmSim
-data/observations_H1C_IDR2
+data/SARAS3
+data/observations_H1C_IDR3
 data/observations_H4C_IDR2
-# Emulators (lots of them, only add selectively)
+data/globalemu
+data/margarine
+data/fgivenx
 data/trained_emulators_poweremu
-# Non-public HERA data
 images/
+Untitled.ipynb
+fgivenx_constraints.py
+T_model.npy
+T_model.npz
+T_radio_data.py
 # Python stuff
 __pycache__/
 .ipynb_checkpoints
-

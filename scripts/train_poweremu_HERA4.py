@@ -7,7 +7,7 @@ import numpy as np
 from copy import deepcopy
 import seaborn as sns
 ccb = sns.color_palette("colorblind")
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 #from mpi4py import MPI
 #comm = MPI.COMM_WORLD
 #rank = comm.Get_rank()
@@ -62,7 +62,7 @@ def PT12_to_PL9(PT12):
     # Convert 12 parameters to usually used parameters, with appropriate logs
     features = np.zeros((PT12.shape[0], 9))
 
-    features[:,0] = np.log(PT12[:,0]) #fstarII
+    features[:,0] = np.log10(PT12[:,0]) #fstarII
     features[:,1] = np.log10(PT12[:,1]) #fStarIII
     features[:,2] = np.log10(PT12[:,2]) #Vc
     features[:,3] = np.log10(PT12[:,3]) #fX
@@ -87,7 +87,7 @@ n_over = 400
 layers = (100, 100, 100, 100)
 
 #Delta power spectrum emulator
-if True: #(rank==0) or (size==1):
+if False: #(rank==0) or (size==1):
     parameters_HERA4_train, parameters_HERA4_test, Deltak_HERA4_train, Deltak_HERA4_test = train_test_split(parameters_HERA4, Deltak_HERA4, test_size=0.2, random_state=42)
     #print("Checkpoint 1.0: Gen PS training, rank={0}".format(rank), flush=True)
     print("Checkpoint 1.0: Gen PS training", flush=True)
@@ -95,7 +95,7 @@ if True: #(rank==0) or (size==1):
     #Truncate data points below 1mK^2 to 1 for a better emulator.
     train_y[train_y<1] = 1
     print(train_x.shape, train_y.shape)
-"""
+
     if False: #gridsearch to tune hyperparameters
         from sklearn.neural_network import MLPRegressor
         from sklearn.pipeline import make_pipeline
@@ -150,7 +150,7 @@ if True: #(rank==0) or (size==1):
 ########################################################################
 
 #XRB emulator
-if True:
+if False:
     parameters_HERA4_train, parameters_HERA4_test, XRB_HERA4_train, XRB_HERA4_test = train_test_split(parameters_HERA4, np.log(XRB_HERA4), test_size=0.2, random_state=42)
     print("Checkpoint: XRB generate training set", flush=True)
     train_x, train_y = gen_training_1d(n_over=n_over, params=parameters_HERA4_train, data=XRB_HERA4_train, zlow=np.log( nu_keV ).min(), zhigh=np.log( nu_keV ).max(), zarr=np.log(nu_keV) )
@@ -164,7 +164,7 @@ if True:
     #emu_XRB.save(path + "data/trained_emulators_poweremu/XRB_emu_PL9_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(500, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
 
 #SFR emulator
-if True:
+if False:
     redshifts = np.array([6,7,8])
     parameters_HERA4_train, parameters_HERA4_test, SFR_HERA4_train, SFR_HERA4_test = train_test_split(parameters_HERA4, SFR_HERA4[:,:redshifts.size], test_size=0.2, random_state=42)
     print("Checkpoint: SFR generate training set", flush=True)
@@ -177,6 +177,25 @@ if True:
     emu_SFR.train(train_x, train_y)
     #emu_SFR.save(path + "data/trained_emulators_poweremu/SFR_emu_PL9_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(500, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
 
+#Tradio emulator
+if True:
+    data = np.load(path+"T_model.npz")
+    nu_today = data["nu_today"]/1e9
+    T_model = data["T_model"]
+    parameters_HERA4_train, parameters_HERA4_test, T_model_HERA4_train, T_model_HERA4_test = train_test_split(parameters_HERA4, T_model, test_size=0.2, random_state=42)
+    #plt.plot(np.log10(nu_today), np.log10(T_model_HERA4_train)[::10,:].T,alpha=0.04, c="k")
+    #plt.show()
+    print("Checkpoint: T generate training set", flush=True)
+    train_x, train_y = gen_training_1d(n_over=100, params=parameters_HERA4_train, data=np.log10(T_model_HERA4_train), zlow=np.log10(nu_today).min(), zhigh=np.log10(nu_today).max(), zarr=np.log10(nu_today) )
+    #train_y = 10**train_y
+    layers = (100, 100, 100, 100)
+    tol = 1e-4#1e-5
+    offset = 0
+    emu_T = poweremu(loadfile=None,preprocesss_log_x=False, preprocess_y=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam", offset=0,tol=tol)
+    print("Checkpoint: T training", flush=True)
+    emu_T.train(train_x, train_y)
+    emu_T.save(path + "data/trained_emulators_poweremu/T_emu2_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(100, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
+"""
 #Trad emulator
 if False: #(rank==1) or (size==1):
     Trad_noNaNs = Trad_HERA4#[:,:31]

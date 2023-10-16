@@ -3,6 +3,8 @@ import hera_pspec as hp
 #import simpleqe #https://github.com/nkern/simpleQE
 import numpy as np
 import scipy.special as ssp
+import matplotlib.pyplot as plt
+from codes.emulator_poweremu import *
 
 # Likelihood and data extraction code based on notebook in archive here:
 # http://reionization.org/science/public-data-release-1/
@@ -137,35 +139,68 @@ def compare_data(datapath='IDR3/Deltasq_Band_{1:}_Field_{0:}.h5', theory_err=0.2
     plt.grid()
     plt.legend(loc="lower right")
 
+def emulatorModel2d(emu, z, karr, p):
+    par0 = np.array([z, np.NaN, *p[:9]])
+    params=np.tile(par0, (len(karr), 1))
+    params[:,1] = karr
+    #print(params)
+    return emu.predict(params)
 
 class likelihood:
     def __init__(self, datapath='IDR2/pspec_h1c_idr2_field{}.h5', selections=None, zero_fill=1e-50,
-                decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True):
+                decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
+                return_individual_loglikes=False, debug=False,
+                emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"}
+                 ):
+        self.output_names = output_names
         self.theory_err = theory_err
         self.datapath = datapath
         self.decimation_factor = decimation_factor
         self.set_negative_to_zero = set_negative_to_zero
         self.zero_fill = zero_fill
+        self.return_individual_loglikes = return_individual_loglikes
+        self.debug = debug
+        self.model_dsq = poweremu(loadfile=emupath, preprocesss_log_x=False, tol=1e-5, offset=0)
         self.data = {}
-        if ('idr4' in self.datapath) or ('idr6' in self.datapath): #added by SP
-            self.data = np.load(self.datapath, allow_pickle=True).item()
-        elif "idr2" in self.datapath:
-            for band, selection in selections.items():
-                self.data[band] = {}
-                for field, sel in selection.items():
-                    self.data[band][field] = extract_data(datapath=self.datapath,
-                             band=int(band),
-                             field=field,
-                             kstart=sel["kstart"],
-                             kstart_modulo=kstart_modulo,
-                             decimation_factor=self.decimation_factor,
-                             set_negative_to_zero=self.set_negative_to_zero)
-        self.logL0, self.logL0_individual = self.loglike(lambda z,k: np.zeros(len(k)), return_individual_loglikes=True)
+        self.nDerived = len(self.output_names.items())
 
-    def loglike(self, model, debug=False, return_individual_loglikes=False):
+        if isinstance(self.datapath,list) and isinstance(selections,list):
+            for dpath,sel in zip(self.datapath,selections):
+                if ('idr4' in dpath) or ('idr6' in dpath): #added by SP
+                    self.data = np.load(dpath, allow_pickle=True).item()
+                elif ("idr2" in dpath) or ("idr3" in dpath):
+                    for band, selection in sel.items():
+                        self.data[band] = {}
+                        for field, sel in selection.items():
+                            self.data[band][field] = extract_data(datapath=dpath,
+                                    band=int(band),
+                                    field=field,
+                                    kstart=sel["kstart"],
+                                    kstart_modulo=kstart_modulo,
+                                    decimation_factor=self.decimation_factor,
+                                    set_negative_to_zero=self.set_negative_to_zero)
+        else:
+            if ('idr4' in self.datapath) or ('idr6' in self.datapath): #added by SP
+                self.data = np.load(self.datapath, allow_pickle=True).item()
+            elif ("idr2" in self.datapath) or ("idr3" in self.datapath):
+                for band, selection in selections.items():
+                    self.data[band] = {}
+                    for field, sel in selection.items():
+                        self.data[band][field] = extract_data(datapath=self.datapath,
+                                band=int(band),
+                                field=field,
+                                kstart=sel["kstart"],
+                                kstart_modulo=kstart_modulo,
+                                decimation_factor=self.decimation_factor,
+                                set_negative_to_zero=self.set_negative_to_zero)
+
+        #self.logL0, self.logL0_individual = self.loglike(lambda z,k: np.zeros(len(k)))
+
+    def computeLikelihood(self, p):
         # Important: model must take k as h/cMpc!
         loglike = 0
-        if return_individual_loglikes:
+        if self.return_individual_loglikes:
             individual_loglikes = []
         for band in self.data.keys():
             for field in self.data[band].keys():
@@ -174,7 +209,7 @@ class likelihood:
                 wfn = self.data[band][field]["wfn"]
                 z = self.data[band][field]["z"]
                 k = self.data[band][field]["k_model"]
-                m = model(z,k)
+                m = emulatorModel2d(emu=self.model_dsq, z=z, karr=k, p=p)
                 theory = wfn @ m #theory=model for diag(wfn), @=matrix multiplication
                 r = dsq - theory
                 l = 0.5 * (1 + ssp.erf(r / np.sqrt(2) / np.sqrt(std**2+(self.theory_err*theory)**2)))
@@ -183,18 +218,16 @@ class likelihood:
                 if self.zero_fill>0:
                     l[l == 0.0] = self.zero_fill
                 loglike += np.sum(np.log(l))
-                if return_individual_loglikes:
-                    #kweight = np.sum( np.log(l)*self.data[band][field]["k_data"]/np.sum(np.log(l)) )
-                    #print("z, kweight: ", z, kweight)
+                if self.return_individual_loglikes:
                     individual_loglikes.append(np.sum(np.log(l)))
 
-                if debug:
+                if self.debug:
                     print("Model:", m)
                     print("Theory:", theory)
                     print("Data:", dsq)
                     print("Std:", std)
                     print("Adding logL", loglike, "from", np.shape(l), "likelihoods:", np.log(l))
-        if return_individual_loglikes:
+        if self.return_individual_loglikes:
             return loglike, individual_loglikes
         else:
             return loglike

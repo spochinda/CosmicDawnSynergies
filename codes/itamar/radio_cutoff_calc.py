@@ -119,7 +119,7 @@ def get_radio_sed(sed_type, power=-0.7):
     return numpy.log10(nu), log_sed
         
 def get_T_radio_today(z_dense, sfr_dense):
-    nu_today = numpy.logspace(-2, 1, 100)*10**9 * u.Hz # Hz
+    nu_today = numpy.logspace(-2, 1.1, 100)*10**9 * u.Hz # Hz
     lambda_today  = c.c/nu_today
     log_nu, log_sed = get_radio_sed('power_law')
     dz = abs(z_dense[1] - z_dense[0])

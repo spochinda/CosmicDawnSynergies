@@ -51,7 +51,7 @@ from codes.loader_21cmSim import *
 #z_array = np.arange(6,50.01,1)
 path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
 z_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_z_", name="hera", key='z21cm', endings=["mat"])[0] #Added by SP
-zmask = np.array(z_array >= 7) & (z_array <= 26)
+zmask = np.array(z_array >= 7) & (z_array <= 27)
 z_array = z_array[zmask]
 ## And these ones for xHI.
 #z_xHI_array = np.arange(0,30.001,0.1)
@@ -89,7 +89,6 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
     for i,m in enumerate( np.random.permutation(len(params)) ):
         if (i%round( len(params)*60/100 )==0) | (i==0):
             print( "Index {0}/{1}: {2}% ".format(i, len(params), round(100*i/len(params)) ),flush=True )
-
         p = params[m]
         z = [fix_z]*n_over if fix_z else np.random.uniform(low=zlow, high=zhigh, size=n_over)
         k = [fix_k]*n_over if fix_k else np.random.uniform(low=klow, high=khigh, size=n_over)
@@ -104,7 +103,7 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
     indices = np.random.choice(len(training_y), size=len(training_y), replace=False)
     return np.array(training_x)[indices], np.array(training_y)[indices,0]
 
-def Tinterp1d(z, Tarr, zarr):#=z_array):
+def Tinterp1d(z, Tarr, zarr):
     f = sip.interp1d(zarr, Tarr, kind="linear")
     return f(z)
 
