@@ -97,7 +97,8 @@ like_hera = likelihood(
     datapath=dpath,
     decimation_factor=2,
     selections=selection,
-    return_individual_loglikes=False,
+    return_individual_loglikes=False, #Can only use false with this new likelihood module approach
+    emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
     output_names = output_names_HERA
 )
 
