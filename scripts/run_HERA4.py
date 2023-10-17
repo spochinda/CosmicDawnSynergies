@@ -1,4 +1,6 @@
-path = "/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/" #"/home/sp2053/rds/hpc-work/powerspectra_analysis/"
+import os
+path = os.path.dirname(os.getcwd()) #"/home/sp2053/rds/hpc-work/powerspectra_analysis/" #"/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
+
 import numpy as np
 from scipy.constants import parsec, physical_constants
 from codes.emulator_poweremu import *
@@ -15,7 +17,6 @@ from globalemu.eval import evaluate
 from tensorflow import keras
 from itertools import product
 
-import sys, os
 import time
 
 from mpi4py import MPI
@@ -30,19 +31,19 @@ if rank==0:
 
 """
 paramNames = [
-             "log10fstarII", #0
-             "log10fstarIII",#1
-             "log10Vc",#2
-             "log10fX",#3
-             "alpha",#4
-             "nu_0",#5
-             #"zeta",
-             "tau",#6
-             "log10fradio",#7
-             "pop",#8
-             #"feed",
-             #"delay",
-             ]
+            "log10fstarII", #0
+            "log10fstarIII",#1
+            "log10Vc",#2
+            "log10fX",#3
+            "alpha",#4
+            "nu_0",#5
+            #"zeta",
+            "tau",#6
+            "log10fradio",#7
+            "pop",#8
+            #"feed",
+            #"delay",
+            ]
 """
 texDict = {"log10fstarII": r"$\log_{10} \left(f_{\rm star, II}\right)$",
         "log10fstarIII": r"$\log_{10} \left(f_{\rm star, III}\right)$",
@@ -327,7 +328,7 @@ saras_maf = MAF.load("data/margarine/SARAS_MAF.pkl")
 mafs = [hera_maf, saras_maf]
 theta_lims = np.stack(
     [np.max([maf.theta_min for maf in mafs],axis=0), 
-     np.min([maf.theta_max for maf in mafs],axis=0)],
+    np.min([maf.theta_max for maf in mafs],axis=0)],
     axis=1)
 #maf_param_indices = [0,1,2,3,6,7]
 
@@ -349,14 +350,14 @@ def dumper(live, dead, logweights, logZ, logZerr):
 
 
 LikelihoodModules = np.array([like_hera, 
-                         LikelihoodXRB(use_MAFs=use_MAFs, output_names = output_names_Chandra), 
-                         LikelihoodRadioBackground(use_MAFs=use_MAFs, output_names = output_names_LWA), 
-                         LikelihoodSARAS3(use_MAFs=use_MAFs, output_names = output_names_SARAS3),
-                         LikelihoodNeutralFraction(use_MAFs=use_MAFs, output_names = output_names_xHI)])
+                        LikelihoodXRB(use_MAFs=use_MAFs, output_names = output_names_Chandra), 
+                        LikelihoodRadioBackground(use_MAFs=use_MAFs, output_names = output_names_LWA), 
+                        LikelihoodSARAS3(use_MAFs=use_MAFs, output_names = output_names_SARAS3),
+                        LikelihoodNeutralFraction(use_MAFs=use_MAFs, output_names = output_names_xHI)])
 
 #constraints = np.array([(1,1,1,1), (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1)]).astype(bool) #HERA, Chandra, LWA, SARAS
-constraints = np.array([(0,0,0,0,1)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
-nlives = [10]
+constraints = np.array([(1,1,1,1,0)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
+nlives = [2]
 
 for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints)):
     priorDict_ = priorDict.copy() if not SARAS else {**priorDict.copy(), **priorDict_SARAS3.copy()}
@@ -445,8 +446,8 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
         #except Exception as e:
         #    exc_type, exc_obj, exc_tb = sys.exc_info()
         #    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-         #   print(exc_type, fname, exc_tb.tb_lineno)
-         #   print(e, flush=True)
+        #   print(exc_type, fname, exc_tb.tb_lineno)
+        #   print(e, flush=True)
 
 
     
