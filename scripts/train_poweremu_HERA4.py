@@ -1,3 +1,7 @@
+path = '/home/sp2053/rds/hpc-work/powerspectra_analysis/'
+#path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
+print("Inside script")
+
 from codes.emulator_poweremu import *
 from codes.loader_21cmSim import *
 from codes.tools import *
@@ -10,12 +14,9 @@ ccb = sns.color_palette("colorblind")
 #matplotlib.use('Agg')
 #from mpi4py import MPI
 #comm = MPI.COMM_WORLD
-#rank = comm.Get_rank()
-#size = comm.Get_size()
-
-#Load data
-#path = 'data/models_21cmSim/HERA_IDR4_Emulator_Data/'
-path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
+rank = 0#comm.Get_rank()
+size = 1#comm.Get_size()
+print("Rank,size: ",rank,size)
 
 z_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_z_", name="hera", key='z21cm', endings=["mat"])[0]
 k_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_k_", name="hera", key='ks', endings=["mat"])[0]
@@ -25,6 +26,7 @@ parameters = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', m
 Trad = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_TradLOS_", name="hera", key='combined_TradLOSs', endings=["mat"])
 TK = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_TK_", name="hera", key='combined_TKs', endings=["mat"])
 Ts = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_Ts_", name="hera", key='combined_Tss', endings=["mat"])
+T21 = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_T21_", name="hera", key='combined_T21s', endings=["mat"])
 
 XRB = load_files(path + "data/models_21cmSim/HERA_IDR4_Emulator_Data/", middle="_XRB_", name="hera", key='combined_XRBs', endings=["mat"])
 nu_keV = load_files(path + "data/models_21cmSim/HERA_IDR4_Emulator_Data/", middle="_nu_", name="hera", key='nu_keV', endings=["mat"])[0]
@@ -37,6 +39,7 @@ nan_samples = np.unique(
         np.where(np.isnan(Trad))[0],
         np.where(np.isnan(TK))[0],
         np.where(np.isnan(Ts))[0],
+        ####T21 has no nans
     ])
 )
 print("Dropping {0} samples since they contain NaNs at relevant places. This is {1}% of the data, number of samples dropped. Applying z-mask and k-mask".format(len(nan_samples), np.round(len(nan_samples)/len(Deltak)*100),2))
@@ -50,6 +53,7 @@ parameters = np.delete(parameters, nan_samples, axis=0)
 Trad_HERA4 = np.delete(Trad, nan_samples, axis=0)[:,zmask]
 TK_HERA4 = np.delete(TK, nan_samples, axis=0)[:,zmask]
 Ts_HERA4 = np.delete(Ts, nan_samples, axis=0)[:,zmask]
+T21_HERA4 = np.delete(T21, nan_samples, axis=0)[:,zmask]
 
 XRB_HERA4 = np.delete(XRB[:,nu_mask], nan_samples, axis=0)
 SFR_HERA4 = np.delete(SFR, nan_samples, axis=0)
@@ -84,7 +88,6 @@ parameters_HERA4 = PT12_to_PL9(parameters)
 h=0.6704
 
 n_over = 400
-layers = (100, 100, 100, 100)
 
 #Delta power spectrum emulator
 if False: #(rank==0) or (size==1):
@@ -94,8 +97,6 @@ if False: #(rank==0) or (size==1):
     train_x, train_y = gen_training(n_over=n_over, params=parameters_HERA4_train, data=Deltak_HERA4_train, zlow=zarr.min(), zhigh=zarr.max(), klow=karr.min()/h, khigh=karr.max()/h)
     #Truncate data points below 1mK^2 to 1 for a better emulator.
     train_y[train_y<1] = 1
-    print(train_x.shape, train_y.shape)
-
     if False: #gridsearch to tune hyperparameters
         from sklearn.neural_network import MLPRegressor
         from sklearn.pipeline import make_pipeline
@@ -137,45 +138,29 @@ if False: #(rank==0) or (size==1):
         stds = clf.cv_results_['std_test_score']
         for mean, std, params in zip(means, stds, clf.cv_results_['params']):
             print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params), flush=True)
-        #np.save("gridsearch_results_2.npy", clf.cv_results_)
-
     # Train & Save
     layers = (100, 100, 100, 100) #(100, 100, 100, 100)
-    tol = 1e-6 #1e-6
+    tol = 1e-5 #1e-6
     offset = 0 #1
-    emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=310, solver="adam", offset=offset,tol=tol) #offset 10-100
+    emu_dsq = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=310, solver="adam", offset=offset,tol=tol) #offset 10-100
     print("Checkpoint 1.1: PS training", flush=True)
-    emu.train(train_x, train_y)
-    #emu.save("data/trained_emulators_poweremu/Deltasq_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
+    emu_dsq.train(train_x, train_y)
+    emu_dsq.save("data/trained_emulators_poweremu/dsq_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
 ########################################################################
 
-#XRB emulator
-if False:
-    parameters_HERA4_train, parameters_HERA4_test, XRB_HERA4_train, XRB_HERA4_test = train_test_split(parameters_HERA4, np.log(XRB_HERA4), test_size=0.2, random_state=42)
-    print("Checkpoint: XRB generate training set", flush=True)
-    train_x, train_y = gen_training_1d(n_over=n_over, params=parameters_HERA4_train, data=XRB_HERA4_train, zlow=np.log( nu_keV ).min(), zhigh=np.log( nu_keV ).max(), zarr=np.log(nu_keV) )
-    train_y = np.exp(train_y) #samples drawn in logspace and convert back
-    #layers = (100, 100, 100, 100)
-    tol = 1e-4#1e-5
-    offset = 0
-    emu_XRB = poweremu(loadfile=None,preprocesss_log_x=False, preprocess_y=True, hidden_layer_sizes=layers, max_iter=9999, solver="adam", offset=0,tol=tol)
-    print("Checkpoint: XRB training", flush=True)
-    emu_XRB.train(train_x, train_y)
-    #emu_XRB.save(path + "data/trained_emulators_poweremu/XRB_emu_PL9_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(500, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
-
 #SFR emulator
-if False:
+if False: #(rank==1) or (size==1):
     redshifts = np.array([6,7,8])
     parameters_HERA4_train, parameters_HERA4_test, SFR_HERA4_train, SFR_HERA4_test = train_test_split(parameters_HERA4, SFR_HERA4[:,:redshifts.size], test_size=0.2, random_state=42)
     print("Checkpoint: SFR generate training set", flush=True)
     train_x, train_y = gen_training_1d(n_over=n_over, params=parameters_HERA4_train, data=SFR_HERA4_train, zlow=redshifts.min(), zhigh=redshifts.max(), zarr=redshifts )
-    #layers = (100, 100, 100, 100)
-    tol = 1e-4#1e-5
+    layers = (80, 80, 80, 80)
+    tol = 1e-5#1e-5
     offset = 0
     emu_SFR = poweremu(loadfile=None,preprocesss_log_x=False, preprocess_y=True, hidden_layer_sizes=layers, max_iter=9999, solver="adam", offset=0,tol=tol)
-    print("Checkpoint: XRB training", flush=True)
+    print("Checkpoint: SFR training", flush=True)
     emu_SFR.train(train_x, train_y)
-    #emu_SFR.save(path + "data/trained_emulators_poweremu/SFR_emu_PL9_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(500, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
+    emu_SFR.save(path + "data/trained_emulators_poweremu/SFR1_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
 
 #Tradio emulator
 if True:
@@ -183,19 +168,34 @@ if True:
     nu_today = data["nu_today"]/1e9
     T_model = data["T_model"]
     parameters_HERA4_train, parameters_HERA4_test, T_model_HERA4_train, T_model_HERA4_test = train_test_split(parameters_HERA4, T_model, test_size=0.2, random_state=42)
-    #plt.plot(np.log10(nu_today), np.log10(T_model_HERA4_train)[::10,:].T,alpha=0.04, c="k")
-    #plt.show()
+    
     print("Checkpoint: T generate training set", flush=True)
-    train_x, train_y = gen_training_1d(n_over=100, params=parameters_HERA4_train, data=np.log10(T_model_HERA4_train), zlow=np.log10(nu_today).min(), zhigh=np.log10(nu_today).max(), zarr=np.log10(nu_today) )
-    #train_y = 10**train_y
+    train_x, train_y = gen_training_1d(n_over=200, params=parameters_HERA4_train, data=np.log10(T_model_HERA4_train), zlow=np.log10(nu_today).min(), zhigh=np.log10(nu_today).max(), zarr=np.log10(nu_today) )
+    train_y = 10**train_y
     layers = (100, 100, 100, 100)
     tol = 1e-4#1e-5
     offset = 0
-    emu_T = poweremu(loadfile=None,preprocesss_log_x=False, preprocess_y=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam", offset=0,tol=tol)
+    emu_T = poweremu(loadfile=None,preprocesss_log_x=False, preprocess_y=True, hidden_layer_sizes=layers, max_iter=9999, solver="adam", offset=0,tol=tol)
     print("Checkpoint: T training", flush=True)
     emu_T.train(train_x, train_y)
-    emu_T.save(path + "data/trained_emulators_poweremu/T_emu2_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(100, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
-"""
+    emu_T.save(path + "data/trained_emulators_poweremu/T_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(200, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
+
+#XRB emulator
+if (rank==0) or (size==1):
+    parameters_HERA4_train, parameters_HERA4_test, XRB_HERA4_train, XRB_HERA4_test = train_test_split(parameters_HERA4, XRB_HERA4, test_size=0.2, random_state=42)
+    print("Checkpoint: XRB generate training set", flush=True)
+    train_x, train_y = gen_training_1d(n_over=n_over, params=parameters_HERA4_train, data=np.log10(XRB_HERA4_train), zlow=np.log10( nu_keV ).min(), zhigh=np.log10( nu_keV ).max(), zarr=np.log10(nu_keV) )
+    train_y = 10**train_y #samples drawn in logspace and convert back
+    layers = (50, 50, 50, 50)
+    tol = 1e-5#1e-5
+    offset = 0
+    emu_XRB = poweremu(loadfile=None,preprocesss_log_x=False, preprocess_y=True, hidden_layer_sizes=layers, max_iter=9999, solver="adam", offset=0,tol=tol)
+    print("Checkpoint: XRB training", flush=True)
+    emu_XRB.train(train_x, train_y)
+    emu_XRB.save(path + "data/trained_emulators_poweremu/CXBlog10_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
+
+
+
 #Trad emulator
 if False: #(rank==1) or (size==1):
     Trad_noNaNs = Trad_HERA4#[:,:31]
@@ -242,6 +242,19 @@ if False: #(rank==3) or (size==1):
     emu.train(train_x, train_y)
     #emu.save("data/trained_emulators_poweremu/Ts_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol_T), str(offset_T) ))
 
+if False: #(rank==3) or (size==1):
+    T21_noNaNs = T21_HERA4#[:,:31]
+    PL_HERA4_train, PL_HERA4_test, T_HERA4_train, T_HERA4_test = train_test_split(parameters_HERA4, T21_noNaNs, test_size=0.2, random_state=42)
+    #print("Checkpoint 4.0: Gen Ts training, rank={0}".format(rank), flush=True)
+    print("Checkpoint 4.0: Gen Ts training", flush=True)
+    train_x, train_y = gen_training_1d(n_over=n_over, params=PL_HERA4_train, data=T_HERA4_train, zlow=zarr.min(), zhigh=zarr.max(), zarr=zarr)
+    layers = (100, 100, 100, 100)
+    tol_T = 1e-4
+    offset_T = 1e-3
+    emu = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=9999, solver="adam", offset=offset_T,tol=tol_T)
+    print("Checkpoint 4.1: T21 training", flush=True)
+    emu.train(train_x, train_y)
+    emu.save("data/trained_emulators_poweremu/T21_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol_T), str(offset_T) ))
 
 print("Finished training emulator. Evaluating quality...", flush=True)
 
@@ -307,9 +320,10 @@ def errmap2d(emu, full_x, full_y, x_axis=np.arange(7,26.01), y_axis=np.logspace(
     #plt.show()
     plt.savefig(filename)
 
-emu_dsq = poweremu(loadfile=path + "data/trained_emulators_poweremu/Deltasq_emu_PL9_n1000_l100100100100_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
-parameters_HERA4_train, parameters_HERA4_test, Deltak_HERA4_train, Deltak_HERA4_test = train_test_split(parameters_HERA4, Deltak_HERA4, test_size=0.2, random_state=42)
-errmap2d(emu=emu_dsq, full_x=parameters_HERA4_test, full_y=Deltak_HERA4_test, x_axis=z_array[zmask], y_axis=k_array[kmask]/h, skip=4 )
+if False: #(rank==0) or (size==1):
+    emu_dsq = poweremu(loadfile=path + "data/trained_emulators_poweremu/Deltasq_emu_n400_l100100100100_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
+    parameters_HERA4_train, parameters_HERA4_test, Deltak_HERA4_train, Deltak_HERA4_test = train_test_split(parameters_HERA4, Deltak_HERA4, test_size=0.2, random_state=42)
+    errmap2d(emu=emu_dsq, full_x=parameters_HERA4_test, full_y=Deltak_HERA4_test, x_axis=z_array[zmask], y_axis=k_array[kmask]/h, skip=0)
 
 
 def errmap1d(emu, full_x, full_y, x_axis=[6,7,8], skip=0, 
@@ -345,17 +359,17 @@ def errmap1d(emu, full_x, full_y, x_axis=[6,7,8], skip=0,
     #plt.close(fig)
     return tarr1, tarr2, tarr3
 
+if False: #(rank==2) or (size==1):
+    #emu_SFR = poweremu(loadfile=path + "data/trained_emulators_poweremu/SFR_emu_PL9_n60_l40404040_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
+    parameters_HERA4_train, parameters_HERA4_test, SFR_HERA4_train, SFR_HERA4_test = train_test_split(parameters_HERA4, SFR_HERA4[:,:3], test_size=0.2, random_state=42)
+    xlabel=r"$Redshift\ z$"
+    ylabel=r"$1 - \rm{SFR_{sim}\ /\ SFR_{emu}}\ [Unitless]$"
+    tarr1, tarr2, tarr3 = errmap1d(emu=emu_SFR, full_x=parameters_HERA4_test, full_y=SFR_HERA4_test, x_axis=[6,7,8], skip=0, xlabel=xlabel, ylabel=ylabel, filename=path+"SFR.png")
 
-#emu_SFR = poweremu(loadfile=path + "data/trained_emulators_poweremu/SFR_emu_PL9_n60_l40404040_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
-parameters_HERA4_train, parameters_HERA4_test, SFR_HERA4_train, SFR_HERA4_test = train_test_split(parameters_HERA4, SFR_HERA4[:,:3], test_size=0.2, random_state=42)
-xlabel=r"$Redshift\ z$"
-ylabel=r"$1 - \rm{SFR_{sim}\ /\ SFR_{emu}}\ [Unitless]$"
-tarr1, tarr2, tarr3 = errmap1d(emu=emu_SFR, full_x=parameters_HERA4_test, full_y=SFR_HERA4_test, x_axis=[6,7,8], skip=0, xlabel=xlabel, ylabel=ylabel, filename=path+"SFR.png")
+if False: #(rank==1) or (size==1):
+    #emu_XRB = poweremu(loadfile=path + "data/trained_emulators_poweremu/XRB_emu_PL9_n500_l100100100100_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
+    parameters_HERA4_train, parameters_HERA4_test, XRB_HERA4_train, XRB_HERA4_test = train_test_split(parameters_HERA4, XRB_HERA4, test_size=0.2, random_state=42)
+    xlabel = r"$\log \nu$"
+    ylabel = r"$1 - \rm{XRB_{sim}\ /\ XRB_{emu}}\ [Unitless]$"
+    tarr1, tarr2, tarr3 = errmap1d(emu=emu_XRB, full_x=parameters_HERA4_test, full_y=XRB_HERA4_test[:,::1], x_axis=np.log(nu_keV[::1]), skip=0, xlabel=xlabel, ylabel=ylabel, filename=path+"XRB.png")
 
-#emu_XRB = poweremu(loadfile=path + "data/trained_emulators_poweremu/XRB_emu_PL9_n500_l100100100100_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
-parameters_HERA4_train, parameters_HERA4_test, XRB_HERA4_train, XRB_HERA4_test = train_test_split(parameters_HERA4, XRB_HERA4, test_size=0.2, random_state=42)
-xlabel = r"$\log \nu$"
-ylabel = r"$1 - \rm{XRB_{sim}\ /\ XRB_{emu}}\ [Unitless]$"
-tarr1, tarr2, tarr3 = errmap1d(emu=emu_XRB, full_x=parameters_HERA4_test, full_y=XRB_HERA4_test[:,::5], x_axis=np.log(nu_keV[::5]), skip=0, xlabel=xlabel, ylabel=ylabel, filename=path+"XRB.png")
-
-"""

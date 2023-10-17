@@ -7,7 +7,7 @@ from tqdm import trange
 import json
 
 def get_cosmo():
-    f = open("/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/scripts/codes/itamar/cosmo.json","r")
+    f = open("codes/itamar/cosmo.json","r")
     cosmo = json.load(f)
     f.close()
     return cosmo

@@ -49,7 +49,7 @@ def numinPrior(index):
 from codes.loader_21cmSim import *
 ## 21cmSim uses these redshifts for all outputs, except xHI.
 #z_array = np.arange(6,50.01,1)
-path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
+path="/home/sp2053/rds/hpc-work/powerspectra_analysis/"
 z_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_z_", name="hera", key='z21cm', endings=["mat"])[0] #Added by SP
 zmask = np.array(z_array >= 7) & (z_array <= 27)
 z_array = z_array[zmask]

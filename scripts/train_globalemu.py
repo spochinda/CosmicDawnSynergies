@@ -1,4 +1,4 @@
-path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
+path = '/home/sp2053/rds/hpc-work/powerspectra_analysis/'
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from scipy.io import loadmat
