@@ -1,3 +1,4 @@
+path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from scipy.io import loadmat
@@ -7,7 +8,7 @@ from globalemu.preprocess import process
 from globalemu.network import nn
 import matplotlib.pyplot as plt
 from codes.tools import *
-path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
+
 
 
 
