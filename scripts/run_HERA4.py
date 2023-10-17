@@ -161,8 +161,6 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
     
     paramNames = list(priorDict_.keys())
 
-
-
     def prior(cube):
         theta = np.zeros_like(cube)
         if not use_MAFs:
