@@ -102,9 +102,9 @@ discrete_params = {
 }
 
 # Emulators
-P = poweremu(loadfile=path+"data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
-XRB_emu = poweremu(loadfile=path+"data/trained_emulators_poweremu/CXBlog10_emu_n400_l50505050_t1e-05_o0.pkl", preprocesss_log_x=False, tol=1e-5, offset=0)
-SFR_emu = poweremu(loadfile=path+"data/trained_emulators_poweremu/SFR1_emu_n400_l80808080_t1e-05_o0.pkl", preprocesss_log_x=False, tol=1e-5, offset=0)
+P = poweremu(loadfile=path+"/data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl", tol=1e-5, n_iter_no_change=99999, preprocesss_log_x=False, offset=0)
+XRB_emu = poweremu(loadfile=path+"/data/trained_emulators_poweremu/CXBlog10_emu_n400_l50505050_t1e-05_o0.pkl", preprocesss_log_x=False, tol=1e-5, offset=0)
+SFR_emu = poweremu(loadfile=path+"/data/trained_emulators_poweremu/SFR1_emu_n400_l80808080_t1e-05_o0.pkl", preprocesss_log_x=False, tol=1e-5, offset=0)
 
 
 
