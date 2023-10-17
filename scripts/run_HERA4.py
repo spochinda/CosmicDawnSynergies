@@ -147,7 +147,7 @@ LikelihoodModules = np.array([like_hera,
                         LikelihoodNeutralFraction(use_MAFs=use_MAFs, output_names = output_names_xHI)])
 
 #constraints = np.array([(1,1,1,1), (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1)]).astype(bool) #HERA, Chandra, LWA, SARAS
-constraints = np.array([(1,1,1,1,0)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
+constraints = np.array([(1,1,1,1,1)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
 nlives = [2]
 
 for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints)):
