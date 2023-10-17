@@ -243,7 +243,7 @@ class LikelihoodNeutralFraction:
 
     def computeLikelihood(self,p):
         if not self.use_MAFs:
-            xHI_emu, zs = self.predictor(p) 
+            xHI_emu, zs = self.predictor(p[:9]) 
             xHI_emu_sigma = 0.05
             xHI=np.array([0.09, 0.57, 0.855]) #[approx McGreer+15, Mason+18, Hoag+19]0.06
             xHI_sigma=np.array([0.08, 0.13, 0.075])#0.05

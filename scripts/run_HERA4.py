@@ -179,16 +179,19 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
 
 
     def loglikelihood(p, include_HERA=HERA, include_Chandra=Chandra,  include_LWA=LWA, include_SARAS=SARAS):
-        logL_nDerived = [likelihood.computeLikelihood(p) for likelihood in LikelihoodModules[constraints[i]]]
-        logL = np.sum([item[0] if isinstance(item,list) else item for item in logL_nDerived])
+        try:
+            logL_nDerived = [likelihood.computeLikelihood(p) for likelihood in LikelihoodModules[constraints[i]]]
+            logL = np.sum([item[0] if isinstance(item,list) else item for item in logL_nDerived])
 
-        logL_nDerived_flattened = np.array([])
-        for item in logL_nDerived:
-            if isinstance(item,list):
-                for sub_item in item:
-                    logL_nDerived_flattened = np.append(logL_nDerived_flattened, sub_item)
-            else:
-                logL_nDerived_flattened = np.append(logL_nDerived_flattened, item)
+            logL_nDerived_flattened = np.array([])
+            for item in logL_nDerived:
+                if isinstance(item,list):
+                    for sub_item in item:
+                        logL_nDerived_flattened = np.append(logL_nDerived_flattened, sub_item)
+                else:
+                    logL_nDerived_flattened = np.append(logL_nDerived_flattened, item)
+        except Exception as e:
+            print(e)
 
         return logL, logL_nDerived_flattened#, *T_emus]
 
