@@ -8,7 +8,7 @@ data/globalemu
 data/margarine
 data/fgivenx
 data/trained_emulators_poweremu
-scripts/analysis_joint_paper
+scripts/analysis_joint_paper/
 images/
 # Python stuff
 __pycache__/
