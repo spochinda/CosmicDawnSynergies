@@ -8,8 +8,8 @@ data/globalemu
 data/margarine
 data/fgivenx
 data/trained_emulators_poweremu
+scripts/analysis_joint_paper
 images/
-Untitled.ipynb
 # Python stuff
 __pycache__/
 .ipynb_checkpoints

@@ -62,9 +62,9 @@ source activate /home/sp2053/.conda/envs/emu_run
 echo "Initializing Python script with ntasks:"
 echo $SLURM_NTASKS
 
-mpirun -n $SLURM_NTASKS /home/sp2053/.conda/envs/emulator/bin/python run_HERA4.py
+mpirun -n $SLURM_NTASKS /home/sp2053/.conda/envs/emulator/bin/python run_mcmc.py
 
-#!srun -n $SLURM_NTASKS --mpi=pmix /home/sp2053/.conda/envs/emulator/bin/python run_HERA4.py
+#!srun -n $SLURM_NTASKS --mpi=pmix /home/sp2053/.conda/envs/emulator/bin/python run_mcmc.py
 
 #!python test.py 
 
