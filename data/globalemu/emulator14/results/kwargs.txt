@@ -1,0 +1,6 @@
+batch_size: 769
+epochs: 1000
+input_shape: 10
+layer_sizes: [20, 20, 20, 20]
+activation: tanh
+early_stop: True

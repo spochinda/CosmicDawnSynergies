@@ -4,20 +4,19 @@ data/models_21cmSim
 data/SARAS3
 data/observations_H1C_IDR3
 data/observations_H4C_IDR2
-data/margarine
+data/margarine/*
 !data/margarine/SARAS_MAF.pkl 
 !data/margarine/Chandra_MAF.pkl 
 !data/margarine/HERA_MAF_IDR3.pkl 
 !data/margarine/LWA_MAF.pkl 
 !data/margarine/HERA_Chandra_LWA_SARAS_MAF_IDR3.pkl
-data/fgivenx
-data/trained_emulators_poweremu
+data/trained_emulators_poweremu/*
 !data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl
 !data/trained_emulators_poweremu/SFR1_emu_n400_l80808080_t1e-05_o0.pkl
 !data/trained_emulators_poweremu/CXBlog10_emu_n400_l50505050_t1e-05_o0.pkl
-data/globalemu
+data/globalemu/*
 !data/globalemu/emulator14
-
+data/fgivenx
 scripts/analysis_joint_paper/
 images/
 # Python stuff
