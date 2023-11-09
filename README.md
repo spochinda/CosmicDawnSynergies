@@ -12,4 +12,6 @@ For the joint analysis I used 4 emulators.
 ## Usage
 Add any new likelihoods as a class in the likelihood.py file. It should have a method called computeLikelihood which returns a single log likelihood.
 
+The nested sampling is run with run_mcmc.py in scripts/.
+
 More info will follow...
