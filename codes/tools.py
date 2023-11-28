@@ -2,6 +2,7 @@ import scipy.interpolate as sip
 import scipy.optimize as sop
 import scipy.integrate as sin
 import numpy as np
+import os
 
 def confidence_level(samples, weights=None, level=0.68, method="iso-probability"):
     assert level<1, "Level >= 1!"
@@ -49,7 +50,7 @@ def numinPrior(index):
 from codes.loader_21cmSim import *
 ## 21cmSim uses these redshifts for all outputs, except xHI.
 #z_array = np.arange(6,50.01,1)
-path="/home/sp2053/rds/hpc-work/powerspectra_analysis/"
+path= os.getcwd().split("/scripts")[0] + "/"
 z_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_z_", name="hera", key='z21cm', endings=["mat"])[0] #Added by SP
 zmask = np.array(z_array >= 7) & (z_array <= 27)
 z_array = z_array[zmask]
