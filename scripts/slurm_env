@@ -4,7 +4,7 @@
 #! Name of the job:
 #SBATCH -J env_run
 #! Account name for group, use SL2 for paying queue:
-#SBATCH -A ACEDO-SL3-CPU
+#SBATCH -A ACEDO-SL2-CPU
 #! Output filename:
 #! %A means slurm job ID and %a means array index
 #SBATCH --output=%A_%a.out

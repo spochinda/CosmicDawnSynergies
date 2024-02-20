@@ -109,9 +109,8 @@ class LikelihoodRadioBackground:
     def computeLikelihood(self, p):
         if not self.use_MAFs:
             nu_today = np.logspace(-2, 1.1, 100)#*10**9 * u.Hz # Hz
-            T_model = 10**emulatorModel1d(emu=self.Tradio_emu, arr=np.log10(nu_today), p=p)
-
-            T_model_interp = np.interp(self.nu_obs, nu_today.value, T_model)
+            T_model = emulatorModel1d(emu=self.Tradio_emu, arr=np.log10(nu_today), p=p[:9])
+            T_model_interp = np.interp(self.nu_obs*1e-9, np.log10(nu_today), T_model)
             dT_model_interp = T_model_interp*0.05 #25 percent error
 
             P = 0.5 * (1 + ssp.erf( (self.T_obs - T_model_interp) / np.sqrt(2) / np.sqrt(self.dT_obs**2+dT_model_interp**2))) 
