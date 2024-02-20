@@ -51,6 +51,7 @@ class LikelihoodRadioBackground:
         self.z_array = np.arange(6, 40, 0.1) #hardcoded redshift array 6-40
 
         self.SFR_emu = poweremu(loadfile=self.emupath, preprocesss_log_x=False, tol=1e-5, offset=0)
+        self.Tradio_emu = poweremu(loadfile="data/trained_emulators_poweremu/Tradio_emu_n200_l50505050_t0.0001_o0.pkl", preprocesss_log_x=False, preprocess_y=False, tol=1e-4, offset=0)
         self.maf = MAF.load(self.mafpath)
         self.nu_obs, self.T_obs, self.dT_obs = np.load(self.datapath)
         self.nDerived = len(self.output_names.items()) #len(self.nu_obs) + 1 if not self.use_MAFs else 1 #Tradios + logLLWA     
@@ -80,7 +81,7 @@ class LikelihoodRadioBackground:
 
         return nu_today, T
 
-    def computeLikelihood(self, p):
+    def computeLikelihood_old(self, p):
         if not self.use_MAFs:
             fr = 10**p[7] #index for fradio
             z_dense = np.arange(6, 40, 0.1)
@@ -94,6 +95,24 @@ class LikelihoodRadioBackground:
             T_model = T_today * fr 
             T_model_interp = np.interp(self.nu_obs, nu_today.value, T_model)
             dT_model_interp = T_model_interp*0.25 #25 percent error
+
+            P = 0.5 * (1 + ssp.erf( (self.T_obs - T_model_interp) / np.sqrt(2) / np.sqrt(self.dT_obs**2+dT_model_interp**2))) 
+            if 0 in P:
+                logL=-np.inf
+            else:    
+                logL = np.log(P).sum()
+        else:
+            T_model_interp = None #np.zeros(len(self.T_obs))
+            logL = self.maf.log_like(p[:9], self.maf_logZ) #insert real evidence
+        return logL#, T_model_interp
+    
+    def computeLikelihood(self, p):
+        if not self.use_MAFs:
+            nu_today = np.logspace(-2, 1.1, 100)#*10**9 * u.Hz # Hz
+            T_model = 10**emulatorModel1d(emu=self.Tradio_emu, arr=np.log10(nu_today), p=p)
+
+            T_model_interp = np.interp(self.nu_obs, nu_today.value, T_model)
+            dT_model_interp = T_model_interp*0.05 #25 percent error
 
             P = 0.5 * (1 + ssp.erf( (self.T_obs - T_model_interp) / np.sqrt(2) / np.sqrt(self.dT_obs**2+dT_model_interp**2))) 
             if 0 in P:
