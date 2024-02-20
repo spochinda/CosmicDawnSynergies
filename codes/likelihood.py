@@ -11,6 +11,10 @@ from margarine.maf import MAF
 from tensorflow import keras
 from globalemu.eval import evaluate
 
+import astropy.constants as c
+import astropy.units as u
+
+
 def emulatorModel2d(emu, z, karr, p):
     par0 = np.array([z, np.NaN, *p])
     params=np.tile(par0, (len(karr), 1))
@@ -30,7 +34,7 @@ class LikelihoodRadioBackground:
     def __init__(self, 
                  z_cutoff=6.01,
                  datapath='codes/itamar/LWA1_with_err.npy',
-                 emupath='data/trained_emulators_poweremu/SFR1_emu_n400_l80808080_t1e-05_o0.pkl', 
+                 emupath="data/trained_emulators_poweremu/SFR_emu_fullz_n70_l50505050_t0.0001_o0.pkl", #'data/trained_emulators_poweremu/SFR1_emu_n400_l80808080_t1e-05_o0.pkl', 
                  mafpath='data/margarine/LWA_MAF.pkl',
                  maf_logZ = -0.05650523374863248,
                  use_MAFs=False,
@@ -44,26 +48,52 @@ class LikelihoodRadioBackground:
         self.maf_logZ = maf_logZ
         self.use_MAFs = use_MAFs
         self.z_cutoff = z_cutoff
+        self.z_array = np.arange(6, 40, 0.1) #hardcoded redshift array 6-40
 
         self.SFR_emu = poweremu(loadfile=self.emupath, preprocesss_log_x=False, tol=1e-5, offset=0)
         self.maf = MAF.load(self.mafpath)
         self.nu_obs, self.T_obs, self.dT_obs = np.load(self.datapath)
-        self.nDerived = len(self.output_names.items()) #len(self.nu_obs) + 1 if not self.use_MAFs else 1 #Tradios + logLLWA
+        self.nDerived = len(self.output_names.items()) #len(self.nu_obs) + 1 if not self.use_MAFs else 1 #Tradios + logLLWA     
 
+    def T_radio_today(self,z_dense, sfr_dense, cut_sfr=True):
+        nu_today = np.logspace(-2, 1.1, 100)*10**9 * u.Hz # Hz
+        lambda_today  = c.c/nu_today
+        log_nu, log_sed = rad.get_radio_sed('power_law')
+        dz = abs(z_dense[1] - z_dense[0])
+        T = np.zeros_like(nu_today.value)
+        
+        if cut_sfr: 
+            z_dense = z_dense[sfr_dense > 10**(-7)]
+            sfr_dense = sfr_dense[sfr_dense > 10**(-7)]
+
+        for t_idx, (ldba, nu) in enumerate(zip(lambda_today, nu_today)):
+            factor = (  ldba**2/(2*c.k_B)  )*(  c.c/(4*np.pi)  )
+            for z_idx, z in enumerate(z_dense):
+                sfr = sfr_dense[z_idx]
+                Hz = rad.Hubble_const(z) * u.km/u.s/u.Mpc
+                A = (1/Hz)*(1/(1+z)) * dz
+                log_nu_emmit = np.log10(nu.to(u.Hz).value*(1 + z))
+                log_sed_interp = np.interp(log_nu_emmit, log_nu, log_sed)
+                val = A*factor*10**(log_sed_interp)*(u.W  /u.Hz) *sfr /(u.Mpc)**3
+                #T[z_idx:, t_idx] += val.to(u.K).value
+                T[t_idx] += val.to(u.K).value
+
+        return nu_today, T
 
     def computeLikelihood(self, p):
         if not self.use_MAFs:
             fr = 10**p[7] #index for fradio
-            z_dense = np.linspace(self.z_cutoff-0.01, self.z_cutoff+0.01,2)
-            arr = [np.floor(self.z_cutoff),np.ceil(self.z_cutoff),np.ceil(self.z_cutoff)+1]
-            sfr_dense = 10**(np.interp(z_dense, arr, np.log10( 
-                emulatorModel1d(emu=self.SFR_emu, arr=arr, p=p[:9])
-            ) )) 
+            z_dense = np.arange(6, 40, 0.1)
+            SFR_predict = emulatorModel1d(emu=self.SFR_emu, arr=self.z_array, p=p)
+            sfr_dense = 10**(np.interp(z_dense, self.z_array, 
+                                       np.log10(SFR_predict)  #interpolate in logspace
+                                       ))
 
-            nu_today, T_today = rad.get_T_radio_today(z_dense[::-1], sfr_dense[::-1])
-            T_model = np.mean(T_today, axis=0) * fr
+            nu_today, T_today = self.T_radio_today(z_dense[::-1], sfr_dense[::-1]) #rad.get_T_radio_today(z_dense[::-1], sfr_dense[::-1])
+            #T_model = np.mean(T_today, axis=0) * fr
+            T_model = T_today * fr 
             T_model_interp = np.interp(self.nu_obs, nu_today.value, T_model)
-            dT_model_interp = T_model_interp*0.05
+            dT_model_interp = T_model_interp*0.25 #25 percent error
 
             P = 0.5 * (1 + ssp.erf( (self.T_obs - T_model_interp) / np.sqrt(2) / np.sqrt(self.dT_obs**2+dT_model_interp**2))) 
             if 0 in P:
