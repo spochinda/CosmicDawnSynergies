@@ -13,6 +13,7 @@ from globalemu.eval import evaluate
 
 import astropy.constants as c
 import astropy.units as u
+from scipy.interpolate import interp1d
 
 
 def emulatorModel2d(emu, z, karr, p):
@@ -80,6 +81,27 @@ class LikelihoodRadioBackground:
                 T[t_idx] += val.to(u.K).value
 
         return nu_today, T
+    
+    def get_T_radio_today_Jiten(self, zs, sfr, frad=1):
+        '''
+        Returns the T_radio today by integrating the redshifting SED across all zs,
+        scaled by the SFR at the given z and frad.
+        Note: modified from Itamar's code above to be much more efficient (x2000 faster)
+        '''
+
+        nu_today = np.logspace(-2, 1.1, 100)*1e9*u.Hz
+        log_nu, log_sed = rad.get_radio_sed('power_law')
+        log_sed_interp = interp1d(log_nu, log_sed, kind='linear')
+
+        constants = 1/(8*np.pi*c.k_B) * (c.c**3/nu_today**2)
+        dz = abs(zs[1] - zs[0])
+        A = 1/(rad.Hubble_const(zs)*u.km/u.s/u.Mpc) * 1/(1+zs) * dz # dz/(H*(1+z))
+        redshifted_sed = 10**log_sed_interp(np.log10(np.outer(1+zs,nu_today.value))) * (u.W/u.Hz) 
+
+        T_at_z = constants[None, :] * A[:, None] * frad * redshifted_sed * sfr[:, None]/(u.Mpc**3)
+        T_today = np.sum(T_at_z,axis=0).to_value(u.K)
+            
+        return nu_today, T_today
 
     def computeLikelihood_old(self, p):
         if not self.use_MAFs:
@@ -109,7 +131,7 @@ class LikelihoodRadioBackground:
     def computeLikelihood(self, p):
         if not self.use_MAFs:
             nu_today = np.logspace(-2, 1.1, 100)#*10**9 * u.Hz # Hz
-            T_model = 10**emulatorModel1d(emu=self.Tradio_emu, arr=np.log10(self.nu_obs*1e-9), p=p[:9])
+            T_model = 10**emulatorModel1d(emu=self.Tradio_emu, arr=np.log10(self.nu_obs*1e-9), p=p[:9]) #fr multiplied in the emulator
             #T_model_interp = np.interp(self.nu_obs*1e-9, np.log10(nu_today), T_model)
             dT_model = T_model*0.05 #25 percent error
 
