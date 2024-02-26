@@ -18,8 +18,8 @@ if rank==0:
     print("Running script",flush=True)
 
 
-texDict = {"log10fstarII": r"$\log_{10} \left(f_{\rm star, II}\right)$",
-        "log10fstarIII": r"$\log_{10} \left(f_{\rm star, III}\right)$",
+texDict = {"log10fstarII": r"$\log_{10} \left(f_{\rm \ast, II}\right)$",
+        "log10fstarIII": r"$\log_{10} \left(f_{\rm \ast, III}\right)$",
         "log10Vc": r"$\log_{10}\left(V_c\right)$",
         "log10fX": r"$\log_{10}\left( f_{\rm X}\right)$",
         "alpha": r"$\alpha$",
@@ -148,8 +148,8 @@ LikelihoodModules = np.array([like_hera,
                         LikelihoodNeutralFraction(use_MAFs=use_MAFs, output_names = output_names_xHI)])
 
 #constraints = np.array([(1,1,1,1), (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1)]).astype(bool) #HERA, Chandra, LWA, SARAS
-constraints = np.array([(0,0,1,0,0),(1,1,1,1,1)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
-nlives = [10000,1000]
+constraints = np.array([(1,1,1,1,0)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
+nlives = [1000]
 
 for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints)):
     priorDict_ = priorDict.copy() if not SARAS else {**priorDict.copy(), **priorDict_SARAS3.copy()}
@@ -210,10 +210,10 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
     nDerived = np.sum([likelihood.nDerived for likelihood in LikelihoodModules[constraints[i]]]) #2 #(bandsNfields*HERA-1)*0 + LikelihoodXRB(use_MAFs=use_MAFs).nDerived + LikelihoodRadioBackground(use_MAFs=use_MAFs).nDerived + LikelihoodSARAS3(use_MAFs=use_MAFs).nDerived #if not use_MAFs else 2 #+3*len(redshifts) #2*9 + 3*9 # (selections, number of bands*fields, +6 temperature outputs) # idr4=(9bands*2fields+3temps*9bands), idr2=(2bands*1fields+3temps*9redshifts(AKA bands)) #2
     settings = PolyChordSettings(nDims, nDerived)
     settings.nlive = nlive #00 #2000
-    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_test2_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive)
+    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_test_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive)
     settings.file_root = 'run'
     settings.do_clustering = True
-    settings.read_resume = False    
+    settings.read_resume = True    
     
     if rank==0:
         start_time = time.time()
