@@ -83,7 +83,6 @@ class MLP(nn.Module):
         self.fc_out = nn.Linear(hidden_dim, out_dim)
 
     def forward(self, x):
-        
         x = self.fc_in(x)
         x = self.relu(x)
         for fc in self.fc_hidden:
@@ -111,19 +110,22 @@ class poweremu_torch(nn.Module):
         self.model.train()
         for epoch in range(self.train_opt["epochs"]):
             loss_epoch = torch.tensor(0., device=self.device)
-            for i,(input,output) in enumerate(train_data):
+            for i,(input,target) in enumerate(train_data):
                 
-                if self.train_opt.get("log_indices") is not None:
+                if self.train_opt.get("log_indices") is not None: 
                     input[:, self.train_opt["log_indices"]] = torch.log10(input[:, self.train_opt["log_indices"]])
                 if (self.train_opt.get("log_output") is not None) and (self.train_opt.get("log_output")):
-                    output = torch.log10(output)
+                    target = torch.log10(target)
 
                 predicted = self.model(input)
-                loss_batch = torch.nn.MSELoss()(predicted, output)
+                #loss_batch = torch.nn.MSELoss()(predicted, output)
+                
+                loss_batch = torch.nanmean(torch.square(predicted - target))
+                
 
                 self.optimizer.zero_grad()
                 loss_batch.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
+                #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
                 self.optimizer.step()
 
                 if self.multi_gpu:
@@ -131,13 +133,16 @@ class poweremu_torch(nn.Module):
                 
                 loss_epoch += loss_batch / len(train_data)
 
+
             self.loss.append(loss_epoch.item())
 
             print(f"[{self.device}] Epoch {epoch} | Loss: {loss_epoch.item()}", flush=True)
 
-            if loss_epoch == torch.min(self.loss):
+            if loss_epoch == torch.min(torch.tensor(self.loss)):
                 print("Saving model! (train print)", flush=True)
                 #self.save_network("best_model.pth")
+            else:
+                print("Not saving model! (train print)", flush=True)
             
             if self.multi_gpu:
                 torch.distributed.barrier()
@@ -198,4 +203,70 @@ class poweremu_torch(nn.Module):
 if __name__ == "__main__":
     # Example usage
     # Load data
-    pass
+    
+    from scipy.io import loadmat
+    import numpy as np
+    from tools import gen_training
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    print(device)
+
+    z_array = loadmat("/home/dp331/dp331/dc-poch1/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat")["z21cm"][0]
+    z_mask = (z_array >= 7) & (z_array <= 27)
+    z_array = z_array[z_mask].astype(np.float32)
+    #z_array = torch.from_numpy(z_array).to(device)
+
+    k_array = loadmat("/home/dp331/dp331/dc-poch1/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat")["ks"][0]
+    k_mask = k_array >= 8.5e-2
+    k_array = k_array[k_mask].astype(np.float32)
+    #k_array = torch.from_numpy(k_array).to(device)
+
+    parameters = loadmat("/home/dp331/dp331/dc-poch1/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat")["parameters"]
+    parameters = np.delete(parameters, [6,-2,-1], axis=1).astype(np.float32)
+    #parameters = torch.from_numpy(parameters).to(device)
+    
+    Deltak = loadmat("/home/dp331/dp331/dc-poch1/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat")["combined_Deltaks"][:,z_mask,:][:,:,k_mask]
+    Deltak = Deltak.astype(np.float32)
+    #Deltak = torch.from_numpy(Deltak).to(device)
+    
+    h = 0.6704
+    input_train, input_test, output_train, output_test = train_test_split(parameters, Deltak, test_size=0.2, random_state=42)
+        
+    input_train_interp, output_train_interp = gen_training(n_over=1, params=input_train, data=output_train, zlow=z_array.min(), zhigh=z_array.max(), klow=k_array.min()/h, khigh=k_array.max()/h)
+    #find indices where output_train_interp is zero and delete them (also be careful of nans and infs)
+    zero_indices = np.argwhere(output_train_interp == 0)
+    output_train_interp = np.delete(output_train_interp, zero_indices[:,0], axis=0)
+    input_train_interp = np.delete(input_train_interp, zero_indices[:,0], axis=0)
+    
+    
+    input_train_interp = torch.from_numpy(input_train_interp.astype(np.float32)).to(device)
+    output_train_interp = torch.from_numpy(output_train_interp.astype(np.float32)).to(device)
+
+
+
+
+    # Train
+    from torch.utils.data import DataLoader, TensorDataset
+    train_data = TensorDataset(input_train_interp, output_train_interp)
+    train_loader = DataLoader(train_data, batch_size=1000, shuffle=True)
+
+
+    network_opt = {
+        "in_dim": input_train_interp.shape[1],
+        "hidden_dim": 100,
+        "n_hidden": 3,
+        "out_dim": 1
+    }
+    train_opt = {
+        "epochs": 40,
+        "log_indices": 2+np.array([0,1,2,3,7]), #+2 because we add z and k
+        "log_output": True
+    }
+
+    Emulator = poweremu_torch(network=MLP, network_opt=network_opt, train_opt=train_opt, learning_rate=1e-5, device=device)
+    Emulator.train(train_loader)
+    
+    
+    
+    
+    
