@@ -70,3 +70,132 @@ class poweremu():
         y0 = self.inv_preprocess_y(y1)
         y0 = y0[0] if single_point else y0
         return y0
+
+#build MLP regressor in pytorch
+import torch 
+import torch.nn as nn
+class MLP(nn.Module):
+    def __init__(self, in_dim, hidden_dim, n_hidden = 1, out_dim = 1):
+        super(MLP, self).__init__()
+        self.fc_in = nn.Linear(in_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc_hidden = [nn.Linear(hidden_dim, hidden_dim) for i in range(n_hidden)]
+        self.fc_out = nn.Linear(hidden_dim, out_dim)
+
+    def forward(self, x):
+        
+        x = self.fc_in(x)
+        x = self.relu(x)
+        for fc in self.fc_hidden:
+            x = self.relu(fc(x))
+        x = self.fc_out(x)
+
+        return x
+
+class poweremu_torch(nn.Module):
+    def __init__(self, network, network_opt, train_opt, learning_rate=1e-3, device="cpu"):
+        super(poweremu_torch, self).__init__()
+        self.network = network #MLP
+        self.network_opt = network_opt #dictionary of MLP args
+        self.model = network(**network_opt)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        
+        self.train_opt = train_opt #dictionary of training args (learning rate, epochs, etc.)
+        self.loss = []
+
+        self.multi_gpu = torch.cuda.device_count() > 1 
+        self.device = device #"cpu" or "cuda:i"
+        
+    def train(self, train_data):
+        
+        self.model.train()
+        for epoch in range(self.train_opt["epochs"]):
+            loss_epoch = torch.tensor(0., device=self.device)
+            for i,(input,output) in enumerate(train_data):
+                
+                if self.train_opt.get("log_indices") is not None:
+                    input[:, self.train_opt["log_indices"]] = torch.log10(input[:, self.train_opt["log_indices"]])
+                if (self.train_opt.get("log_output") is not None) and (self.train_opt.get("log_output")):
+                    output = torch.log10(output)
+
+                predicted = self.model(input)
+                loss_batch = torch.nn.MSELoss()(predicted, output)
+
+                self.optimizer.zero_grad()
+                loss_batch.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
+                self.optimizer.step()
+
+                if self.multi_gpu:
+                    torch.distributed.all_reduce(tensor=loss_batch, op=torch.distributed.ReduceOp.AVG)
+                
+                loss_epoch += loss_batch / len(train_data)
+
+            self.loss.append(loss_epoch.item())
+
+            print(f"[{self.device}] Epoch {epoch} | Loss: {loss_epoch.item()}", flush=True)
+
+            if loss_epoch == torch.min(self.loss):
+                print("Saving model! (train print)", flush=True)
+                #self.save_network("best_model.pth")
+            
+            if self.multi_gpu:
+                torch.distributed.barrier()
+    
+    @torch.no_grad()
+    def predict(self, x):
+        self.model.eval()
+        if self.train_opt.get("log_indices") is not None:
+            x[:, self.train_opt["log_indices"]] = torch.log10(x[:, self.train_opt["log_indices"]])
+
+        y = self.model(x)
+        
+        if (self.train_opt.get("log_output") is not None) and (self.train_opt.get("log_output")):
+            y = 10**y
+        return y
+
+    def save_network(self, path):
+        if not self.multi_gpu:
+            torch.save(
+                obj = dict(
+                    network_opt = self.network_opt,
+                    model = self.model.state_dict(), 
+                    optimizer = self.optimizer.state_dict(),
+                    train_opt = self.train_opt,
+                    #ema = self.ema.state_dict(),
+                    loss = self.loss,
+                    ),
+                    f = path
+                    )
+        else:
+            if str(self.device) == "cuda:0":
+                print("Saving model!", flush=True)
+                torch.save(
+                    obj = dict(
+                        network_opt = self.network_opt,
+                        model = self.model.module.state_dict(), 
+                        optimizer = self.optimizer.state_dict(),
+                        train_opt = self.train_opt,
+                        #ema = self.ema.state_dict(),
+                        loss = self.loss,
+                        ),
+                        f = path
+                        )
+
+    def load_network(self, path):
+        loaded_state = torch.load(path, map_location=self.device)
+        self.network_opt = loaded_state['network_opt']
+        self.model = self.network(**self.network_opt)
+        self.model.load_state_dict(loaded_state['model'])
+        if self.multi_gpu:
+            self.model.to(self.device)
+            self.model = nn.parallel.DistributedDataParallel(self.model, device_ids=[self.rank])
+        self.train_opt = loaded_state['train_opt']
+        self.optimizer.load_state_dict(loaded_state['optimizer'])
+        self.loss = loaded_state['loss']
+             
+    
+if __name__ == "__main__":
+    # Example usage
+    # Load data
+    pass
