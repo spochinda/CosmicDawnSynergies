@@ -3,7 +3,7 @@ import scipy.optimize as sop
 import scipy.integrate as sin
 import numpy as np
 import os
-
+from .loader_21cmSim import *
 def confidence_level(samples, weights=None, level=0.68, method="iso-probability"):
     assert level<1, "Level >= 1!"
     weights = np.ones(len(samples)) if weights is None else weights
@@ -47,7 +47,7 @@ def numinPrior(index):
     return weights[numin_index]/np.sum(weights)
 
 
-from codes.loader_21cmSim import *
+
 ## 21cmSim uses these redshifts for all outputs, except xHI.
 #z_array = np.arange(6,50.01,1)
 path= os.getcwd().split("/CosmicDawnSynergies")[0] + "/CosmicDawnSynergies/"

@@ -7,7 +7,7 @@ from tqdm import trange
 import json
 
 def get_cosmo():
-    f = open("codes/itamar/cosmo.json","r")
+    f = open(os.path.dirname(__file__)+"/cosmo.json","r")
     cosmo = json.load(f)
     f.close()
     return cosmo

@@ -1,18 +1,23 @@
+import os
+import sys
+sys.path.append("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/src/")
+from CosmicDawnSynergies.likelihood import LikelihoodNeutralFraction, LikelihoodRadioBackground, LikelihoodSARAS3, LikelihoodXRB
+from CosmicDawnSynergies.likelihood_hera import likelihood
 import numpy as np
-from codes.likelihood_hera import *
-from codes.likelihood import *
+#from codes.likelihood import *
+#from C.likelihood_hera import *
 from margarine.maf import MAF
-import pypolychord
+from pypolychord import run_polychord
 from pypolychord.settings import PolyChordSettings
 from pypolychord.priors import UniformPrior,LogUniformPrior
 import time
 from mpi4py import MPI
-import os
+
 path = os.path.dirname(os.getcwd()) #"/home/sp2053/rds/hpc-work/powerspectra_analysis/" #"/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
 
 comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
 size = comm.Get_size()
+rank = comm.Get_rank()
 
 if rank==0:
     print("Running script",flush=True)
@@ -87,21 +92,27 @@ output_names_SARAS3 = {"logL_SARAS": r"\log L_\mathrm{SARAS3}"}
 output_names_xHI = {"logL_xHI": r"\log L_\mathrm{x_{HI}}"}
     
 
-selection = [{"1": {"D": {"kstart":0.36}}}, {"2": {"C": {"kstart":0.34}}}]
+#selection = [{"1": {"D": {"kstart":0.36}}}, {"2": {"C": {"kstart":0.34}}}]
+#dpath = [
+#    'data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5',
+#    'data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5']
+#like_hera = likelihood(
+#    datapath=dpath,
+#    decimation_factor=2,
+#    selections=selection,
+#    return_individual_loglikes=False, #Can only use false with this new likelihood module approach
+#    emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+#    output_names = output_names_HERA
+#)
 
-dpath = [
-    'data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5',
-    'data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5']
-
-like_hera = likelihood(
-    datapath=dpath,
-    decimation_factor=2,
-    selections=selection,
-    return_individual_loglikes=False, #Can only use false with this new likelihood module approach
-    emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
-    output_names = output_names_HERA
-)
-
+dpath = [f"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(7,0,-1)]
+selection = len(range(7,0,-1))*[None,]
+like_hera = likelihood(datapath=dpath, selections=selection, zero_fill=1e-50,
+                decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
+                return_individual_loglikes=False, debug=False,
+                emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"}
+                 )
 
 #Setup sampling
 
@@ -145,11 +156,12 @@ LikelihoodModules = np.array([like_hera,
                         LikelihoodXRB(use_MAFs=use_MAFs, output_names = output_names_Chandra), 
                         LikelihoodRadioBackground(use_MAFs=use_MAFs, output_names = output_names_LWA), 
                         LikelihoodSARAS3(use_MAFs=use_MAFs, output_names = output_names_SARAS3),
-                        LikelihoodNeutralFraction(use_MAFs=use_MAFs, output_names = output_names_xHI)])
+                        LikelihoodNeutralFraction(use_MAFs=use_MAFs, output_names = output_names_xHI)
+                        ])
 
 #constraints = np.array([(1,1,1,1), (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1)]).astype(bool) #HERA, Chandra, LWA, SARAS
-constraints = np.array([(1,1,1,1,0)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
-nlives = [1000]
+constraints = np.array([(1,0,0,0,0)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
+nlives = [5000,]
 
 for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints)):
     priorDict_ = priorDict.copy() if not SARAS else {**priorDict.copy(), **priorDict_SARAS3.copy()}
@@ -210,7 +222,7 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
     nDerived = np.sum([likelihood.nDerived for likelihood in LikelihoodModules[constraints[i]]]) #2 #(bandsNfields*HERA-1)*0 + LikelihoodXRB(use_MAFs=use_MAFs).nDerived + LikelihoodRadioBackground(use_MAFs=use_MAFs).nDerived + LikelihoodSARAS3(use_MAFs=use_MAFs).nDerived #if not use_MAFs else 2 #+3*len(redshifts) #2*9 + 3*9 # (selections, number of bands*fields, +6 temperature outputs) # idr4=(9bands*2fields+3temps*9bands), idr2=(2bands*1fields+3temps*9redshifts(AKA bands)) #2
     settings = PolyChordSettings(nDims, nDerived)
     settings.nlive = nlive #00 #2000
-    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_test_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive)
+    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_test4_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive)
     settings.file_root = 'run'
     settings.do_clustering = True
     settings.read_resume = True    
@@ -222,7 +234,7 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
         print("Starting sampling. Base dir: {0}".format(settings.base_dir), flush=True)
     
     if True:
-        output = pypolychord.run_polychord(loglikelihood, nDims, nDerived, settings, prior, dumper)
+        output = run_polychord(loglikelihood, nDims, nDerived, settings, prior, dumper)
         #output.logZ for evidence
         redshifts_str = [str(z) for z in redshifts]
         polychordnames = []

@@ -4,8 +4,8 @@ from scipy.io import loadmat
 from scipy.constants import parsec, physical_constants
 
 import scipy.special as ssp
-import codes.itamar.radio_cutoff_calc as rad
-from codes.emulator_poweremu import *
+import CosmicDawnSynergies.itamar.radio_cutoff_calc as rad
+from .emulator_poweremu import *
 from margarine.maf import MAF
 
 from tensorflow import keras
@@ -54,7 +54,7 @@ class LikelihoodRadioBackground:
         self.SFR_emu = poweremu(loadfile=self.emupath, preprocesss_log_x=False, tol=1e-5, offset=0)
         self.Tradio_emu = poweremu(loadfile="data/trained_emulators_poweremu/Tradio_emu_n200_l50505050_t0.0001_o0.pkl", preprocesss_log_x=False, preprocess_y=False, tol=1e-4, offset=0)
         self.maf = MAF.load(self.mafpath)
-        self.nu_obs, self.T_obs, self.dT_obs = np.load(self.datapath)
+        #self.nu_obs, self.T_obs, self.dT_obs = np.load(self.datapath)
         self.nDerived = len(self.output_names.items()) #len(self.nu_obs) + 1 if not self.use_MAFs else 1 #Tradios + logLLWA     
 
     def T_radio_today(self,z_dense, sfr_dense, cut_sfr=True):

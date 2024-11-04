@@ -4,7 +4,7 @@ import hera_pspec as hp
 import numpy as np
 import scipy.special as ssp
 import matplotlib.pyplot as plt
-from codes.emulator_poweremu import *
+from .emulator_poweremu import *
 
 # Likelihood and data extraction code based on notebook in archive here:
 # http://reionization.org/science/public-data-release-1/
@@ -89,6 +89,32 @@ def extract_data(field="1", band=1,
         dsq = data[band][field]["dsq"]
         std = data[band][field]["std"]
         wfn = data[band][field]["wfn"]
+    elif ('Deltasq_Band_' in datapath): #added by SP
+        x = hp.UVPSpec()
+        x.read_hdf5(datapath)
+
+        key = x.get_all_keys()[0]
+        spw_index = x.spw_array[0]
+        # Get the delta^2
+        x.get_data(key)
+
+        # Get the (diagonal) covariance
+        std = np.sqrt(x.get_stats('P_SN', key).real[0])
+        x.convert_to_deltasq()
+        dsq = x.data_array[0].real[0,:,0]
+
+        spw_frequencies = x.get_spw_ranges()[spw_index][:2]
+        z = x.cosmo.f2z(np.mean(spw_frequencies))
+
+        k_para = x.get_kparas(spw_index)
+        k_perp = x.get_kperps(spw_index)
+        k_mag = np.sqrt(k_perp**2 + k_para**2)
+        kbins_model = kbins_data = k_mag
+    
+        wfn = np.identity(len(kbins_model))
+    
+
+
     # Decimate data to assume diagonal covariance matrix
     if decimation_factor is not None:
         initial_index = (np.argmin(np.abs(kbins_data - kstart)))
@@ -166,7 +192,7 @@ class likelihood:
         self.nDerived = len(self.output_names.items())
 
         if isinstance(self.datapath,list) and isinstance(selections,list):
-            for dpath,sel in zip(self.datapath,selections):
+            for i,(dpath,sel) in enumerate(zip(self.datapath,selections)):
                 if ('idr4' in dpath) or ('idr6' in dpath): #added by SP
                     self.data = np.load(dpath, allow_pickle=True).item()
                 elif ("idr2" in dpath) or ("idr3" in dpath):
@@ -180,6 +206,15 @@ class likelihood:
                                     kstart_modulo=kstart_modulo,
                                     decimation_factor=self.decimation_factor,
                                     set_negative_to_zero=self.set_negative_to_zero)
+                elif ('Deltasq_Band_' in dpath):
+                    self.data[i] = {}
+                    self.data[i]["0"] = extract_data(datapath=dpath, 
+                                                       band=0,
+                                                       field=0,
+                                                       kstart=0,
+                                                       kstart_modulo=False,
+                                                       decimation_factor=None,
+                                                       set_negative_to_zero=True)
         else:
             if ('idr4' in self.datapath) or ('idr6' in self.datapath): #added by SP
                 self.data = np.load(self.datapath, allow_pickle=True).item()

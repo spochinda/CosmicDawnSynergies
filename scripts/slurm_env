@@ -4,7 +4,7 @@
 #! Name of the job:
 #SBATCH -J env_run
 #! Account name for group, use SL2 for paying queue:
-#SBATCH -A ACEDO-SL2-CPU
+#SBATCH -A FIALKOV-SL3-CPU
 #! Output filename:
 #! %A means slurm job ID and %a means array index
 #SBATCH --output=%A_%a.out
@@ -15,11 +15,10 @@
 #SBATCH --nodes=1
 
 #! Number of tasks. By default SLURM assumes 1 task per node and 1 CPU per task. (for single core jobs always leave this at 1)
-#SBATCH --ntasks-per-node=38
-#!SBATCH --ntasks=62
+#SBATCH --ntasks-per-node=1
 
 #! How many many cores will be allocated per task? (for single core jobs always leave this at 1)
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=32
 #! Estimated runtime: hh:mm:ss (job is force-stopped after if exceeded):
 #SBATCH --time=11:50:00
 #! Estimated maximum memory needed (job is force-stopped if exceeded):
@@ -69,7 +68,7 @@ echo $SLURM_NTASKS
 
 
 
-mpirun -n $SLURM_NTASKS python run_mcmc.py
+mpirun -n $SLURM_CPUS_PER_TASK python run_mcmc.py
 
 #!cd /home/sp2053/.conda/envs/run_emu/lib/python3.8/site-packages/PolyChordLite/
 #!python setup.py install

@@ -4,6 +4,8 @@ data/models_21cmSim/*
 data/SARAS3/*
 data/observations_H1C_IDR3/*
 data/observations_H4C_IDR2/*
+data/observations_H6C_IDR2/*
+data/observations_SDC3b/*
 data/margarine/*
 !data/margarine/SARAS_MAF.pkl 
 !data/margarine/Chandra_MAF.pkl 
@@ -17,7 +19,12 @@ data/trained_emulators_poweremu/*
 data/globalemu/*
 !data/globalemu/emulator14
 data/fgivenx/*
+src/CosmicDawnSynergies/itamar/*
+!src/CosmicDawnSynergies/itamar/cosmo.json
+!src/CosmicDawnSynergies/itamar/radio_cutoff_calc.py
 scripts/analysis_joint_paper/*
+scripts/*err
+scripts/*out
 images/*
 **/*.DS_Store
 # Python stuff
