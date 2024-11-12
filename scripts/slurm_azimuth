@@ -1,0 +1,42 @@
+#!/bin/bash
+#! This line is a comment
+#! Make sure you only have comments and #SBATCH directives between here and the end of the #SBATCH directives, or things will break
+#! Name of the job:
+#SBATCH -J inference
+#SBATCH --partition=standard
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=26
+#SBATCH --cpus-per-task=1
+#SBATCH --time=08:00:00
+
+#! Output filename:
+#! %A means slurm job ID and %a means array index
+#SBATCH --output=%A_%a.out
+#! Errors filename:
+#SBATCH --error=%A_%a.err
+
+#! Don't put any #SBATCH directives below this line
+
+#! Modify the environment seen by the application. For this example we need the default modules.
+module purge                               # Removes all modules still loaded
+module load gnu12/12.2.0                   # REQUIRED - loads mpi compilers
+module load openmpi4/4.1.5                 # REQUIRED - loads mpi compilers
+
+
+source /home/azimuth/venvs/inference/bin/activate
+
+#!mpirun -np 25 python run_mcmc.py
+#!mpirun -np $SLURM_CPUS_PER_TASK python run_mcmc.py
+#!mpirun --hostfile hostfile -np $SLURM_CPUS_PER_TASK python test_mpi.py
+#!mpirun --map-by ppr:20:node --bind-to core -n 20 python test_mpi.py
+#!srun --nodes=1 --ntasks=20 --cpus-per-task=1 mpirun -n 20 python test_mpi.py
+#!mpirun --display-allocation -n 20 python test_mpi.py
+#!OMPI_MCA_rmaps_base_oversubscribe=0 OMPI_MCA_hwloc_base_binding_policy=core mpirun -n 20 python test_mpi.py
+#!for i in {1..3}
+#!do
+#!    echo $i
+mpirun --display-allocation -n $SLURM_NTASKS python run_mcmc.py --band_idx=1
+#!done
+
+
+

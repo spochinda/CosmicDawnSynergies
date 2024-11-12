@@ -30,3 +30,4 @@ images/*
 # Python stuff
 __pycache__/
 .ipynb_checkpoints
+src/*egg-info/

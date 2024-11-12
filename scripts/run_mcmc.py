@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/src/")
+#sys.path.append("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/src/")
 from CosmicDawnSynergies.likelihood import LikelihoodNeutralFraction, LikelihoodRadioBackground, LikelihoodSARAS3, LikelihoodXRB
 from CosmicDawnSynergies.likelihood_hera import likelihood
 import numpy as np
@@ -13,6 +13,13 @@ from pypolychord.priors import UniformPrior,LogUniformPrior
 import time
 from mpi4py import MPI
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--band_idx", type=int, default=1, help="Band index")
+args = parser.parse_args()
+band_idx = args.band_idx
+
+
 path = os.path.dirname(os.getcwd()) #"/home/sp2053/rds/hpc-work/powerspectra_analysis/" #"/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
 
 comm = MPI.COMM_WORLD
@@ -20,7 +27,7 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 if rank==0:
-    print("Running script",flush=True)
+    print(f"Running script with number of processes: {size}",flush=True)
 
 
 texDict = {"log10fstarII": r"$\log_{10} \left(f_{\rm \ast, II}\right)$",
@@ -105,8 +112,9 @@ output_names_xHI = {"logL_xHI": r"\log L_\mathrm{x_{HI}}"}
 #    output_names = output_names_HERA
 #)
 
-dpath = [f"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(7,0,-1)]
-selection = len(range(7,0,-1))*[None,]
+#dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(3,0,-1)]
+dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{band_idx}.h5",]
+selection = [None,] #len(range(3,0,-1))*[None,] #7:0
 like_hera = likelihood(datapath=dpath, selections=selection, zero_fill=1e-50,
                 decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
                 return_individual_loglikes=False, debug=False,
@@ -127,7 +135,7 @@ class UniformDiscretePrior:
 
 
 use_MAFs = False
-hera_maf = MAF.load("data/margarine/HERA_MAF_IDR3.pkl")
+"""hera_maf = MAF.load("data/margarine/HERA_MAF_IDR3.pkl")
 Chandra_maf = MAF.load("data/margarine/Chandra_MAF.pkl")
 LWA_maf = MAF.load("data/margarine/LWA_MAF.pkl")
 saras_maf = MAF.load("data/margarine/SARAS_MAF.pkl") 
@@ -139,7 +147,7 @@ theta_lims = np.stack(
     axis=1)
 #maf_param_indices = [0,1,2,3,6,7]
 
-
+"""
 def dumper(live, dead, logweights, logZ, logZerr):
     # params, derived, b0 (lowest loglikelihood at birth), l0 (loglike)
     print("Last dead point:", dead[-1], flush=True)
@@ -222,7 +230,7 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
     nDerived = np.sum([likelihood.nDerived for likelihood in LikelihoodModules[constraints[i]]]) #2 #(bandsNfields*HERA-1)*0 + LikelihoodXRB(use_MAFs=use_MAFs).nDerived + LikelihoodRadioBackground(use_MAFs=use_MAFs).nDerived + LikelihoodSARAS3(use_MAFs=use_MAFs).nDerived #if not use_MAFs else 2 #+3*len(redshifts) #2*9 + 3*9 # (selections, number of bands*fields, +6 temperature outputs) # idr4=(9bands*2fields+3temps*9bands), idr2=(2bands*1fields+3temps*9redshifts(AKA bands)) #2
     settings = PolyChordSettings(nDims, nDerived)
     settings.nlive = nlive #00 #2000
-    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_test4_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive)
+    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_above11_bidx{6}_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive,band_idx)
     settings.file_root = 'run'
     settings.do_clustering = True
     settings.read_resume = True    

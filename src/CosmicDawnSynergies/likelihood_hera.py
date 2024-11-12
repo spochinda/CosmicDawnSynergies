@@ -95,22 +95,28 @@ def extract_data(field="1", band=1,
 
         key = x.get_all_keys()[0]
         spw_index = x.spw_array[0]
+        spw_frequencies = x.get_spw_ranges()[spw_index][:2]
+        z = x.cosmo.f2z(np.mean(spw_frequencies))
         # Get the delta^2
         x.get_data(key)
-
         # Get the (diagonal) covariance
         std = np.sqrt(x.get_stats('P_SN', key).real[0])
         x.convert_to_deltasq()
         dsq = x.data_array[0].real[0,:,0]
 
-        spw_frequencies = x.get_spw_ranges()[spw_index][:2]
-        z = x.cosmo.f2z(np.mean(spw_frequencies))
-
         k_para = x.get_kparas(spw_index)
         k_perp = x.get_kperps(spw_index)
         k_mag = np.sqrt(k_perp**2 + k_para**2)
+        
+        dsq_mask = dsq+std < 1e10
+        k_mask = np.logical_and(k_mag < 1.47, k_mag > 0.027)
+        mask = np.logical_and(dsq_mask, k_mask)
+
+        dsq = dsq[mask]
+        std = std[mask]
+        k_mag = k_mag[mask]
+
         kbins_model = kbins_data = k_mag
-    
         wfn = np.identity(len(kbins_model))
     
 

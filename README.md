@@ -15,3 +15,56 @@ Add any new likelihoods as a class in the likelihood.py file. It should have a m
 The nested sampling is run with run_mcmc.py in scripts/.
 
 More info will follow...
+
+
+
+
+
+## How to install pypolychord on Azimuth
+
+### Step-by-Step Instructions
+
+1. **Load MPI compilers:**
+    ```bash
+    module load gnu12/12.2.0
+    module load openmpi4/4.1.5
+    ```
+
+    If you encounter an error indicating that `libhwloc.so.15` shared library is missing:
+
+    a. Verify `hwloc/2.9.3` is loaded or load it:
+
+        module load hwloc/2.9.3
+        
+
+    b. If `libhwloc.so.15` is still not found, check if `/opt/ohpc/pub/libs/hwloc/lib` is in the `LD_LIBRARY_PATH`:
+        
+        
+        echo $LD_LIBRARY_PATH
+        
+
+    c. If it isn't, add it to the `LD_LIBRARY_PATH`:
+        
+        
+        export LD_LIBRARY_PATH=/opt/ohpc/pub/libs/hwloc/lib:$LD_LIBRARY_PATH
+
+
+    d. If `libhwloc.so.15` is still not found, check if it exists:
+
+        find /opt/ohpc/pub/libs/hwloc/lib -name libhwloc.so.15
+
+
+    e. If it does exist and is still not found, create a symbolic link:
+        ```bash
+        sudo ln -s /opt/ohpc/pub/libs/hwloc/lib/libhwloc.so.15 /usr/lib64/libhwloc.so.15
+        ```
+
+2. **If you are missing the Python headers, install them:**
+    ```bash
+    sudo dnf install python3-devel
+    ```
+
+3. **Install pypolychord:**
+    ```bash
+    pip install git+https://github.com/PolyChord/PolyChordLite@master
+    ```

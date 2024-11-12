@@ -11,3 +11,10 @@ matplotlib
 pandas
 scikit-learn
 fastkde
+#torch
+#tqdm
+#astropy
+#tf-keras
+#globalemu
+#seaborn
+

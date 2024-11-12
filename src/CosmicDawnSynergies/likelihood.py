@@ -53,7 +53,7 @@ class LikelihoodRadioBackground:
 
         self.SFR_emu = poweremu(loadfile=self.emupath, preprocesss_log_x=False, tol=1e-5, offset=0)
         self.Tradio_emu = poweremu(loadfile="data/trained_emulators_poweremu/Tradio_emu_n200_l50505050_t0.0001_o0.pkl", preprocesss_log_x=False, preprocess_y=False, tol=1e-4, offset=0)
-        self.maf = MAF.load(self.mafpath)
+        #self.maf = MAF.load(self.mafpath)
         #self.nu_obs, self.T_obs, self.dT_obs = np.load(self.datapath)
         self.nDerived = len(self.output_names.items()) #len(self.nu_obs) + 1 if not self.use_MAFs else 1 #Tradios + logLLWA     
 
@@ -169,7 +169,7 @@ class LikelihoodXRB:
         self.maf_logZ = maf_logZ
         self.use_MAFs = use_MAFs
         self.XRB_emu = poweremu(loadfile=self.emupath, preprocesss_log_x=False, tol=1e-5, offset=0)
-        self.maf = MAF.load(self.mafpath)
+        #self.maf = MAF.load(self.mafpath)
         
         self.pre_compute()
         self.nDerived = len(self.output_names.items()) #len(self.X_limits) + 1 if not self.use_MAFs else 1 #CXBs + logLChandra
@@ -253,7 +253,7 @@ class LikelihoodSARAS3:
         #setup
         self.model = keras.models.load_model(self.emupath + 'model.h5', compile=False)
         self.predictor = evaluate(base_dir=self.emupath, model=self.model, z=self.z, gc=False, logs=[]) #0,1,2,3,7], )
-        self.maf = MAF.load(self.mafpath)
+        #self.maf = MAF.load(self.mafpath)
         self.nDerived = len(self.output_names.items()) #2 if not self.use_MAFs else 1#logLSARAS
         
         #self.pre_compute()
