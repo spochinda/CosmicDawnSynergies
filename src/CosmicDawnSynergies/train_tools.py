@@ -127,13 +127,14 @@ def ddp_setup(rank: int, world_size: int):
 
     os.environ["MASTER_PORT"] = "2594"#"12355" 
     torch.cuda.set_device(rank)
-    init_process_group(backend="gloo", rank=rank, world_size=world_size) #backend gloo for cpus? nccl for gpus
+    init_process_group(backend="nccl", rank=rank, world_size=world_size) #backend gloo for cpus? nccl for gpus
 
 class Dataloader(torch.utils.data.Dataset):
-    def __init__(self, parameters, target):
+    def __init__(self, parameters, target, device="cpu"):
         #convert np array data to dataframe
         self.parameters = parameters
         self.target = target
+        self.device = device
 
     def __len__(self):
         return len(self.target)
@@ -143,6 +144,8 @@ class Dataloader(torch.utils.data.Dataset):
         target = self.target[idx]
         parameters = torch.from_numpy(parameters).to(torch.float32)
         target = torch.tensor(target, dtype=torch.float32)
+        parameters = parameters.to(self.device)
+        target = target.to(self.device)
         return parameters, target
 
 
@@ -151,7 +154,8 @@ class MLP(nn.Module):
         super(MLP, self).__init__()
         self.fc_in = nn.Linear(in_dim, hidden_dim)
         self.relu = nn.ReLU()
-        self.fc_hidden = [nn.Linear(hidden_dim, hidden_dim) for i in range(n_hidden)]
+        #self.fc_hidden = [nn.Linear(hidden_dim, hidden_dim) for i in range(n_hidden)]
+        self.fc_hidden = nn.ModuleList([nn.Linear(hidden_dim, hidden_dim) for _ in range(n_hidden)])
         self.fc_out = nn.Linear(hidden_dim, out_dim)
 
     def forward(self, x):
@@ -164,22 +168,19 @@ class MLP(nn.Module):
         return x
 
 class poweremu_torch(nn.Module):
-    def __init__(self, network, network_opt, optimizer_opt):
+    def __init__(self, network, network_opt, optimizer_opt, device="cpu"):
         super(poweremu_torch, self).__init__()
+        self.device = device
         self.network = network #MLP
         self.network_opt = network_opt #dictionary of MLP args
-        self.model = network(**network_opt)
+        self.model = self.network(**self.network_opt).to(self.device)
+        self.multi_gpu = torch.cuda.device_count() > 1
+        if self.multi_gpu:
+            self.model = torch.nn.parallel.DistributedDataParallel(self.model, device_ids=[self.device.index])
         self.optimizer_opt = optimizer_opt #dictionary of optimizer args
         self.optimizer = torch.optim.Adam(self.model.parameters(), **optimizer_opt)
 
-        self.multi_gpu = torch.cuda.device_count() > 1
-        if self.multi_gpu:
-            rank = torch.distributed.get_rank()
-            self.device = torch.device(f"cuda:{rank}")
-        elif not self.multi_gpu and torch.cuda.is_available():
-            self.device = torch.device("cuda:0")
-        else:
-            self.device = torch.device("cpu")
+
 
         self.loss = []
         
@@ -188,9 +189,10 @@ class poweremu_torch(nn.Module):
         self.model.train()
         for e in range(epochs):
             loss_epoch = torch.tensor(0., device=self.device)
-            for i,(input,target) in enumerate(train_dataloader):
+            for i,(parameters,target) in enumerate(train_dataloader):
                 print(f"[{str(self.device)}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()}", flush=True)
-                predicted = self.model(input)
+                print(f"data device {parameters.device} | target device {target.device} | model device {self.model.device}", flush=True)
+                predicted = self.model(parameters)
                 
                 loss_batch = torch.nanmean(torch.square(predicted - target))
                 
@@ -276,25 +278,24 @@ def prepare_parameters(parameters, log_indices=[0,1,2,3,8], discard_indices=[6,1
     parameters = np.delete(parameters, discard_indices, axis=1)
     return parameters
 
-def train(rank, parameters, logdsq_interp):
-    world_size = torch.cuda.device_count()
-    multi_gpu = world_size > 1
+def train(rank, multi_gpu, parameters, logdsq_interp):
     
     if multi_gpu:
+        world_size = torch.cuda.device_count()
         device = torch.device(f"cuda:{rank}")
-        ddp_setup(rank, world_size=2)
+        ddp_setup(rank, world_size=world_size)
     elif not multi_gpu and torch.cuda.is_available():
         device = torch.device("cuda:0")
     else:
         device = torch.device("cpu")
 
-    train_data_module = Dataloader(parameters=parameters, target=logdsq_interp)
-    train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_data_module, shuffle=True, seed=0) if False else None
-    train_dataloader = torch.utils.data.DataLoader(train_data_module, batch_size=2*10000, shuffle=(train_sampler is None), sampler = train_sampler)
+    train_data_module = Dataloader(parameters=parameters, target=logdsq_interp, device=device)
+    train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_data_module, shuffle=True, seed=0) if multi_gpu else None
+    train_dataloader = torch.utils.data.DataLoader(train_data_module, batch_size=10000, shuffle=(train_sampler is None), sampler = train_sampler)
 
     network_opt = dict(in_dim=parameters.shape[1], hidden_dim=100, n_hidden = 4, out_dim = 1)
     optimizer_opt = dict(lr=1e-3)
-    emu = poweremu_torch(network=MLP, network_opt=network_opt, optimizer_opt=optimizer_opt)
+    emu = poweremu_torch(network=MLP, network_opt=network_opt, optimizer_opt=optimizer_opt, device=device)
 
     #train
     emu.train(train_dataloader, epochs=10)
@@ -315,11 +316,15 @@ if __name__ == "__main__":
     #print([(parameters[:,i].min(),parameters[:,i].max()) for i in range(parameters.shape[1])])
     minimum = dsq[dsq!=0].min()
     dsq[dsq==0] = minimum * 1e-3
-    parameters, logdsq_interp = gen_training_data(parameters=parameters, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 30], [3e-2, 0.99, 30]], data_dims_log=[False, True], data_log=True)
+    parameters, logdsq_interp = gen_training_data(parameters=parameters, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_dims_log=[False, True], data_log=True)
 
     if multi_gpu:
-        torch.multiprocessing.spawn(train, args=(parameters, logdsq_interp), nprocs=world_size)
+        print("Using multi-gpu", flush=True)
+        for i in range(torch.cuda.device_count()):
+            print(f"Device {i}: {torch.cuda.get_device_properties(i).name}", flush=True)
+        torch.multiprocessing.spawn(train, args=(multi_gpu, parameters, logdsq_interp), nprocs=world_size)
     else:
-        train(0, parameters, logdsq_interp)
+        print("Not using multi-gpu")
+        train(0, multi_gpu, parameters, logdsq_interp)
 
 
