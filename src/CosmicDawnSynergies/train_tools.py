@@ -3,6 +3,7 @@ from scipy.io import loadmat
 from scipy.interpolate import RegularGridInterpolator
 from joblib import Parallel, delayed
 import numpy as np
+import torch.distributed
 from tqdm import tqdm
 
 import matplotlib.pyplot as plt
@@ -110,11 +111,24 @@ plt.savefig(current_dir+'/images/XRB_interpolation_test.png')
 
 
 #build MLP regressor in pytorch
+import pandas as pd
 import torch 
 import torch.nn as nn
-import pandas as pd
+from torch.distributed import init_process_group, destroy_process_group
 
-#PyTorch dataloader with __init__, __len__, and __getitem__ methods
+
+def ddp_setup(rank: int, world_size: int):
+    try:
+        os.environ["MASTER_ADDR"] #check if master address exists
+        print("Found master address: ", os.environ["MASTER_ADDR"])
+    except:
+        print("Did not find master address variable. Setting manually...")
+        os.environ["MASTER_ADDR"] = "localhost"
+
+    os.environ["MASTER_PORT"] = "2594"#"12355" 
+    torch.cuda.set_device(rank)
+    init_process_group(backend="gloo", rank=rank, world_size=world_size) #backend gloo for cpus? nccl for gpus
+
 class Dataloader(torch.utils.data.Dataset):
     def __init__(self, parameters, target):
         #convert np array data to dataframe
@@ -175,7 +189,7 @@ class poweremu_torch(nn.Module):
         for e in range(epochs):
             loss_epoch = torch.tensor(0., device=self.device)
             for i,(input,target) in enumerate(train_dataloader):
-                print(f"[{self.device}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()}", flush=True)
+                print(f"[{str(self.device)}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()}", flush=True)
                 predicted = self.model(input)
                 
                 loss_batch = torch.nanmean(torch.square(predicted - target))
@@ -188,7 +202,7 @@ class poweremu_torch(nn.Module):
                 if self.multi_gpu:
                     torch.distributed.all_reduce(tensor=loss_batch, op=torch.distributed.ReduceOp.AVG)
                 
-                loss_epoch += loss_batch.detach() * (len(target) / train_dataloader.__len__())
+                loss_epoch += loss_batch.detach() / train_dataloader.__len__() # maybe not right
 
 
             self.loss.append(loss_epoch.item())
@@ -262,12 +276,17 @@ def prepare_parameters(parameters, log_indices=[0,1,2,3,8], discard_indices=[6,1
     parameters = np.delete(parameters, discard_indices, axis=1)
     return parameters
 
-if __name__ == "__main__":
-    parameters = prepare_parameters(parameters)
-    #print([(parameters[:,i].min(),parameters[:,i].max()) for i in range(parameters.shape[1])])
-    minimum = dsq[dsq!=0].min()
-    dsq[dsq==0] = minimum * 1e-3
-    parameters, logdsq_interp = gen_training_data(parameters=parameters, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 30], [3e-2, 0.99, 30]], data_dims_log=[False, True], data_log=True)
+def train(rank, parameters, logdsq_interp):
+    world_size = torch.cuda.device_count()
+    multi_gpu = world_size > 1
+    
+    if multi_gpu:
+        device = torch.device(f"cuda:{rank}")
+        ddp_setup(rank, world_size=2)
+    elif not multi_gpu and torch.cuda.is_available():
+        device = torch.device("cuda:0")
+    else:
+        device = torch.device("cpu")
 
     train_data_module = Dataloader(parameters=parameters, target=logdsq_interp)
     train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_data_module, shuffle=True, seed=0) if False else None
@@ -279,5 +298,28 @@ if __name__ == "__main__":
 
     #train
     emu.train(train_dataloader, epochs=10)
+
+    if multi_gpu:
+        torch.distributed.barrier()
+        destroy_process_group()
+
+    
+
+
+if __name__ == "__main__":
+    world_size = torch.cuda.device_count()
+    multi_gpu = world_size > 1
+
+
+    parameters = prepare_parameters(parameters)
+    #print([(parameters[:,i].min(),parameters[:,i].max()) for i in range(parameters.shape[1])])
+    minimum = dsq[dsq!=0].min()
+    dsq[dsq==0] = minimum * 1e-3
+    parameters, logdsq_interp = gen_training_data(parameters=parameters, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 30], [3e-2, 0.99, 30]], data_dims_log=[False, True], data_log=True)
+
+    if multi_gpu:
+        torch.multiprocessing.spawn(train, args=(parameters, logdsq_interp), nprocs=world_size)
+    else:
+        train(0, parameters, logdsq_interp)
 
 
