@@ -44,7 +44,7 @@ def random_grid_interpolation(p, data_dims, data, vars):
 
 
 
-def gen_training_data(parameters, data_dims, data, vars, data_dims_log, data_log, n_jobs=-1):
+def gen_training_data(parameters, data_dims, data, vars, data_dims_log, data_log, n_jobs=-1, verbose=False):
     
     data_dims = [np.log10(data_dims[i]) if data_dims_log[i] else data_dims[i] for i in range(len(data_dims))]
     data = np.log10(data) if data_log else data
@@ -52,7 +52,7 @@ def gen_training_data(parameters, data_dims, data, vars, data_dims_log, data_log
 
     results = Parallel(n_jobs=n_jobs)(
         delayed(random_grid_interpolation)(p=p, data_dims=data_dims, data=data_i, vars=vars)
-        for p, data_i in tqdm(zip(parameters, data), total=len(parameters))
+        for p, data_i in tqdm(zip(parameters, data), total=len(parameters), desc="Interpolating", disable=not verbose)
     )
 
     p_list, interp_list = zip(*results)
@@ -115,6 +115,8 @@ import pandas as pd
 import torch 
 import torch.nn as nn
 from torch.distributed import init_process_group, destroy_process_group
+from sklearn.model_selection import train_test_split
+import time 
 
 
 def ddp_setup(rank: int, world_size: int):
@@ -130,11 +132,19 @@ def ddp_setup(rank: int, world_size: int):
     init_process_group(backend="nccl", rank=rank, world_size=world_size) #backend gloo for cpus? nccl for gpus
 
 class Dataloader(torch.utils.data.Dataset):
-    def __init__(self, parameters, target, device="cpu"):
+    def __init__(self, parameters, target, fullDataset=False, device="cpu", **kwargs):
         #convert np array data to dataframe
         self.parameters = parameters
         self.target = target
+        self.fullDataset = fullDataset
         self.device = device
+        
+        self.data_dims = kwargs.pop("data_dims", None)
+        self.data_dims_log = kwargs.pop("data_dims_log", None)
+        self.vars = kwargs.pop("vars", None)
+        self.data_log = kwargs.pop("data_log", None)
+
+        assert not (not fullDataset and (self.data_dims is None or self.data_dims_log is None or self.vars is None or self.data_log is None)), "If fullDataset=False, data_dims, data_dims_log, vars, data_log must be provided"
 
     def __len__(self):
         return len(self.target)
@@ -142,8 +152,11 @@ class Dataloader(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         parameters = self.parameters[idx]
         target = self.target[idx]
+        if not self.fullDataset:
+            parameters, target = gen_training_data(parameters=parameters, data_dims=self.data_dims, data=self.target, vars=self.vars, data_dims_log=self.data_dims_log, data_log=self.data_log, n_jobs=-1, verbose=False)
+
         parameters = torch.from_numpy(parameters).to(torch.float32)
-        target = torch.tensor(target, dtype=torch.float32)
+        target = torch.tensor(target, dtype=torch.float32)        
         parameters = parameters.to(self.device)
         target = target.to(self.device)
         return parameters, target
@@ -184,32 +197,48 @@ class poweremu_torch(nn.Module):
 
         self.loss = []
         
-    def train(self, train_dataloader, epochs):
+    def train(self, train_dataloader, epochs, accu_frac=0.1):
         
         self.model.train()
+        #self.optimizer.zero_grad()
         for e in range(epochs):
-            loss_epoch = torch.tensor(0., device=self.device)
+            start_time = time.time()
+            #loss_epoch = torch.tensor(0., device=self.device)
+            stime = time.time()
             for i,(parameters,target) in enumerate(train_dataloader):
-                print(f"[{str(self.device)}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()}", flush=True)
-                print(f"data device {parameters.device} | target device {target.device} | model device {self.model.device}", flush=True)
+                
                 predicted = self.model(parameters)
                 
-                loss_batch = torch.nanmean(torch.square(predicted - target))
+                loss = torch.mean(torch.square(predicted - target))
                 
-                self.optimizer.zero_grad()
-                loss_batch.backward()
-                #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
-                self.optimizer.step()
+                loss.backward()
 
-                if self.multi_gpu:
-                    torch.distributed.all_reduce(tensor=loss_batch, op=torch.distributed.ReduceOp.AVG)
+                #print(f"Predicted: {predicted[0].item():.2f} | Target: {target[0].item():.2f} | Loss: {loss.item():.2f}", flush=True)
                 
-                loss_epoch += loss_batch.detach() / train_dataloader.__len__() # maybe not right
+                if (i+1) % (train_dataloader.__len__()//(accu_frac**-1)) == 0:
+                    if self.device.index == 0 or self.device.type=="cpu":
+                        print(f"[{str(self.device)}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()} | Time: {time.time()-stime:.2f} | Loss: {loss.item():.2f}", flush=True)
+                    stime = time.time()
+                    
+                    #loss_epoch.backward()
+                    #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+
+            
+                
+                #if self.multi_gpu:        
+                #    if self.device.index == 0 and i % (train_dataloader.__len__()//10) == 0:
+                #        print(f"[{str(self.device)}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()}", flush=True)
+                #    torch.distributed.all_reduce(tensor=loss_batch, op=torch.distributed.ReduceOp.AVG)
+                
+                #loss_epoch += loss_batch.detach() / train_dataloader.__len__() # maybe not right
 
 
-            self.loss.append(loss_epoch.item())
+            #self.loss.append(loss_epoch.item())
 
-            print(f"[{self.device}] Epoch {e} | Loss: {loss_epoch.item()}", flush=True)
+            if self.device.index == 0 or self.device.type=="cpu":
+                print(f"[{self.device}] Epoch {e} | Time: {time.time()-start_time:.2f}", flush=True)
 
             #if loss_epoch == torch.min(torch.tensor(self.loss)):
             #    print("Saving model! (train print)", flush=True)
@@ -278,7 +307,11 @@ def prepare_parameters(parameters, log_indices=[0,1,2,3,8], discard_indices=[6,1
     parameters = np.delete(parameters, discard_indices, axis=1)
     return parameters
 
-def train(rank, multi_gpu, parameters, logdsq_interp):
+def train(rank, multi_gpu, parameters, logdsq_interp, fullDataset=False, **kwargs):
+    data_dims = kwargs.pop("data_dims", None)
+    data_dims_log = kwargs.pop("data_dims_log", None)
+    vars = kwargs.pop("vars", None)
+    data_log = kwargs.pop("data_log", None)
     
     if multi_gpu:
         world_size = torch.cuda.device_count()
@@ -286,15 +319,15 @@ def train(rank, multi_gpu, parameters, logdsq_interp):
         ddp_setup(rank, world_size=world_size)
     elif not multi_gpu and torch.cuda.is_available():
         device = torch.device("cuda:0")
+
     else:
         device = torch.device("cpu")
-
-    train_data_module = Dataloader(parameters=parameters, target=logdsq_interp, device=device)
+    train_data_module = Dataloader(parameters=parameters, target=logdsq_interp, fullDataset=fullDataset, device=device, data_dims=data_dims, data_dims_log=data_dims_log, vars=vars, data_log=data_log)
     train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_data_module, shuffle=True, seed=0) if multi_gpu else None
     train_dataloader = torch.utils.data.DataLoader(train_data_module, batch_size=10000, shuffle=(train_sampler is None), sampler = train_sampler)
 
     network_opt = dict(in_dim=parameters.shape[1], hidden_dim=100, n_hidden = 4, out_dim = 1)
-    optimizer_opt = dict(lr=1e-3)
+    optimizer_opt = dict(lr=1e-4)
     emu = poweremu_torch(network=MLP, network_opt=network_opt, optimizer_opt=optimizer_opt, device=device)
 
     #train
@@ -311,20 +344,23 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     multi_gpu = world_size > 1
 
-
     parameters = prepare_parameters(parameters)
-    #print([(parameters[:,i].min(),parameters[:,i].max()) for i in range(parameters.shape[1])])
     minimum = dsq[dsq!=0].min()
     dsq[dsq==0] = minimum * 1e-3
-    parameters, logdsq_interp = gen_training_data(parameters=parameters, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_dims_log=[False, True], data_log=True)
+
+    #train_test_split for parameters and dsq
+    parameters_train, parameters_test, dsq_train, dsq_test = train_test_split(parameters, dsq, test_size=0.2, train_size=0.8, random_state=42)
+    
+    parameters_train, logdsq_train = gen_training_data(parameters=parameters_train, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_dims_log=[False, True], data_log=True)
 
     if multi_gpu:
         print("Using multi-gpu", flush=True)
         for i in range(torch.cuda.device_count()):
             print(f"Device {i}: {torch.cuda.get_device_properties(i).name}", flush=True)
-        torch.multiprocessing.spawn(train, args=(multi_gpu, parameters, logdsq_interp), nprocs=world_size)
+        torch.multiprocessing.spawn(train, args=(multi_gpu, parameters_train, logdsq_train, True), nprocs=world_size)
     else:
         print("Not using multi-gpu")
-        train(0, multi_gpu, parameters, logdsq_interp)
+        train(0, multi_gpu=multi_gpu, parameters=parameters_train, logdsq_interp=logdsq_train, fullDataset=True)#, data_dims=(z_array, k_array), data_dims_log=[False, True], vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_log=True)
+
 
 
