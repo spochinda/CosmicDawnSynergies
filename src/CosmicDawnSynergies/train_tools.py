@@ -9,7 +9,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 current_dir = os.path.dirname(__file__).split('CosmicDawnSynergies')[0] + 'CosmicDawnSynergies'
-path = os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
+path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
 
 z_array = loadmat(path+'hera_z_mat.mat')['z21cm'][0]
 k_array = loadmat(path+'hera_k_mat.mat')['ks'][0]
@@ -122,9 +122,9 @@ import time
 def ddp_setup(rank: int, world_size: int):
     try:
         os.environ["MASTER_ADDR"] #check if master address exists
-        print("Found master address: ", os.environ["MASTER_ADDR"])
+        print("Found master address: ", os.environ["MASTER_ADDR"], flush=True)
     except:
-        print("Did not find master address variable. Setting manually...")
+        print("Did not find master address variable. Setting manually...", flush=True)
         os.environ["MASTER_ADDR"] = "localhost"
 
     os.environ["MASTER_PORT"] = "2594"#"12355" 
@@ -134,10 +134,10 @@ def ddp_setup(rank: int, world_size: int):
 class Dataloader(torch.utils.data.Dataset):
     def __init__(self, parameters, target, fullDataset=False, device="cpu", **kwargs):
         #convert np array data to dataframe
-        self.parameters = parameters
-        self.target = target
         self.fullDataset = fullDataset
         self.device = device
+        self.parameters = torch.from_numpy(parameters).to(torch.float32).to(self.device)
+        self.target = torch.from_numpy(target).to(torch.float32).to(self.device)
         
         self.data_dims = kwargs.pop("data_dims", None)
         self.data_dims_log = kwargs.pop("data_dims_log", None)
@@ -155,29 +155,40 @@ class Dataloader(torch.utils.data.Dataset):
         if not self.fullDataset:
             parameters, target = gen_training_data(parameters=parameters, data_dims=self.data_dims, data=self.target, vars=self.vars, data_dims_log=self.data_dims_log, data_log=self.data_log, n_jobs=-1, verbose=False)
 
-        parameters = torch.from_numpy(parameters).to(torch.float32)
-        target = torch.tensor(target, dtype=torch.float32)        
-        parameters = parameters.to(self.device)
-        target = target.to(self.device)
+        #parameters = torch.from_numpy(parameters).to(torch.float32)
+        #target = torch.tensor(target, dtype=torch.float32)        
+        #parameters = parameters.to(self.device)
+        #target = target.to(self.device)
         return parameters, target
 
 
 class MLP(nn.Module):
     def __init__(self, in_dim, hidden_dim, n_hidden = 1, out_dim = 1):
         super(MLP, self).__init__()
-        self.fc_in = nn.Linear(in_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        #self.fc_hidden = [nn.Linear(hidden_dim, hidden_dim) for i in range(n_hidden)]
-        self.fc_hidden = nn.ModuleList([nn.Linear(hidden_dim, hidden_dim) for _ in range(n_hidden)])
-        self.fc_out = nn.Linear(hidden_dim, out_dim)
+        layers = []
+
+        layers.append(nn.Linear(in_dim, hidden_dim))
+        layers.append(nn.ReLU())
+        for _ in range(n_hidden):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_dim, out_dim))
+
+        self.model = nn.Sequential(*layers)
+
+        ## Initialize weights
+        #self._initialize_weights()
+
+    #def _initialize_weights(self):
+    #    for m in self.model:
+    #        if isinstance(m, nn.Linear):
+    #            nn.init.xavier_uniform_(m.weight)
+    #            if m.bias is not None:
+    #                nn.init.zeros_(m.bias)
 
     def forward(self, x):
-        x = self.fc_in(x)
-        x = self.relu(x)
-        for fc in self.fc_hidden:
-            x = self.relu(fc(x))
-        x = self.fc_out(x)
-
+        x = self.model(x)
+        x = torch.squeeze(x)
         return x
 
 class poweremu_torch(nn.Module):
@@ -197,48 +208,60 @@ class poweremu_torch(nn.Module):
 
         self.loss = []
         
-    def train(self, train_dataloader, epochs, accu_frac=0.1):
+    def train(self, train_dataloader, validation_dataloader, epochs, accu_frac=0.02, profiling=False):
         
         self.model.train()
-        #self.optimizer.zero_grad()
         for e in range(epochs):
-            start_time = time.time()
-            #loss_epoch = torch.tensor(0., device=self.device)
+            loss_epoch = torch.tensor(0., device=self.device)
+            validation_epoch = torch.tensor(0., device=self.device)
+            q50 = torch.tensor(0., device=self.device)
             stime = time.time()
             for i,(parameters,target) in enumerate(train_dataloader):
                 
-                predicted = self.model(parameters)
-                
-                loss = torch.mean(torch.square(predicted - target))
-                
-                loss.backward()
+                if profiling:   torch.cuda.nvtx.range_push("predict-loss-backward")
+                pred_train = self.model(parameters)
+                loss = torch.square(pred_train - target)
 
-                #print(f"Predicted: {predicted[0].item():.2f} | Target: {target[0].item():.2f} | Loss: {loss.item():.2f}", flush=True)
+
+                with torch.no_grad():
+                    resid = loss.clone().detach()
+                    resid = torch.sqrt(resid)
+                    q50 += torch.quantile(resid, 0.5) / train_dataloader.__len__()
+                    if torch.cuda.current_device() == 0:
+                        if i==0:
+                            plt.figure()
+                            plt.hist(resid.cpu().numpy(), bins=100)
+                            plt.xlabel('Residuals')
+                            plt.ylabel('Frequency')
+                            plt.title('Residuals')
+                            plt.savefig("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/images/residuals.png")
+                            plt.close()
+
+
+                loss = torch.sqrt(torch.mean(loss))
+                loss.backward()
+                if profiling:   torch.cuda.nvtx.range_pop()
+                loss_epoch += loss.clone().detach()
                 
-                if (i+1) % (train_dataloader.__len__()//(accu_frac**-1)) == 0:
+                if ((i+1) % (train_dataloader.__len__()//(accu_frac**-1)) == 0) and (i != 0):
+                    loss_epoch /= (train_dataloader.__len__()//(accu_frac**-1))
+                    if self.multi_gpu:
+                        torch.distributed.all_reduce(tensor=loss_epoch, op=torch.distributed.ReduceOp.AVG)
+                        torch.distributed.all_reduce(tensor=q50, op=torch.distributed.ReduceOp.AVG)
+                    q50 = 10**q50.item()
+                    loss_epoch = 10**loss_epoch.item()
+
                     if self.device.index == 0 or self.device.type=="cpu":
-                        print(f"[{str(self.device)}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()} | Time: {time.time()-stime:.2f} | Loss: {loss.item():.2f}", flush=True)
-                    stime = time.time()
+                        print(f"[{str(self.device)}] Epoch {e} | Batch {i+1} out of {train_dataloader.__len__()} | Time: {time.time()-stime:.2f} | Loss: dDsq = {loss_epoch:.0f} ({q50:.0f}) mK^2 ", flush=True)
+                    loss_epoch = torch.tensor(0., device=self.device)
+
                     
-                    #loss_epoch.backward()
                     #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
+                    
+                    if profiling:   torch.cuda.nvtx.range_push("optimizer")
                     self.optimizer.step()
                     self.optimizer.zero_grad()
-
-            
-                
-                #if self.multi_gpu:        
-                #    if self.device.index == 0 and i % (train_dataloader.__len__()//10) == 0:
-                #        print(f"[{str(self.device)}] Epoch {e} | Batch {i} out of {train_dataloader.__len__()}", flush=True)
-                #    torch.distributed.all_reduce(tensor=loss_batch, op=torch.distributed.ReduceOp.AVG)
-                
-                #loss_epoch += loss_batch.detach() / train_dataloader.__len__() # maybe not right
-
-
-            #self.loss.append(loss_epoch.item())
-
-            if self.device.index == 0 or self.device.type=="cpu":
-                print(f"[{self.device}] Epoch {e} | Time: {time.time()-start_time:.2f}", flush=True)
+                    if profiling:   torch.cuda.nvtx.range_pop()                
 
             #if loss_epoch == torch.min(torch.tensor(self.loss)):
             #    print("Saving model! (train print)", flush=True)
@@ -307,7 +330,7 @@ def prepare_parameters(parameters, log_indices=[0,1,2,3,8], discard_indices=[6,1
     parameters = np.delete(parameters, discard_indices, axis=1)
     return parameters
 
-def train(rank, multi_gpu, parameters, logdsq_interp, fullDataset=False, **kwargs):
+def train(rank, multi_gpu, parameters_train, target_train, parameters_validation, target_validation, batch_size, fullDataset=False, profiling=False, **kwargs):
     data_dims = kwargs.pop("data_dims", None)
     data_dims_log = kwargs.pop("data_dims_log", None)
     vars = kwargs.pop("vars", None)
@@ -322,22 +345,63 @@ def train(rank, multi_gpu, parameters, logdsq_interp, fullDataset=False, **kwarg
 
     else:
         device = torch.device("cpu")
-    train_data_module = Dataloader(parameters=parameters, target=logdsq_interp, fullDataset=fullDataset, device=device, data_dims=data_dims, data_dims_log=data_dims_log, vars=vars, data_log=data_log)
+    
+    train_data_module = Dataloader(parameters=parameters_train, target=target_train, fullDataset=fullDataset, device=device)#, data_dims=data_dims, data_dims_log=data_dims_log, vars=vars, data_log=data_log)
     train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_data_module, shuffle=True, seed=0) if multi_gpu else None
-    train_dataloader = torch.utils.data.DataLoader(train_data_module, batch_size=10000, shuffle=(train_sampler is None), sampler = train_sampler)
+    train_dataloader = torch.utils.data.DataLoader(train_data_module, batch_size=batch_size, shuffle=(train_sampler is None), sampler = train_sampler,)
 
-    network_opt = dict(in_dim=parameters.shape[1], hidden_dim=100, n_hidden = 4, out_dim = 1)
+    validation_data_module = Dataloader(parameters=parameters_validation, target=target_validation, fullDataset=fullDataset, device=device)#, data_dims=data_dims, data_dims_log=data_dims_log, vars=vars, data_log=data_log)
+    validation_sampler = torch.utils.data.distributed.DistributedSampler(dataset=validation_data_module, shuffle=True, seed=0) if multi_gpu else None
+    validation_dataloader = torch.utils.data.DataLoader(validation_data_module, batch_size=batch_size, shuffle=(validation_sampler is None), sampler = validation_sampler,)
+
+    network_opt = dict(in_dim=parameters_train.shape[1], hidden_dim=100, n_hidden = 4, out_dim = 1)
     optimizer_opt = dict(lr=1e-4)
     emu = poweremu_torch(network=MLP, network_opt=network_opt, optimizer_opt=optimizer_opt, device=device)
 
+
     #train
-    emu.train(train_dataloader, epochs=10)
+    if profiling:
+        with torch.autograd.profiler.emit_nvtx():
+            emu.train(train_dataloader, validation_dataloader, epochs=1, accu_frac=1, profiling=profiling)
+    else:
+        emu.train(train_dataloader, validation_dataloader, epochs=100, accu_frac=1, profiling=profiling)
 
     if multi_gpu:
         torch.distributed.barrier()
         destroy_process_group()
 
     
+def flatten_data(parameters, data, data_dims):
+
+    grids = np.meshgrid(*data_dims, indexing='ij')
+    combinations = np.vstack([grid.ravel() for grid in grids]).T
+
+    num_parameters = len(parameters)
+    num_combinations = len(combinations)
+    parameters = np.repeat(parameters, num_combinations, axis=0)
+    combinations = np.tile(combinations, (num_parameters, 1))
+    parameters = np.hstack((combinations, parameters))
+    
+    data = data.ravel()
+    assert len(parameters) == len(data), "Length of parameters and data must be the same"
+
+    return parameters, data
+
+
+#m_idx = 1000
+#z_idx = 20
+#k_start = 0
+#idx_start = np.ravel_multi_index((m_idx, z_idx, k_start), dsq_original.shape)
+#plt.figure()
+#plt.loglog(k_array, dsq_flattened[idx_start:idx_start+len(k_array)], 'o', alpha=0.5, label='Flattened Data')
+#plt.loglog(k_array, dsq_original[m_idx, z_idx], 'x', alpha=0.8, label='Original Data')
+#plt.xlabel('k')
+#plt.ylabel('dsq')
+#plt.legend()
+#plt.title('dsq vs k')
+#plt.savefig("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/images/dsq_flatten_test.png")
+#plt.close()    
+
 
 
 if __name__ == "__main__":
@@ -349,18 +413,34 @@ if __name__ == "__main__":
     dsq[dsq==0] = minimum * 1e-3
 
     #train_test_split for parameters and dsq
-    parameters_train, parameters_test, dsq_train, dsq_test = train_test_split(parameters, dsq, test_size=0.2, train_size=0.8, random_state=42)
-    
-    parameters_train, logdsq_train = gen_training_data(parameters=parameters_train, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_dims_log=[False, True], data_log=True)
+    parameters_train, parameters_validation, dsq_train, dsq_validation = train_test_split(parameters, dsq, test_size=0.2, train_size=0.8, random_state=42)
 
+    #parameters_validation, dsq_validation = flatten_data(parameters=parameters_validation, data=dsq_validation, data_dims=(z_array, k_array))
+    #np.savez_compressed("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/validation_data.npz", parameters=parameters_validation_2, dsq=dsq_validation_2)
+    #load
+    data = np.load("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/validation_data.npz")
+    parameters_validation = data['parameters']
+    logdsq_validation = np.log10(data['dsq'])
+
+    #parameters_train, logdsq_train = gen_training_data(parameters=parameters_train, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_dims_log=[False, True], data_log=True, verbose=True)# if torch.cuda.current_device() == 0 else False)
+    #np.savez_compressed("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/training_data.npz", parameters=parameters_train, logdsq=logdsq_train)
+    #load training data
+    data = np.load("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/training_data.npz")
+    parameters_train = data['parameters']
+    logdsq_train = data['logdsq']
+
+    print(parameters_train.shape, logdsq_train.shape, parameters_validation.shape, logdsq_validation.shape)
+
+    
     if multi_gpu:
-        print("Using multi-gpu", flush=True)
+        print(f"Using multi-gpu with {world_size} GPUs", flush=True)
         for i in range(torch.cuda.device_count()):
             print(f"Device {i}: {torch.cuda.get_device_properties(i).name}", flush=True)
-        torch.multiprocessing.spawn(train, args=(multi_gpu, parameters_train, logdsq_train, True), nprocs=world_size)
+        torch.multiprocessing.spawn(train, args=(multi_gpu, parameters_train, logdsq_train, parameters_validation, logdsq_validation, 50000, True, False), nprocs=world_size)
+        print("Training complete", flush=True)
     else:
         print("Not using multi-gpu")
-        train(0, multi_gpu=multi_gpu, parameters=parameters_train, logdsq_interp=logdsq_train, fullDataset=True)#, data_dims=(z_array, k_array), data_dims_log=[False, True], vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_log=True)
+        train(0, multi_gpu=multi_gpu, parameters_train=parameters_train, target_train=logdsq_train, parameters_validation=parameters_validation, target_validation=logdsq_validation, batch_size=10000, fullDataset=True, profiling=True)#, data_dims=(z_array, k_array), data_dims_log=[False, True], vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_log=True)
 
-
-
+    
+    
