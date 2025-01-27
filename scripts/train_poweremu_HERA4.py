@@ -1,10 +1,11 @@
-path = '/home/sp2053/rds/hpc-work/powerspectra_analysis/'
+#path = '/home/sp2053/rds/hpc-work/powerspectra_analysis/'
 #path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/powerspectra_analysis/"
 print("Inside script")
-
-from codes.emulator_poweremu import *
-from codes.loader_21cmSim import *
-from codes.tools import *
+#print(dir(CosmicDawnSynergies))
+from CosmicDawnSynergies.emulator_poweremu import *
+from CosmicDawnSynergies.loader_21cmSim import *
+from CosmicDawnSynergies.tools import *
+from CosmicDawnSynergies.train_tools import flatten_data, gen_training_data
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
@@ -87,16 +88,31 @@ parameters_HERA4 = PT12_to_PL9(parameters)
 #Little-h to convert to h / cMpc
 h=0.6704
 
-n_over = 400
+n_over = 50
 
 #Delta power spectrum emulator
-if False: #(rank==0) or (size==1):
+if True: #(rank==0) or (size==1):
     parameters_HERA4_train, parameters_HERA4_test, Deltak_HERA4_train, Deltak_HERA4_test = train_test_split(parameters_HERA4, Deltak_HERA4, test_size=0.2, random_state=42)
     #print("Checkpoint 1.0: Gen PS training, rank={0}".format(rank), flush=True)
+    print("Shapes: ", parameters_HERA4_train.shape, Deltak_HERA4_train.shape)
     print("Checkpoint 1.0: Gen PS training", flush=True)
-    train_x, train_y = gen_training(n_over=n_over, params=parameters_HERA4_train, data=Deltak_HERA4_train, zlow=zarr.min(), zhigh=zarr.max(), klow=karr.min()/h, khigh=karr.max()/h)
+    
+    #parameters_HERA4_train, logdsq_train = gen_training_data(parameters=parameters_HERA4_train, data_dims=(z_array, k_array), data=Deltak_HERA4_train, vars=[[7, 26, 10], [8.5e-2, 0.99, 10]], data_dims_log=[False, True], data_log=True, verbose=True)# if torch.cuda.current_device() == 0 else False)
+    #train_x = parameters_HERA4_train
+    #train_y = logdsq_train
+    #print("train_x, train_y shapes: ", train_x.shape, train_y.shape)
+
+    #train_x, train_y = gen_training(n_over=n_over, params=parameters_HERA4_train, data=Deltak_HERA4_train, zlow=zarr.min(), zhigh=zarr.max(), klow=karr.min()/h, khigh=karr.max()/h, z_array=zarr, k_array=karr/h)
+    #save
+    #np.savez("data/trained_emulators_poweremu/PS_training_data_new_n_over{0}.npz".format(n_over), train_x=train_x, train_y=train_y)
+    
+    #load
+    #data = np.load("data/trained_emulators_poweremu/PS_training_data_new_n_over{0}.npz".format(n_over))
+    #train_x = data["train_x"]
+    #train_y = data["train_y"]
+    
     #Truncate data points below 1mK^2 to 1 for a better emulator.
-    train_y[train_y<1] = 1
+    #train_y[train_y<1] = 1
     if False: #gridsearch to tune hyperparameters
         from sklearn.neural_network import MLPRegressor
         from sklearn.pipeline import make_pipeline
@@ -142,10 +158,46 @@ if False: #(rank==0) or (size==1):
     layers = (100, 100, 100, 100) #(100, 100, 100, 100)
     tol = 1e-5 #1e-6
     offset = 0 #1
-    emu_dsq = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=310, solver="adam", offset=offset,tol=tol) #offset 10-100
-    print("Checkpoint 1.1: PS training", flush=True)
-    emu_dsq.train(train_x, train_y)
-    emu_dsq.save("data/trained_emulators_poweremu/dsq_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
+    if False:
+        emu_dsq = poweremu(loadfile=None,preprocesss_log_x=False, hidden_layer_sizes=layers, max_iter=310, solver="adam", offset=offset,tol=tol) #offset 10-100
+        print("Checkpoint 1.1: PS training", flush=True)
+        emu_dsq.train(train_x, train_y)
+        emu_dsq.save("data/trained_emulators_poweremu/dsq_emu_new2_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
+    else:
+        print("Loading...", flush=True)
+        emu_dsq = poweremu(loadfile="data/trained_emulators_poweremu/dsq_emu_new2_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)), tol=tol, n_iter_no_change=99999, preprocesss_log_x=False, offset=offset)
+        print("Loaded", emu_dsq, flush=True)
+        print("parameters_HERA4_test.shape, Deltak_HERA4_test.shape", parameters_HERA4_test.shape, Deltak_HERA4_test.shape)
+        parameters_HERA4_test, Deltak_HERA4_test = flatten_data(parameters=parameters_HERA4_test, data=Deltak_HERA4_test, data_dims=(zarr, karr))
+        print("parameters_HERA4_test.shape, dsq_validation.shape", parameters_HERA4_test.shape, Deltak_HERA4_test.shape)
+        pred_test = emu_dsq.predict(parameters_HERA4_test)
+        print("pred_test.shape", pred_test.shape)
+        rmse = np.exp(np.mean((np.log(pred_test) - np.log(Deltak_HERA4_test))**2)**0.5)
+        print("RMSE: ", rmse)
+
+        mask = np.logical_and(pred_test>=1, Deltak_HERA4_test>=1)
+        pred_test = pred_test[mask]
+        Deltak_HERA4_test = Deltak_HERA4_test[mask]
+        pred_test = np.log(pred_test)
+        target = np.log(Deltak_HERA4_test)
+
+        bin_min = min(pred_test.min(), target.min())
+        bin_max = max(pred_test.max(), target.max())
+        bins = np.linspace(bin_min, bin_max, 100)
+        fig,ax = plt.subplots(1,1,figsize=(6,6))
+        hist, edges = np.histogram(pred_test, bins=bins)
+        ax.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Predictions')
+        hist, edges = np.histogram(target, bins=bins)
+        ax.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Targets')
+        ax.legend()
+        ax.set_xlabel("log(Delta^2)")
+        ax.set_ylabel("Count")
+        plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/residuals_sklearn2.png")
+        plt.close(fig)
+        
+
+
+
 ########################################################################
 
 #SFR emulator
@@ -163,7 +215,7 @@ if False: #(rank==1) or (size==1):
     emu_SFR.save(path + "data/trained_emulators_poweremu/SFR1_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(n_over, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
 
 #Tradio emulator
-if True:
+if False:
     data = np.load(path+"T_model.npz")
     nu_today = data["nu_today"]/1e9
     T_model = data["T_model"]
@@ -181,7 +233,7 @@ if True:
     emu_T.save(path + "data/trained_emulators_poweremu/T_emu_n{0}_l{1}{2}{3}{4}_t{5}_o{6}.pkl".format(200, layers[0], layers[1], layers[2], layers[3], str(tol), str(offset)))
 
 #XRB emulator
-if (rank==0) or (size==1):
+if False:#(rank==0) or (size==1):
     parameters_HERA4_train, parameters_HERA4_test, XRB_HERA4_train, XRB_HERA4_test = train_test_split(parameters_HERA4, XRB_HERA4, test_size=0.2, random_state=42)
     print("Checkpoint: XRB generate training set", flush=True)
     train_x, train_y = gen_training_1d(n_over=n_over, params=parameters_HERA4_train, data=np.log10(XRB_HERA4_train), zlow=np.log10( nu_keV ).min(), zhigh=np.log10( nu_keV ).max(), zarr=np.log10(nu_keV) )
@@ -259,6 +311,8 @@ if False: #(rank==3) or (size==1):
 print("Finished training emulator. Evaluating quality...", flush=True)
 
 offset = 0
+
+
 
 def calculate_accuracy(emu, test_x, test_y):
     pred_y = emu.predict(test_x)

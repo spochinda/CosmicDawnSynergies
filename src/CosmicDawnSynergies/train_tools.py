@@ -9,7 +9,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 current_dir = os.path.dirname(__file__).split('CosmicDawnSynergies')[0] + 'CosmicDawnSynergies'
-path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
+path = "/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
 
 z_array = loadmat(path+'hera_z_mat.mat')['z21cm'][0]
 k_array = loadmat(path+'hera_k_mat.mat')['ks'][0]
@@ -18,7 +18,7 @@ XRB = loadmat(path + "hera_XRB_mat.mat")['combined_XRBs']
 nu_keV = loadmat(path + "hera_nu_mat.mat")['nu_keV'][0]
 parameters = loadmat(path+'hera_parameters_mat.mat')['parameters']
 
-def random_grid_interpolation(p, data_dims, data, vars):
+def random_grid_interpolation(parameters, data_dims, data, vars):
     #p = parameters[i]
     #data_dims = tuple of data axes e.g. (x (redshift), y (wavevector))
     #data = dsq[i]
@@ -27,20 +27,19 @@ def random_grid_interpolation(p, data_dims, data, vars):
 
     priors = [np.random.uniform(*var) for var in vars]
     
-    #priors[0][0] = 6 # for testing dsq
+    #priors[0][0] = 10 # for testing dsq
     #priors[1][0] = np.log10(k_array[19]) # for testing dsq
 
     priors = [np.sort(prior) for prior in priors]
     interp = RegularGridInterpolator(data_dims, data, method='linear')
     grids = np.meshgrid(*priors)
     interp = interp(tuple(grids))
-    interp = interp.flatten()
-    grids = [grid.flatten()[:, None] for grid in grids]
-    #grids_dim = [grid[:, None] for grid in grids]
-    p = np.tile(p, (len(grids[0]), 1))
-    p = np.hstack((*grids, p))
-
-    return p, interp
+    stacked = np.stack((*grids, interp), axis=-1)
+    stacked = stacked.reshape(-1, stacked.shape[-1])
+    parameters = np.tile(parameters, (stacked.shape[0], 1))
+    interp = stacked[:,-1]
+    parameters = np.hstack((stacked[:, :-1], parameters))
+    return parameters, interp
 
 
 
@@ -51,7 +50,7 @@ def gen_training_data(parameters, data_dims, data, vars, data_dims_log, data_log
     vars = [[np.log10(var[0]), np.log10(var[1]), var[2]] if data_dims_log[i] else var for i, var in enumerate(vars)]
 
     results = Parallel(n_jobs=n_jobs)(
-        delayed(random_grid_interpolation)(p=p, data_dims=data_dims, data=data_i, vars=vars)
+        delayed(random_grid_interpolation)(parameters=p, data_dims=data_dims, data=data_i, vars=vars)
         for p, data_i in tqdm(zip(parameters, data), total=len(parameters), desc="Interpolating", disable=not verbose)
     )
 
@@ -127,7 +126,7 @@ def ddp_setup(rank: int, world_size: int):
         print("Did not find master address variable. Setting manually...", flush=True)
         os.environ["MASTER_ADDR"] = "localhost"
 
-    os.environ["MASTER_PORT"] = "2594"#"12355" 
+    os.environ["MASTER_PORT"] = "2595"#"12355" 
     torch.cuda.set_device(rank)
     init_process_group(backend="nccl", rank=rank, world_size=world_size) #backend gloo for cpus? nccl for gpus
 
@@ -160,129 +159,309 @@ class Dataloader(torch.utils.data.Dataset):
         #parameters = parameters.to(self.device)
         #target = target.to(self.device)
         return parameters, target
+"""
+            if self.use_attn:
+                self.layernorm_attn = nn.LayerNorm(in_dim)
+                self.query = nn.Linear(in_dim, in_dim)
+                self.key = nn.Linear(in_dim, in_dim)
+                self.value = nn.Linear(in_dim, in_dim)
+                self.softmax = nn.Softmax(dim=-1)        
+
+            layers = []
+            layers.append(nn.Linear(in_dim, hidden_dim))
+            if self.use_norm_dropout:
+                layers.append(nn.LayerNorm(hidden_dim))
+            layers.append(nn.Tanh())
+            if self.use_norm_dropout:
+                layers.append(nn.Dropout(dropout)) ###
+            for _ in range(n_hidden):
+                layers.append(nn.Linear(hidden_dim, hidden_dim))
+                if self.use_norm_dropout:
+                    layers.append(nn.LayerNorm(hidden_dim))
+                layers.append(nn.Tanh())
+                if self.use_norm_dropout:
+                    layers.append(nn.Dropout(dropout)) ###
+            layers.append(nn.Linear(hidden_dim, out_dim))
+            #layers.append(nn.ReLU()) ###
+            self.fc = nn.Sequential(*layers)
+
+            
+                x = self.layernorm_attn(x)
+                Q = self.query(x)  # Shape: [batch_size, features]
+                K = self.key(x)    # Shape: [batch_size, features]
+                V = self.value(x)  # Shape: [batch_size, features]
+                # Compute attention scores between features
+                attention_scores = torch.matmul(Q.unsqueeze(2), K.unsqueeze(1)) / (x.size(-1) ** 0.5)
+                # Shape: [batch_size, features, features]        
+                attention_weights = self.softmax(attention_scores)  # Shape: [batch_size, features, features]
+                # Apply attention weights to values
+                x = torch.matmul(attention_weights, V.unsqueeze(2)).squeeze(2)  # Shape: [batch_size, features]
 
 
+            #if torch.cuda.current_device() == 0:    print("[5] After attention, x shape:", x.shape, flush=True)      # Check x shape
+            x = self.fc(x)
+            #if torch.cuda.current_device() == 0:    print("[6] After model, x shape:", x.shape, flush=True)      # Check x shape
+            x = torch.squeeze(x)
+            #if torch.cuda.current_device() == 0:    print("[7] After squeeze, x shape:", x.shape, flush=True)      # Check x shape
+"""
 class MLP(nn.Module):
-    def __init__(self, in_dim, hidden_dim, n_hidden = 1, out_dim = 1):
+    def __init__(self, in_dim, hidden_dim, n_hidden = 1, out_dim = 1, dropout = 0.2, use_norm_dropout = False, use_attn = True):
         super(MLP, self).__init__()
-        layers = []
+        
+        self.use_attn = use_attn
+        self.use_norm_dropout = use_norm_dropout
 
-        layers.append(nn.Linear(in_dim, hidden_dim))
-        layers.append(nn.ReLU())
-        for _ in range(n_hidden):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
+        self.bool = True
+        if self.bool:
+            layers = []
+            layers.append(nn.Linear(in_dim, hidden_dim))
+            if self.use_norm_dropout:
+                layers.append(nn.LayerNorm(hidden_dim))
             layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_dim, out_dim))
+            if self.use_norm_dropout:
+                layers.append(nn.Dropout(dropout)) ###
+            for _ in range(n_hidden):
+                layers.append(nn.Linear(hidden_dim, hidden_dim))
+                if self.use_norm_dropout:
+                    layers.append(nn.LayerNorm(hidden_dim))
+                layers.append(nn.ReLU())
+                if self.use_norm_dropout:
+                    layers.append(nn.Dropout(dropout)) ###
+            layers.append(nn.Linear(hidden_dim, out_dim))
+            self.mlp = nn.Sequential(*layers)
+        else:
+            self.fc1 = nn.Linear(1, 64)
+            #self.norm1 = nn.LayerNorm(64)
+            self.act1 = nn.ReLU()
+            self.dropout1 = nn.Dropout(dropout)
+            
+            self.fc2 = nn.Linear(64, 128)
+            #self.norm2 = nn.LayerNorm(128)
+            self.act2 = nn.ReLU()
+            self.dropout2 = nn.Dropout(dropout)
+            
+            transformer_layer = nn.TransformerEncoderLayer(d_model=128, nhead=1, dim_feedforward=256, dropout=dropout, batch_first=True)
+            self.transformer = nn.TransformerEncoder(transformer_layer, num_layers=2, enable_nested_tensor=False)
+            
+            self.fc3 = nn.Linear(128, 64)
+            #self.norm3 = nn.LayerNorm(64)
+            self.act3 = nn.ReLU()
+            self.dropout3 = nn.Dropout(dropout)
+            
+            self.fc4 = nn.Linear(64,32)
+            #self.norm4 = nn.LayerNorm(32)
+            self.act4 = nn.ReLU()
+            self.dropout4 = nn.Dropout(dropout)
 
-        self.model = nn.Sequential(*layers)
+            self.fc5 = nn.Linear(32, 16)
+            #self.norm5 = nn.LayerNorm(16)
+            self.act5 = nn.ReLU()
+            self.dropout5 = nn.Dropout(dropout)
 
-        ## Initialize weights
-        #self._initialize_weights()
+            self.fc6 = nn.Linear(16, 8)
+            #self.norm6 = nn.LayerNorm(8)
+            self.act6 = nn.ReLU()
+            self.dropout6 = nn.Dropout(dropout)
 
-    #def _initialize_weights(self):
-    #    for m in self.model:
-    #        if isinstance(m, nn.Linear):
-    #            nn.init.xavier_uniform_(m.weight)
-    #            if m.bias is not None:
-    #                nn.init.zeros_(m.bias)
+            self.fc7 = nn.Linear(8, 4)
+            #self.norm7 = nn.LayerNorm(4)
+            self.act7 = nn.ReLU()
+            self.dropout7 = nn.Dropout(dropout)
+
+            self.fc8 = nn.Linear(4, 1)
+            self.act8 = nn.ReLU()
+            self.dropout8 = nn.Dropout(dropout)
+
+            self.fc9 = nn.Linear(11, 8)
+            #self.norm9 = nn.LayerNorm(8)
+            self.act9 = nn.ReLU()
+            self.dropout9 = nn.Dropout(dropout)
+
+            self.fc10 = nn.Linear(8, 4)
+            #self.norm10 = nn.LayerNorm(4)
+            self.act10 = nn.ReLU()
+            self.dropout10 = nn.Dropout(dropout)
+
+            self.fc11 = nn.Linear(4, 1)
 
     def forward(self, x):
-        x = self.model(x)
-        x = torch.squeeze(x)
+        if self.bool:
+            x = self.mlp(x)
+            x = x.squeeze(-1)
+        else:
+            x = x.unsqueeze_(-1)
+            x = self.dropout1(self.act1(self.fc1(x))) #64
+            x = self.dropout2(self.act2(self.fc2(x))) #128
+            x = self.transformer(x) #128
+            x = self.dropout3(self.act3(self.fc3(x))) #64
+            x = self.dropout4(self.act4(self.fc4(x))) #32
+            x = self.dropout5(self.act5(self.fc5(x))) #16
+            x = self.dropout6(self.act6(self.fc6(x))) #8
+            x = self.dropout7(self.act7(self.fc7(x))) #4
+            x = self.dropout8(self.act8(self.fc8(x))) #1
+            x = x.squeeze(-1)
+            x = self.dropout9(self.act9(self.fc9(x))) #8
+            x = self.dropout10(self.act10(self.fc10(x))) #4
+            x = self.fc11(x) #1
+            x = x.squeeze(-1)
+
         return x
 
 class poweremu_torch(nn.Module):
-    def __init__(self, network, network_opt, optimizer_opt, device="cpu"):
+    def __init__(self, 
+                 network, network_opt, 
+                 optimizer, optimizer_opt, 
+                 train_opt, scale_opt, 
+                 device="cpu"):
         super(poweremu_torch, self).__init__()
         self.device = device
         self.network = network #MLP
         self.network_opt = network_opt #dictionary of MLP args
         self.model = self.network(**self.network_opt).to(self.device)
-        self.multi_gpu = torch.cuda.device_count() > 1
+        self.multi_gpu = torch.cuda.device_count() > 1 and self.device!="cpu"
         if self.multi_gpu:
             self.model = torch.nn.parallel.DistributedDataParallel(self.model, device_ids=[self.device.index])
         self.optimizer_opt = optimizer_opt #dictionary of optimizer args
-        self.optimizer = torch.optim.Adam(self.model.parameters(), **optimizer_opt)
+        self.optimizer = optimizer(self.model.parameters(), **optimizer_opt)
+        self.train_opt = train_opt
+        self.scale_opt = scale_opt
 
 
 
         self.loss = []
+        self.validation_loss = []
         
-    def train(self, train_dataloader, validation_dataloader, epochs, accu_frac=0.02, profiling=False):
+    def train(self, train_dataloader, validation_dataloader, **kwargs):
+        epochs = self.train_opt.pop("epochs", 100)
+        profiling = self.train_opt.pop("profiling", False)
+        loss_fn = self.train_opt.pop("loss_fn", torch.nn.MSELoss())
         
-        self.model.train()
+        parameters_validation = validation_dataloader.dataset.parameters
+        target_validation = validation_dataloader.dataset.target
+
+        #loss_fn = torch.nn.HuberLoss(delta=10.)
+        #loss_fn = torch.nn.L1Loss()
+        #loss_fn = torch.nn.KLDivLoss(reduction="batchmean", log_target=False)
+        
+        if self.device.index == 0 or self.device.type=="cpu":
+            print(self.model, flush=True)
         for e in range(epochs):
-            loss_epoch = torch.tensor(0., device=self.device)
-            validation_epoch = torch.tensor(0., device=self.device)
-            q50 = torch.tensor(0., device=self.device)
             stime = time.time()
             for i,(parameters,target) in enumerate(train_dataloader):
                 
-                if profiling:   torch.cuda.nvtx.range_push("predict-loss-backward")
+                if profiling:   torch.cuda.nvtx.range_push("predict-loss-backward-step")
+                self.model.train()
+                self.optimizer.zero_grad()
                 pred_train = self.model(parameters)
-                loss = torch.square(pred_train - target)
-
+                loss = loss_fn(pred_train, target)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
+                self.optimizer.step()
+                if profiling:   torch.cuda.nvtx.range_pop()
+                
 
                 with torch.no_grad():
-                    resid = loss.clone().detach()
-                    resid = torch.sqrt(resid)
-                    q50 += torch.quantile(resid, 0.5) / train_dataloader.__len__()
-                    if torch.cuda.current_device() == 0:
-                        if i==0:
-                            plt.figure()
-                            plt.hist(resid.cpu().numpy(), bins=100)
-                            plt.xlabel('Residuals')
-                            plt.ylabel('Frequency')
-                            plt.title('Residuals')
-                            plt.savefig("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/images/residuals.png")
+                    self.model.eval()
+
+                    if self.multi_gpu:  torch.distributed.all_reduce(loss, op=torch.distributed.ReduceOp.AVG)
+                                        
+                    _loss = loss.clone().detach().cpu().item()
+                    pred_validation = self.model(parameters_validation)
+                    _vresidlog = pred_validation - target_validation
+                    _vrmselog = 10**torch.sqrt(torch.mean(torch.square(_vresidlog)))
+
+                    if self.multi_gpu:  torch.distributed.all_reduce(_vrmselog, op=torch.distributed.ReduceOp.AVG)
+
+                    _vrmselog = _vrmselog.clone().detach().cpu().item()
+                
+                    self.loss.append(_loss)
+                    self.validation_loss.append(_vrmselog)
+                    
+                    _residlog = pred_train - target
+                    _rmselog = 10**torch.sqrt(torch.mean(torch.square(_residlog))).detach().item()
+                    _q95log = 10**torch.quantile(torch.sqrt(torch.square(_residlog)), 0.95).item()
+                    _percentlog = 100 * torch.abs(_residlog) / target
+                    _percentlog = _percentlog[~torch.isinf(_percentlog)]
+                    _percentlogq95 = torch.nanquantile(_percentlog, 0.95)
+                    
+                    if self.device.index == 0 or self.device.type=="cpu":
+                        
+                        print(f"[{str(self.device)}] "
+                              f"Epoch {e} | "
+                              f"Batch {i+1} out of {train_dataloader.__len__()} | "
+                              f"Time: {time.time()-stime:.2f} | "
+                              f"Train: RMSE={_rmselog:.2f} mK2 q95<={_q95log:,.2f} mK2, pct<={_percentlogq95:,.2f}% | "
+                              f"Validation: {_vrmselog:,.2f} mK^2" 
+                              ,flush=True)
+                        
+                        if (_vrmselog == min(self.validation_loss)) and (self.device.index == 0 or self.device.type=="cpu") and (e >= 5):
+                            print(f"Saving model with validation loss: {_vrmselog:,.2f}", flush=True)
+                            self.save_network("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/data/trained_emulators_poweremu/MLP_7_2.pth")
+
+                        #if (i == 0) or (i == train_dataloader.__len__() // 2):
+                            fig, ax = plt.subplots(1,1, figsize=(6,6))
+                            bin_min = min(pred_train.detach().cpu().numpy().min(), target.detach().cpu().numpy().min())
+                            bin_max = max(pred_train.detach().cpu().max(), target.detach().cpu().max())
+                            bins = np.linspace(bin_min, bin_max, 100)
+                            hist, edges = np.histogram(pred_train.detach().cpu().numpy(), bins=bins)
+                            ax.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Predictions')
+                            hist, edges = np.histogram(target.detach().cpu().numpy(), bins=bins)
+                            ax.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Targets')
+                            ax.set_xlabel('logDelta^2')
+                            ax.set_ylabel('Frequency')
+                            ax.legend()
+                            plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/histval_7_2.png")
                             plt.close()
 
+                            #fig, axes = plt.subplots(1,11, figsize=(6*11,6))
+                            #labels = ["z", "k", "logf_star_II", "logf_star_III", "logVc", "logfX", "alpha", "nu_0", "tau", "logfrad", "pop_trans_model"]
+                            #for i in range(11):
+                            #    axes[i].hist(parameters_validation[:,i].detach().cpu().numpy(), bins=100)
+                            #    axes[i].set_xlabel(f'{labels[i]}')
+                            #    axes[i].set_ylabel('Frequency')
+                            #plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/parameters_hist_7_2.png")
 
-                loss = torch.sqrt(torch.mean(loss))
-                loss.backward()
-                if profiling:   torch.cuda.nvtx.range_pop()
-                loss_epoch += loss.clone().detach()
-                
-                if ((i+1) % (train_dataloader.__len__()//(accu_frac**-1)) == 0) and (i != 0):
-                    loss_epoch /= (train_dataloader.__len__()//(accu_frac**-1))
-                    if self.multi_gpu:
-                        torch.distributed.all_reduce(tensor=loss_epoch, op=torch.distributed.ReduceOp.AVG)
-                        torch.distributed.all_reduce(tensor=q50, op=torch.distributed.ReduceOp.AVG)
-                    q50 = 10**q50.item()
-                    loss_epoch = 10**loss_epoch.item()
+                            fig, axes = plt.subplots(1,2, figsize=(12,6))
+                            hist, edges = np.histogram(_residlog.abs().detach().cpu().numpy(), bins=100)
+                            axes[0].bar(edges[:-1], hist, width=np.diff(edges))
+                            axes[0].grid()
+                            axes[0].set_xlabel('absResiduals [mK^2]')
+                            axes[0].set_ylabel('Frequency')
+                            hist, edges = np.histogram(_percentlog.detach().cpu().numpy(), bins=100)
+                            axes[1].bar(edges[:-1], hist, width=np.diff(edges))
+                            axes[1].grid()
+                            axes[1].set_xlabel('Percent Error')
+                            axes[1].set_ylabel('Frequency')                            
+                            
+                            plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/residuals_perc_7_2.png")
+                            plt.close()
 
-                    if self.device.index == 0 or self.device.type=="cpu":
-                        print(f"[{str(self.device)}] Epoch {e} | Batch {i+1} out of {train_dataloader.__len__()} | Time: {time.time()-stime:.2f} | Loss: dDsq = {loss_epoch:.0f} ({q50:.0f}) mK^2 ", flush=True)
-                    loss_epoch = torch.tensor(0., device=self.device)
+                            fig, axes = plt.subplots(1,1, figsize=(12,6))
+                            bin_min = min(pred_train.detach().cpu().numpy().min(), target.detach().cpu().numpy().min())
+                            bin_max = max(pred_train.detach().cpu().max(), target.detach().cpu().max())
+                            bins = np.linspace(bin_min, bin_max, 100)
+                            hist, edges = np.histogram(pred_train.detach().cpu().numpy(), bins=bins)
+                            axes.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Predictions')
+                            hist, edges = np.histogram(target.detach().cpu().numpy(), bins=bins)
+                            axes.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Targets')
+                            #axes.hist(target.detach().cpu().numpy(), bins=100, alpha=0.5, label='Targets')
+                            axes.set_xlabel('logDelta^2')
+                            axes.set_ylabel('Frequency')
+                            axes.legend()
+                            
+                            plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/residuals_7_2.png")
+                            plt.close()
 
-                    
-                    #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
-                    
-                    if profiling:   torch.cuda.nvtx.range_push("optimizer")
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
-                    if profiling:   torch.cuda.nvtx.range_pop()                
+                            #fig, axes = plt.subplots(1,11, figsize=(11*6,6))
+                            #labels = ["z", "k", "logf_star_II", "logf_star_III", "logVc", "logfX", "alpha", "nu_0", "tau", "logfrad", "pop_trans_model"]
+                            #for i in range(11):
+                            #    axes[i].hist(parameters[:,i].detach().cpu().numpy(), bins=100)
+                            #    axes[i].set_xlabel(f'{labels[i]}')
+                            #    axes[i].set_ylabel('Frequency')
+                            #plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/parameters_hist_4_2.png")
 
-            #if loss_epoch == torch.min(torch.tensor(self.loss)):
-            #    print("Saving model! (train print)", flush=True)
-            #    #self.save_network("best_model.pth")
-            #else:
-            #    print("Not saving model! (train print)", flush=True)
-            #
-            #if self.multi_gpu:
-            #    torch.distributed.barrier()
-    
-    @torch.no_grad()
-    def predict(self, x):
-        self.model.eval()
-        if self.train_opt.get("log_indices") is not None:
-            x[:, self.train_opt["log_indices"]] = torch.log10(x[:, self.train_opt["log_indices"]])
 
-        y = self.model(x)
-        
-        if (self.train_opt.get("log_output") is not None) and (self.train_opt.get("log_output")):
-            y = 10**y
-        return y
+
 
     def save_network(self, path):
         if not self.multi_gpu:
@@ -293,13 +472,15 @@ class poweremu_torch(nn.Module):
                     optimizer = self.optimizer.state_dict(),
                     train_opt = self.train_opt,
                     #ema = self.ema.state_dict(),
+                    scale_opt = self.scale_opt,
                     loss = self.loss,
+                    validation_loss = self.validation_loss,
                     ),
                     f = path
                     )
         else:
             if str(self.device) == "cuda:0":
-                print("Saving model!", flush=True)
+                #print("Saving model!", flush=True)
                 torch.save(
                     obj = dict(
                         network_opt = self.network_opt,
@@ -307,7 +488,9 @@ class poweremu_torch(nn.Module):
                         optimizer = self.optimizer.state_dict(),
                         train_opt = self.train_opt,
                         #ema = self.ema.state_dict(),
+                        scale_opt = self.scale_opt,
                         loss = self.loss,
+                        validation_loss = self.validation_loss,
                         ),
                         f = path
                         )
@@ -320,9 +503,12 @@ class poweremu_torch(nn.Module):
         if self.multi_gpu:
             self.model.to(self.device)
             self.model = nn.parallel.DistributedDataParallel(self.model, device_ids=[self.rank])
-        self.train_opt = loaded_state['train_opt']
         self.optimizer.load_state_dict(loaded_state['optimizer'])
+        #self.ema.load_state_dict(loaded_state['ema'])
+        self.train_opt = loaded_state['train_opt']
+        self.scale_opt = loaded_state['scale_opt']
         self.loss = loaded_state['loss']
+        self.validation_loss = loaded_state['validation_loss']
              
 def prepare_parameters(parameters, log_indices=[0,1,2,3,8], discard_indices=[6,10,11]):
     if log_indices is not None:
@@ -330,11 +516,7 @@ def prepare_parameters(parameters, log_indices=[0,1,2,3,8], discard_indices=[6,1
     parameters = np.delete(parameters, discard_indices, axis=1)
     return parameters
 
-def train(rank, multi_gpu, parameters_train, target_train, parameters_validation, target_validation, batch_size, fullDataset=False, profiling=False, **kwargs):
-    data_dims = kwargs.pop("data_dims", None)
-    data_dims_log = kwargs.pop("data_dims_log", None)
-    vars = kwargs.pop("vars", None)
-    data_log = kwargs.pop("data_log", None)
+def train(rank, multi_gpu, parameters_train, target_train, parameters_validation, target_validation, batch_size, scale_opt, fullDataset=False, profiling=False, **kwargs):
     
     if multi_gpu:
         world_size = torch.cuda.device_count()
@@ -354,17 +536,22 @@ def train(rank, multi_gpu, parameters_train, target_train, parameters_validation
     validation_sampler = torch.utils.data.distributed.DistributedSampler(dataset=validation_data_module, shuffle=True, seed=0) if multi_gpu else None
     validation_dataloader = torch.utils.data.DataLoader(validation_data_module, batch_size=batch_size, shuffle=(validation_sampler is None), sampler = validation_sampler,)
 
-    network_opt = dict(in_dim=parameters_train.shape[1], hidden_dim=100, n_hidden = 4, out_dim = 1)
-    optimizer_opt = dict(lr=1e-4)
-    emu = poweremu_torch(network=MLP, network_opt=network_opt, optimizer_opt=optimizer_opt, device=device)
+    network_opt = dict(in_dim=parameters_train.shape[1], hidden_dim=100, n_hidden = 6, out_dim = 1, dropout = 0.1, use_norm_dropout = False, use_attn = False) #use_norm_dropout = True, use_attn = True)
+    optimizer_opt = dict(lr=1e-3, weight_decay=1e-4)
+    train_opt = dict(epochs=10000, profiling=profiling, loss_fn=torch.nn.MSELoss())
+    scale_opt = scale_opt
+    emu = poweremu_torch(network=MLP, network_opt=network_opt,
+                         optimizer=torch.optim.Adam, optimizer_opt=optimizer_opt,
+                         train_opt=train_opt, scale_opt=scale_opt,
+                         device=device)
 
 
     #train
-    if profiling:
+    if train_opt["profiling"]:
         with torch.autograd.profiler.emit_nvtx():
-            emu.train(train_dataloader, validation_dataloader, epochs=1, accu_frac=1, profiling=profiling)
+            emu.train(train_dataloader, validation_dataloader)
     else:
-        emu.train(train_dataloader, validation_dataloader, epochs=100, accu_frac=1, profiling=profiling)
+        emu.train(train_dataloader, validation_dataloader)
 
     if multi_gpu:
         torch.distributed.barrier()
@@ -402,45 +589,212 @@ def flatten_data(parameters, data, data_dims):
 #plt.savefig("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/images/dsq_flatten_test.png")
 #plt.close()    
 
+#labels = 
+# ["z", "k", "logf_star_II", 
+# "logf_star_III", "logVc", "logfX", 
+# "alpha", "nu_0", "tau", 
+# "logfrad", "pop_trans_model"]
+class Scaler:
+    def __init__(
+            self, 
+            scale_opt):  
+
+        self.scale_opt = scale_opt
+
+    def standardize(self, data, **kwargs):
+        minimum = kwargs.pop("minimum", data.min())
+        maximum = kwargs.pop("maximum", data.max())
+        return (2 * (data - minimum) / (maximum - minimum)) - 1
+
+    def normalize(self, data, **kwargs):
+        mean = kwargs.pop("mean", data.mean())
+        std = kwargs.pop("std", data.std())
+        return (data - mean) / std
+    
+    def identity(self, data):
+        return data
+
+    def inverse_standardize(self, data, minimum, maximum):
+        return 0.5 * (data + 1) * (maximum - minimum) + minimum
+
+    def inverse_normalize(self, data, mean, std):
+        return (data * std) + mean
+
+    def inverse_identity(self, data):
+        return data
+    
+    def transform(self, data, use_scale_opt = True, **kwargs):
+        minimum = kwargs.pop("minimum", data.min(axis=0))
+        maximum = kwargs.pop("maximum", data.max(axis=0))
+        mean = kwargs.pop("mean", data.mean(axis=0))
+        std = kwargs.pop("std", data.std(axis=0))
+
+        n_sim, n_params = data.shape
+        assert n_params == len(self.scale_opt.keys()), "number of features and number of transforms in scale_opt must be the same"
+        for i,key in enumerate(self.scale_opt.keys()):
+            if self.scale_opt[key]["method"] == 'standardize':
+                stats = self.scale_opt[key]["stats"] if use_scale_opt else {"minimum": minimum[i], "maximum": maximum[i]}
+                data[:,i] = self.standardize(data[:,i], **stats)
+            elif self.scale_opt[key]["method"] == 'normalize':
+                stats = self.scale_opt[key]["stats"] if use_scale_opt else {"mean": mean[i], "std": std[i]}
+                data[:,i] = self.normalize(data[:,i], **stats)
+            else:
+                data[:,i] = self.identity(data[:,i])
+        return data
+    
+    def inverse_transform(self, data, use_scale_opt = True, **kwargs):
+        minimum = kwargs.pop("minimum", data.min(axis=0))
+        maximum = kwargs.pop("maximum", data.max(axis=0))
+        mean = kwargs.pop("mean", data.mean(axis=0))
+        std = kwargs.pop("std", data.std(axis=0))
+
+        n_sim, n_params = data.shape
+        assert n_params == len(self.axes_transform), "Length of data and transform must be the same"
+        for i,key in self.scale_opt.keys():
+            if self.scale_opt[key]["method"] == 'standardize':
+                stats = self.scale_opt[key]["stats"] if use_scale_opt else {"minimum": minimum[i], "maximum": maximum[i]}
+                data[:,i] = self.inverse_standardize(data[:,i], **stats)
+            elif self.scale_opt[key]["method"] == 'normalize':
+                stats = self.scale_opt[key]["stats"] if use_scale_opt else {"mean": mean[i], "std": std[i]}
+                data[:,i] = self.inverse_normalize(data[:,i], **stats)
+            else:
+                data[:,i] = self.inverse_identity(data[:,i])
+        return data
+
+            
+
+
 
 
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     multi_gpu = world_size > 1
 
+    little_h = 0.6704
     parameters = prepare_parameters(parameters)
     minimum = dsq[dsq!=0].min()
-    dsq[dsq==0] = minimum * 1e-3
+    dsq[dsq==0] = minimum * 10**np.random.uniform(-3, 0, dsq[dsq==0].shape) #1e-3
+    #dsq[dsq<1.] = 1.
 
     #train_test_split for parameters and dsq
     parameters_train, parameters_validation, dsq_train, dsq_validation = train_test_split(parameters, dsq, test_size=0.2, train_size=0.8, random_state=42)
 
-    #parameters_validation, dsq_validation = flatten_data(parameters=parameters_validation, data=dsq_validation, data_dims=(z_array, k_array))
-    #np.savez_compressed("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/validation_data.npz", parameters=parameters_validation_2, dsq=dsq_validation_2)
+    zmask = np.logical_and(z_array >= 6, z_array <= 27)
+    kmask = np.logical_and(k_array / little_h >= 3e-2 / little_h, k_array / little_h <= 0.99 / little_h)
+    dsq_validation = dsq_validation[:, zmask, :][:, :, kmask]
+    parameters_validation, dsq_validation = flatten_data(parameters=parameters_validation, data=dsq_validation, data_dims=(z_array[zmask], np.log10(k_array[kmask] / little_h)))
+    logdsq_validation = np.log10(dsq_validation)
+    #np.savez_compressed("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/validation_data.npz", parameters=parameters_validation, dsq=dsq_validation)
     #load
-    data = np.load("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/validation_data.npz")
-    parameters_validation = data['parameters']
-    logdsq_validation = np.log10(data['dsq'])
-
-    #parameters_train, logdsq_train = gen_training_data(parameters=parameters_train, data_dims=(z_array, k_array), data=dsq, vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_dims_log=[False, True], data_log=True, verbose=True)# if torch.cuda.current_device() == 0 else False)
-    #np.savez_compressed("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/training_data.npz", parameters=parameters_train, logdsq=logdsq_train)
-    #load training data
-    data = np.load("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/training_data.npz")
-    parameters_train = data['parameters']
-    logdsq_train = data['logdsq']
-
-    print(parameters_train.shape, logdsq_train.shape, parameters_validation.shape, logdsq_validation.shape)
-
+    #data = np.load("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/validation_data.npz")
+    #parameters_validation = data['parameters']
+    #logdsq_validation = np.log10(data['dsq'])
     
+    #shuffle parameters_validation and logdsq_validation with torch
+    indices = torch.randperm(len(parameters_validation))
+    parameters_validation = parameters_validation[indices]
+    logdsq_validation = logdsq_validation[indices]
+    print(f"Shapes: parameters_train: {parameters_train.shape}, dsq_train: {dsq_train.shape}, parameters_validation: {parameters_validation.shape}, logdsq_validation: {logdsq_validation.shape}, z_array[zmask]: {z_array[zmask].shape}, k_array[kmask]: {k_array[kmask].shape}", flush=True)
+    parameters_train, logdsq_train = gen_training_data(parameters=parameters_train, data_dims=(z_array, k_array / little_h), data=dsq_train, vars=[[6, 27, 10], [3e-2 / little_h, 0.99 / little_h, 10]], data_dims_log=[False, True], data_log=True, verbose=True)# if torch.cuda.current_device() == 0 else False)
+    np.savez_compressed("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/training_data_7_2.npz", parameters_train=parameters_train, logdsq_train=logdsq_train, parameters_validation=parameters_validation, logdsq_validation=logdsq_validation)
+    #load training data
+    #data = np.load("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/training_data.npz")
+    #parameters_train = data['parameters']
+    #logdsq_train = data['logdsq']
+    #standardize/normalize parameters_train and parameters_validation
+    mean = parameters_train.mean(axis=0)
+    std = parameters_train.std(axis=0)
+    minimum = parameters_train.min(axis=0)
+    maximum = parameters_train.max(axis=0)
+    #labels = ["z", "k", "logf_star_II", "logf_star_III", "logVc", 
+    # "logfX", "alpha", "nu_0", "tau", "logfrad", "pop_trans_model"]
+    from collections import OrderedDict
+    scale_opt = OrderedDict(
+                     z               = dict(method = "standardize", stats = dict(minimum = minimum[0], maximum = maximum[0])),
+                     logk            = dict(method = "standardize", stats = dict(minimum = minimum[1], maximum = maximum[1])),
+                     logf_star_II    = dict(method = "standardize", stats = dict(minimum = minimum[2], maximum = maximum[2])),
+                     logf_star_III   = dict(method = "standardize", stats = dict(minimum = minimum[3], maximum = maximum[3])),
+                     logVc           = dict(method = "standardize", stats = dict(minimum = minimum[4], maximum = maximum[4])),
+                     logfx           = dict(method = "standardize", stats = dict(minimum = minimum[5], maximum = maximum[5])),
+                     alpha           = dict(method = "standardize", stats = dict(minimum = minimum[6], maximum = maximum[6])),
+                     nu_0            = dict(method = "standardize", stats = dict(minimum = minimum[7], maximum = maximum[7])),
+                     tau             = dict(method = "normalize",   stats = dict(mean = mean[8], std = std[8])),
+                     logfrad         = dict(method = "standardize", stats = dict(minimum = minimum[9], maximum = maximum[9])),
+                     pop_trans_model = dict(method = "standardize", stats = dict(minimum = minimum[10], maximum = maximum[10])),
+                     )
+    scaler = Scaler(scale_opt)
+    parameters_train = scaler.transform(parameters_train)
+    parameters_validation = scaler.transform(parameters_validation)
+    ##min-max normalise all features except feature 8 
+    #parameters_train[:, :8] = (2 * (parameters_train[:, :8] - features_min[:8]) / (features_max[:8] - features_min[:8])) - 1
+    #parameters_validation[:, :8] = (2 * (parameters_validation[:, :8] - features_min[:8]) / (features_max[:8] - features_min[:8])) - 1
+    #parameters_train[:, 9:] = (2 * (parameters_train[:, 9:] - features_min[9:]) / (features_max[9:] - features_min[9:])) - 1
+    #parameters_validation[:, 9:] = (2 * (parameters_validation[:, 9:] - features_min[9:]) / (features_max[9:] - features_min[9:])) - 1
+    ##standardise feature 8
+    #parameters_train[:, 8] = (parameters_train[:, 8] - mean[8]) / std[8]
+    #parameters_validation[:, 8] = (parameters_validation[:, 8] - mean[8]) / std[8]
+
+    #remove outliers
+    #mask = logdsq_train < -4
+    #parameters_train = np.delete(parameters_train, mask, axis=0)
+    #logdsq_train = np.delete(logdsq_train, mask, axis=0)
+    #mask = logdsq_validation < -4
+    #parameters_validation = np.delete(parameters_validation, mask, axis=0)
+    #logdsq_validation = np.delete(logdsq_validation, mask, axis=0)
+    """
+    #number of data pointd before
+    nbefore = len(logdsq_train)
+    #bin data and uniformly draw an equal amount of samples from each bin
+    def rebin_data(data, num_samples):
+        bin_min = data.min()
+        bin_max = data.max()
+        bins = np.array([bin_min, *np.linspace(0., 5, 19), bin_max])
+        bin_indices = np.digitize(data, bins)
+        bin_nmin = np.array([np.sum(bin_indices == i) for i in range(1, len(bins))]).min()
+        indices = []
+        for i in range(1, len(bins)):
+            indices.extend(np.random.choice(np.where(bin_indices == i)[0], bin_nmin, replace=False))
+        return indices
+    indices = rebin_data(logdsq_train, 10000)
+    bins = [logdsq_train.min(), *np.linspace(-2, 5, 19), logdsq_train.max()]
+    parameters_train = parameters_train[indices]
+    logdsq_train = logdsq_train[indices]
+    nafter = len(logdsq_train)
+    print(f"Number of samples before: {nbefore:,}, after: {nafter:,}. Percentage of data kept: {100*nafter/nbefore:.2f}%", flush=True)
+    
+    #shuffle parameters_train and logdsq_train with torch
+    indices = torch.randperm(len(parameters_train))
+    parameters_train = parameters_train[indices]
+    logdsq_train = logdsq_train[indices]
+    
+    #plot histograms of logdsq_train
+    #fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #hist, edges = np.histogram(logdsq_train, bins=bins)
+    #bin_centers = 0.5 * (edges[:-1] + edges[1:])
+    #ax.bar(bin_centers, hist, width=np.diff(edges), alpha=0.5, label='Training Data')
+    #ax.legend()
+    #ax.set_xlabel('logdsq')
+    #ax.set_ylabel('Frequency')
+    #plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/logdsq_histogram_rebinned.png")
+
+    #fig, axes = plt.subplots(1,11, figsize=(6*11,6))
+    #labels = ["z", "k", "logf_star_II", "logf_star_III", "logVc", "logfX", "alpha", "nu_0", "tau", "logfrad", "pop_trans_model"]
+    #for i in range(11):
+    #    axes[i].hist(parameters_train[:,i], bins=100)
+    #    axes[i].set_xlabel(f'{labels[i]}')
+    #    axes[i].set_ylabel('Frequency')
+    #plt.savefig("/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/images/parameters_histogram_scaled.png")
+    
+    """
     if multi_gpu:
         print(f"Using multi-gpu with {world_size} GPUs", flush=True)
         for i in range(torch.cuda.device_count()):
             print(f"Device {i}: {torch.cuda.get_device_properties(i).name}", flush=True)
-        torch.multiprocessing.spawn(train, args=(multi_gpu, parameters_train, logdsq_train, parameters_validation, logdsq_validation, 50000, True, False), nprocs=world_size)
+        torch.multiprocessing.spawn(train, args=(multi_gpu, parameters_train, logdsq_train, parameters_validation, logdsq_validation, 20000, scale_opt, True, False), nprocs=world_size)
         print("Training complete", flush=True)
     else:
         print("Not using multi-gpu")
-        train(0, multi_gpu=multi_gpu, parameters_train=parameters_train, target_train=logdsq_train, parameters_validation=parameters_validation, target_validation=logdsq_validation, batch_size=10000, fullDataset=True, profiling=True)#, data_dims=(z_array, k_array), data_dims_log=[False, True], vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_log=True)
+        train(0, multi_gpu=multi_gpu, parameters_train=parameters_train, target_train=logdsq_train, parameters_validation=parameters_validation, target_validation=logdsq_validation, batch_size=10000, scale_opt=scale_opt, fullDataset=True, profiling=True)#, data_dims=(z_array, k_array), data_dims_log=[False, True], vars=[[6, 27, 10], [3e-2, 0.99, 10]], data_log=True)
 
     
     

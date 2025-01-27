@@ -30,7 +30,8 @@ class poweremu():
             # Defaults
             #activation='relu', early_stopping=False,
             #alpha=1e-4, solver='adam', learning_rate='constant',
-            **kwargs))
+            **kwargs), 
+            verbose=True)
         if preprocesss_log_x:
             self.preprocess_x = lambda x: np.log(x)
             self.inv_preprocess_x = lambda x: np.exp(x)

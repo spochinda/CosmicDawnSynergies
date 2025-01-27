@@ -51,9 +51,9 @@ def numinPrior(index):
 ## 21cmSim uses these redshifts for all outputs, except xHI.
 #z_array = np.arange(6,50.01,1)
 path= os.getcwd().split("/CosmicDawnSynergies")[0] + "/CosmicDawnSynergies/"
-z_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_z_", name="hera", key='z21cm', endings=["mat"])[0] #Added by SP
-zmask = np.array(z_array >= 7) & (z_array <= 27)
-z_array = z_array[zmask]
+#z_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_z_", name="hera", key='z21cm', endings=["mat"])[0] #Added by SP
+#zmask = np.array(z_array >= 7) & (z_array <= 27)
+#z_array = z_array[zmask]
 ## And these ones for xHI.
 #z_xHI_array = np.arange(0,30.001,0.1)
 # Little h for wave number conversions, use h from simulation
@@ -62,13 +62,13 @@ h=0.6704
 # should be all identical but double check for new data.
 
 #k_array = load_files('data/models_21cmSim/Sims2021/', middle="_sims_", name="K", key='Kout', endings=["fRad"])[0]
-k_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_k_", name="hera", key='ks', endings=["mat"])[0] #Added by SP
-kmask = np.array(k_array >= 8.5e-2) & (k_array <= 1)
-k_array = k_array[kmask]
+#k_array = load_files(path + 'data/models_21cmSim/HERA_IDR4_Emulator_Data/', middle="_k_", name="hera", key='ks', endings=["mat"])[0] #Added by SP
+#kmask = np.array(k_array >= 8.5e-2) & (k_array <= 1)
+#k_array = k_array[kmask]
 
 
 # Tools useful for emulator training data sampling
-def powerspec_of_z_k_hovercMpc(data, z_array=z_array, k_array_over_h=k_array/h):
+def powerspec_of_z_k_hovercMpc(data, z_array, k_array_over_h):
     # Interpolate a given power spectrum (data) at z and k within the respective bounds
     # Make sure to convert to h/cMpc and never use non-h units anywhere anymore
     #print("zarray, log(karray): ", np.shape(z_array), np.log(k_array_over_h).shape)
@@ -76,7 +76,7 @@ def powerspec_of_z_k_hovercMpc(data, z_array=z_array, k_array_over_h=k_array/h):
     return lambda z,k: np.exp(f(z, np.log(k)))-1
 
 def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag=None,
-                 zlow=7, zhigh=11, klow=0.02, khigh=3):
+                 zlow=7, zhigh=11, klow=0.02, khigh=3, z_array=[6,7,8], k_array=[1e-1, 3e-1, 1]):
     # Sample random z and k from the power spectra interpolations
     # Note: Use k in h/cMpc !
     # n_over = number of random (z,k) samples per model
@@ -93,7 +93,7 @@ def gen_training(n_over, params, data, fix_z=False, fix_k=False, seed=None, flag
         p = params[m]
         z = [fix_z]*n_over if fix_z else np.random.uniform(low=zlow, high=zhigh, size=n_over)
         k = [fix_k]*n_over if fix_k else np.random.uniform(low=klow, high=khigh, size=n_over)
-        f = powerspec_of_z_k_hovercMpc(data=data[m])
+        f = powerspec_of_z_k_hovercMpc(data=data[m], z_array=z_array, k_array_over_h=k_array/h)
         for j in range(n_over):
             if flag is None:
                 training_x.append([z[j],k[j], *p])
@@ -109,7 +109,7 @@ def Tinterp1d(z, Tarr, zarr):
     return f(z)
 
 def gen_training_1d(n_over, params, data, fix_z=False, seed=None, flag=None,
-                    zlow=6, zhigh=31, zarr=z_array):
+                    zlow=6, zhigh=31, zarr=[6,7,8]):
     # n_over = number of random (z,k) samples per model
     # params, data: Parameters and power spectra of models
     # Returns n_over*len(params) samples

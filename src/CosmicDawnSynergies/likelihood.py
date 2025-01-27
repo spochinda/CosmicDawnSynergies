@@ -6,7 +6,7 @@ from scipy.constants import parsec, physical_constants
 import scipy.special as ssp
 import CosmicDawnSynergies.itamar.radio_cutoff_calc as rad
 from .emulator_poweremu import *
-from margarine.maf import MAF
+#from margarine.maf import MAF
 
 from tensorflow import keras
 from globalemu.eval import evaluate
