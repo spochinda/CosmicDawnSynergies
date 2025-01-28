@@ -13,6 +13,10 @@ from pypolychord.priors import UniformPrior,LogUniformPrior
 import time
 from mpi4py import MPI
 
+import torch
+from CosmicDawnSynergies.train_tools import poweremu_torch, MLP
+from CosmicDawnSynergies.train_tools import Scaler
+
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--band_idx", type=int, default=1, help="Band index")
@@ -28,6 +32,19 @@ rank = comm.Get_rank()
 
 if rank==0:
     print(f"Running script with number of processes: {size}",flush=True)
+
+network_opt = dict(in_dim=11, hidden_dim=100, n_hidden = 6, out_dim = 1, dropout = 0.1, use_norm_dropout = False, use_attn = False)
+optimizer_opt = dict(lr=1e-3, weight_decay=1e-4)
+train_opt = dict(epochs=10000, profiling=False, loss_fn=torch.nn.MSELoss())
+scale_opt = dict()
+
+poweremu = poweremu_torch(network=MLP, network_opt=network_opt, 
+                          optimizer=torch.optim.Adam, optimizer_opt=optimizer_opt, 
+                          train_opt=train_opt, scale_opt=scale_opt,
+                          device='cpu')
+poweremu.load_network("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/trained_emulators_poweremu/MLP_7_2.pth")
+scaler = Scaler(poweremu.scale_opt)
+
 
 
 texDict = {"log10fstarII": r"$\log_{10} \left(f_{\rm \ast, II}\right)$",
@@ -53,16 +70,20 @@ texDict_SARAS3 = {
     }
 
 priorDict = {
-            "log10fstarII": np.log10([1e-3, 0.5]).tolist(),
-            "log10fstarIII": np.log10([1e-3, 0.5]).tolist(),
-            "log10Vc": np.log10([4.2, 100]).tolist(),
-            "log10fX": np.log10([1e-3, 1e3]).tolist(),
+            "log10fstarII": scaler.standardize(np.log10([1e-3, 0.5]), **scaler.scale_opt["logf_star_II"]["stats"]),
+            "log10fstarIII": scaler.standardize(np.log10([1e-3, 0.5]), **scaler.scale_opt["logf_star_III"]["stats"]),
+            "log10Vc": scaler.standardize(np.log10([4.2, 100]), **scaler.scale_opt["logVc"]["stats"]),
+            "log10fX": scaler.standardize(np.log10([1e-3, 1e3]), **scaler.scale_opt["logfx"]["stats"]),
             "alpha": [-0.5, 2.5],
             "nu_0": [-0.5, 16.5],#[100:100:1500, 2000, 3000],
-            "tau": [0.054-3*0.007, 0.054+3*0.007],#??
-            "log10fradio": np.log10([1e-1, 99990.]).tolist(),##############
+            "tau": scaler.normalize(np.array([0.054-3*0.007, 0.054+3*0.007]), **scaler.scale_opt["tau"]["stats"]),#??
+            "log10fradio": scaler.standardize(np.log10([1e-1, 99990.]), **scaler.scale_opt["logfrad"]["stats"]),
             "pop": [-0.5, 2.5],#[231, 232, 233],#??
             }
+
+if rank==0:
+    print("Prior dict: ", priorDict, flush=True)
+
 
 priorDict_SARAS3 = {
     "a0": [-10,10],
@@ -76,9 +97,9 @@ priorDict_SARAS3 = {
 }
     
 discrete_params = {
-            "alpha": [1, 1.3, 1.5],
-            "nu_0": [*range(100,1500,100), 1500, 2000, 3000],
-            "pop": [231, 232, 233],
+            "alpha": scaler.standardize(np.array([1, 1.3, 1.5])),
+            "nu_0": scaler.standardize(np.array([*range(100,1500,100), 1500, 2000, 3000])),
+            "pop": scaler.standardize(np.array([231, 232, 233])),
             #"feed": [0, 1],
             #"delay": [0, 0.75]
 }
@@ -112,17 +133,22 @@ output_names_xHI = {"logL_xHI": r"\log L_\mathrm{x_{HI}}"}
 #    output_names = output_names_HERA
 #)
 
-#dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(3,0,-1)]
-dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{band_idx}.h5",]
-selection = [None,] #len(range(3,0,-1))*[None,] #7:0
+dpath = [f"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(7,0,-1)] #8 is z=5.6
+#dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{band_idx}.h5",]
+selection = len(dpath) * [None,] #len(range(3,0,-1))*[None,] #7:0
 like_hera = likelihood(datapath=dpath, selections=selection, zero_fill=1e-50,
                 decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
                 return_individual_loglikes=False, debug=False,
-                emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
-                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"}
+                emupath=None,#'data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"},
+                scaler = scaler,
+                rank = rank
                  )
+like_hera.model_dsq = poweremu.model
+like_hera.model_dsq.eval()
 
 #Setup sampling
+if rank==0: print([like_hera.data[key]["0"]["z"] for key in like_hera.data.keys()], flush=True)
 
 class UniformDiscretePrior:
     def __init__(self, a):
@@ -169,7 +195,7 @@ LikelihoodModules = np.array([like_hera,
 
 #constraints = np.array([(1,1,1,1), (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1)]).astype(bool) #HERA, Chandra, LWA, SARAS
 constraints = np.array([(1,0,0,0,0)]).astype(bool) #HERA, Chandra, LWA, SARAS, xHI
-nlives = [5000,]
+nlives = [1000,]
 
 for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints)):
     priorDict_ = priorDict.copy() if not SARAS else {**priorDict.copy(), **priorDict_SARAS3.copy()}
@@ -212,7 +238,7 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
                 else:
                     logL_nDerived_flattened = np.append(logL_nDerived_flattened, item)
         except Exception as e:
-            print(e)
+            print("error was: ", e)
 
         return logL, logL_nDerived_flattened#, *T_emus]
 
@@ -230,10 +256,10 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
     nDerived = np.sum([likelihood.nDerived for likelihood in LikelihoodModules[constraints[i]]]) #2 #(bandsNfields*HERA-1)*0 + LikelihoodXRB(use_MAFs=use_MAFs).nDerived + LikelihoodRadioBackground(use_MAFs=use_MAFs).nDerived + LikelihoodSARAS3(use_MAFs=use_MAFs).nDerived #if not use_MAFs else 2 #+3*len(redshifts) #2*9 + 3*9 # (selections, number of bands*fields, +6 temperature outputs) # idr4=(9bands*2fields+3temps*9bands), idr2=(2bands*1fields+3temps*9redshifts(AKA bands)) #2
     settings = PolyChordSettings(nDims, nDerived)
     settings.nlive = nlive #00 #2000
-    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_above11_bidx{6}_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive,band_idx)
+    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_bidx{6}_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive,"all2")
     settings.file_root = 'run'
     settings.do_clustering = True
-    settings.read_resume = True    
+    settings.read_resume = False    
     
     if rank==0:
         start_time = time.time()

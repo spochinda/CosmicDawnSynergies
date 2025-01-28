@@ -109,7 +109,7 @@ def extract_data(field="1", band=1,
         k_mag = np.sqrt(k_perp**2 + k_para**2)
         
         dsq_mask = dsq+std < 1e10
-        k_mask = np.logical_and(k_mag < 1.47, k_mag > 0.027)
+        k_mask = np.logical_and(k_mag < 1.47, k_mag > 0.045)
         mask = np.logical_and(dsq_mask, k_mask)
 
         dsq = dsq[mask]
@@ -175,15 +175,22 @@ def emulatorModel2d(emu, z, karr, p):
     par0 = np.array([z, np.NaN, *p[:9]])
     params=np.tile(par0, (len(karr), 1))
     params[:,1] = karr
+    z = 0.5 * (z + 1) * (27 - 6) + 6 # Convert for torch emulator
     #print(params)
-    return emu.predict(params)
+    #pred = emu.predict(params)
+    with torch.no_grad():
+        params = torch.from_numpy(params).to(dtype=torch.float32)
+        pred = emu(params)
+        pred = pred.detach().numpy()
+    return pred
 
 class likelihood:
     def __init__(self, datapath='IDR2/pspec_h1c_idr2_field{}.h5', selections=None, zero_fill=1e-50,
                 decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
                 return_individual_loglikes=False, debug=False,
                 emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
-                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"}
+                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"},
+                **kwargs
                  ):
         self.output_names = output_names
         self.theory_err = theory_err
@@ -196,6 +203,9 @@ class likelihood:
         self.model_dsq = poweremu(loadfile=emupath, preprocesss_log_x=False, tol=1e-5, offset=0)
         self.data = {}
         self.nDerived = len(self.output_names.items())
+        self.scaler = kwargs.pop("scaler", None)
+        rank = kwargs.pop("rank", 0)
+
 
         if isinstance(self.datapath,list) and isinstance(selections,list):
             for i,(dpath,sel) in enumerate(zip(self.datapath,selections)):
@@ -213,6 +223,7 @@ class likelihood:
                                     decimation_factor=self.decimation_factor,
                                     set_negative_to_zero=self.set_negative_to_zero)
                 elif ('Deltasq_Band_' in dpath):
+                    if rank == 0:   print("Loading data from", dpath)
                     self.data[i] = {}
                     self.data[i]["0"] = extract_data(datapath=dpath, 
                                                        band=0,
@@ -221,6 +232,8 @@ class likelihood:
                                                        kstart_modulo=False,
                                                        decimation_factor=None,
                                                        set_negative_to_zero=True)
+                    self.data[i]["0"]["z"] = self.scaler.standardize(self.data[i]["0"]["z"], **self.scaler.scale_opt["z"]["stats"])
+                    self.data[i]["0"]["k_model"] = self.scaler.standardize(np.log10(self.data[i]["0"]["k_model"]), **self.scaler.scale_opt["logk"]["stats"])
         else:
             if ('idr4' in self.datapath) or ('idr6' in self.datapath): #added by SP
                 self.data = np.load(self.datapath, allow_pickle=True).item()
