@@ -73,13 +73,19 @@ def extract_data(field="1", band=1,
         z = uvp.cosmo.f2z(np.mean(spw_frequencies))
         # Get wave number, data, error, and (k-space) window functions
         kbins_data = uvp.get_kparas(spw_index)
-        kbins_model = uvp.get_kparas(spw_index)
+        #kbins_model = uvp.get_kparas(spw_index)
         dsq = uvp.get_data(band_key)[0].real.copy()
         std = np.sqrt(uvp.get_cov(band_key)[0].diagonal().real.copy())
         wfn = uvp.get_window_function(band_key)[0]
         # Negative power spectra values are physically impossible
         if set_negative_to_zero:
             dsq[dsq < 0] = 0
+        mask = np.logical_and(kbins_data < 1.47, kbins_data > 0.045)
+        kbins_data = kbins_data[mask]
+        dsq = dsq[mask]
+        std = std[mask]
+        wfn = wfn[mask][:,mask]
+
     elif ('idr4' in datapath) or ('idr6' in datapath): #added by SP
         band = str(band)
         data = np.load(datapath, allow_pickle=True).item()
@@ -132,12 +138,16 @@ def extract_data(field="1", band=1,
         kbins_indices = slice(initial_index, None, decimation_factor)
         dsq = dsq[kbins_indices]
         std = std[kbins_indices]
-        wfn = wfn[kbins_indices]
+        wfn = wfn[kbins_indices][:,kbins_indices]
         kbins_data = kbins_data[kbins_indices] # just for plots
     # Cutoff k=0 model point
     if ("idr2" in datapath) or ("idr3" in datapath):
-        wfn = wfn[:,1:]
-        kbins_model = kbins_model[1:]
+        pass
+        #wfn = wfn[:,1:]
+        #kbins_model = kbins_model[1:]
+        kbins_model = kbins_data
+
+        #mask = np.logical_and(dsq_mask, k_mask)
     return {"z": z, "k_model": kbins_model, "dsq": dsq, "std": std, "wfn": wfn, "k_data": kbins_data}
 
 def compare_data(datapath='IDR3/Deltasq_Band_{1:}_Field_{0:}.h5', theory_err=0.2,
@@ -262,7 +272,7 @@ class likelihood:
                 std = self.data[band][field]["std"]
                 wfn = self.data[band][field]["wfn"]
                 z = self.data[band][field]["z"]
-                k = self.data[band][field]["k_model"]
+                k = self.data[band][field]["k_data"]
                 m = emulatorModel2d(emu=self.model_dsq, z=z, karr=k, p=p)
                 theory = wfn @ m #theory=model for diag(wfn), @=matrix multiplication
                 r = dsq - theory

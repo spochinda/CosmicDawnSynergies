@@ -120,35 +120,36 @@ output_names_SARAS3 = {"logL_SARAS": r"\log L_\mathrm{SARAS3}"}
 output_names_xHI = {"logL_xHI": r"\log L_\mathrm{x_{HI}}"}
     
 
-#selection = [{"1": {"D": {"kstart":0.36}}}, {"2": {"C": {"kstart":0.34}}}]
-#dpath = [
-#    'data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5',
-#    'data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5']
-#like_hera = likelihood(
-#    datapath=dpath,
-#    decimation_factor=2,
-#    selections=selection,
-#    return_individual_loglikes=False, #Can only use false with this new likelihood module approach
-#    emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
-#    output_names = output_names_HERA
-#)
+selection = [{"1": {"D": {"kstart":0.36}}}, {"2": {"C": {"kstart":0.34}}}]
+dpath = [
+    'data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5',
+    'data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5']
+like_hera = likelihood(
+    datapath=dpath,
+    decimation_factor=2,
+    selections=selection,
+    return_individual_loglikes=False, #Can only use false with this new likelihood module approach
+    emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+    output_names = output_names_HERA
+)
 
-dpath = [f"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(7,0,-1)] #8 is z=5.6
-#dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{band_idx}.h5",]
-selection = len(dpath) * [None,] #len(range(3,0,-1))*[None,] #7:0
-like_hera = likelihood(datapath=dpath, selections=selection, zero_fill=1e-50,
-                decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
-                return_individual_loglikes=False, debug=False,
-                emupath=None,#'data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
-                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"},
-                scaler = scaler,
-                rank = rank
-                 )
+
+#dpath = [f"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(7,0,-1)] #8 is z=5.6
+##dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{band_idx}.h5",]
+#selection = len(dpath) * [None,] #len(range(3,0,-1))*[None,] #7:0
+#like_hera = likelihood(datapath=dpath, selections=selection, zero_fill=1e-50,
+#                decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
+#                return_individual_loglikes=False, debug=False,
+#                emupath=None,#'data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+#                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"},
+#                scaler = scaler,
+#                rank = rank
+#                 )
 like_hera.model_dsq = poweremu.model
 like_hera.model_dsq.eval()
 
 #Setup sampling
-if rank==0: print([like_hera.data[key]["0"]["z"] for key in like_hera.data.keys()], flush=True)
+#if rank==0: print([like_hera.data[key]["0"]["z"] for key in like_hera.data.keys()], flush=True)
 
 class UniformDiscretePrior:
     def __init__(self, a):
@@ -256,7 +257,7 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
     nDerived = np.sum([likelihood.nDerived for likelihood in LikelihoodModules[constraints[i]]]) #2 #(bandsNfields*HERA-1)*0 + LikelihoodXRB(use_MAFs=use_MAFs).nDerived + LikelihoodRadioBackground(use_MAFs=use_MAFs).nDerived + LikelihoodSARAS3(use_MAFs=use_MAFs).nDerived #if not use_MAFs else 2 #+3*len(redshifts) #2*9 + 3*9 # (selections, number of bands*fields, +6 temperature outputs) # idr4=(9bands*2fields+3temps*9bands), idr2=(2bands*1fields+3temps*9redshifts(AKA bands)) #2
     settings = PolyChordSettings(nDims, nDerived)
     settings.nlive = nlive #00 #2000
-    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_bidx{6}_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive,"all2")
+    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_idr3{6}_nlive_{5}_idr3'.format(*constraints[i].astype(int),settings.nlive,"all2")
     settings.file_root = 'run'
     settings.do_clustering = True
     settings.read_resume = False    
