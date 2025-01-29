@@ -114,9 +114,11 @@ def extract_data(field="1", band=1,
         k_perp = x.get_kperps(spw_index)
         k_mag = np.sqrt(k_perp**2 + k_para**2)
         
-        dsq_mask = dsq+std < 1e10
+        dsq_mask = dsq > 0 #+std < 1e10
         k_mask = np.logical_and(k_mag < 1.47, k_mag > 0.045)
         mask = np.logical_and(dsq_mask, k_mask)
+        #dsq_mask = dsq > 0
+        #mask = np.logical_and(mask, dsq_mask)
 
         dsq = dsq[mask]
         std = std[mask]
@@ -185,13 +187,14 @@ def emulatorModel2d(emu, z, karr, p):
     par0 = np.array([z, np.NaN, *p[:9]])
     params=np.tile(par0, (len(karr), 1))
     params[:,1] = karr
-    z = 0.5 * (z + 1) * (27 - 6) + 6 # Convert for torch emulator
-    #print(params)
+    #z = 0.5 * (z + 1) * (27 - 6) + 6 # Convert for torch emulator
+    #print(f"z={z}, karr.min()={karr.min()}, karr.max()={karr.max()}")
+    #print(f"karr.min()={karr.min()}, karr.max()={karr.max()}")
     #pred = emu.predict(params)
     with torch.no_grad():
         params = torch.from_numpy(params).to(dtype=torch.float32)
         pred = emu(params)
-        pred = pred.detach().numpy()
+        pred = 10**pred.detach().numpy()
     return pred
 
 class likelihood:
@@ -232,6 +235,10 @@ class likelihood:
                                     kstart_modulo=kstart_modulo,
                                     decimation_factor=self.decimation_factor,
                                     set_negative_to_zero=self.set_negative_to_zero)
+                            print("Extracted data for band", band, "field", field, "at z=", self.data[band][field]["z"])
+                            self.data[band][field]["z"] = self.scaler.standardize(self.data[band][field]["z"], **self.scaler.scale_opt["z"]["stats"])
+                            self.data[band][field]["k_data"] = self.scaler.standardize(np.log10(self.data[band][field]["k_data"]), **self.scaler.scale_opt["logk"]["stats"])
+                            self.data[band][field]["k_model"] = self.scaler.standardize(np.log10(self.data[band][field]["k_model"]), **self.scaler.scale_opt["logk"]["stats"])
                 elif ('Deltasq_Band_' in dpath):
                     if rank == 0:   print("Loading data from", dpath)
                     self.data[i] = {}
@@ -244,6 +251,7 @@ class likelihood:
                                                        set_negative_to_zero=True)
                     self.data[i]["0"]["z"] = self.scaler.standardize(self.data[i]["0"]["z"], **self.scaler.scale_opt["z"]["stats"])
                     self.data[i]["0"]["k_model"] = self.scaler.standardize(np.log10(self.data[i]["0"]["k_model"]), **self.scaler.scale_opt["logk"]["stats"])
+                    self.data[i]["0"]["k_data"] = self.scaler.standardize(np.log10(self.data[i]["0"]["k_data"]), **self.scaler.scale_opt["logk"]["stats"])
         else:
             if ('idr4' in self.datapath) or ('idr6' in self.datapath): #added by SP
                 self.data = np.load(self.datapath, allow_pickle=True).item()
@@ -303,6 +311,7 @@ class likelihood:
             ncols = len(self.data)
             fig, ax = plt.subplots(ncols=ncols, figsize=(10,5))
             ax = [ax] if ncols==1 else ax
+            formatting = "1D"
         else:
             if len(np.shape(axes)) == 2:
                 formatting = "2D"

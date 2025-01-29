@@ -42,7 +42,7 @@ poweremu = poweremu_torch(network=MLP, network_opt=network_opt,
                           optimizer=torch.optim.Adam, optimizer_opt=optimizer_opt, 
                           train_opt=train_opt, scale_opt=scale_opt,
                           device='cpu')
-poweremu.load_network("/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/trained_emulators_poweremu/MLP_7_2.pth")
+poweremu.load_network("/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/CosmicDawnSynergies/data/trained_emulators_poweremu/MLP_7_2.pth")
 scaler = Scaler(poweremu.scale_opt)
 
 
@@ -81,8 +81,6 @@ priorDict = {
             "pop": [-0.5, 2.5],#[231, 232, 233],#??
             }
 
-if rank==0:
-    print("Prior dict: ", priorDict, flush=True)
 
 
 priorDict_SARAS3 = {
@@ -120,33 +118,84 @@ output_names_SARAS3 = {"logL_SARAS": r"\log L_\mathrm{SARAS3}"}
 output_names_xHI = {"logL_xHI": r"\log L_\mathrm{x_{HI}}"}
     
 
-selection = [{"1": {"D": {"kstart":0.36}}}, {"2": {"C": {"kstart":0.34}}}]
-dpath = [
-    'data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5',
-    'data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5']
-like_hera = likelihood(
-    datapath=dpath,
-    decimation_factor=2,
-    selections=selection,
-    return_individual_loglikes=False, #Can only use false with this new likelihood module approach
-    emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
-    output_names = output_names_HERA
-)
+#selection = [{"1": {"D": {"kstart":0.36}}}, {"2": {"C": {"kstart":0.34}}}]
+#dpath = [
+#    'data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5',
+#    'data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5']
+#like_hera = likelihood(
+#    datapath=dpath,
+#    decimation_factor=2,
+#    selections=selection,
+#    return_individual_loglikes=False, #Can only use false with this new likelihood module approach
+#    emupath='data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+#    output_names = output_names_HERA,
+#    debug=False,
+#    scaler = scaler,
+#)
+
+"""
+from matplotlib import pyplot as plt
+fig,ax = plt.subplots(1,1,figsize=(10,10))
+dsq = like_hera.data["1"]["D"]["dsq"]
+std = like_hera.data["1"]["D"]["std"]
+k_vals = like_hera.data["1"]["D"]["k_data"]
+z = like_hera.data["1"]["D"]["z"]
+ax.errorbar(k_vals, dsq, yerr=std, elinewidth=4, capsize=5, capthick=3, label=f"z={z:.2f}", ls="None", color="deeppink")
+
+dsq = like_hera.data["2"]["C"]["dsq"]
+std = like_hera.data["2"]["C"]["std"]
+k_vals = like_hera.data["2"]["C"]["k_data"]
+z = like_hera.data["2"]["C"]["z"]
+ax.errorbar(k_vals, dsq, yerr=std, elinewidth=4, capsize=5, capthick=3, label=f"z={z:.2f}", ls="None", color="blue")
+#a1].set_xscale("log")
+ax.set_yscale("log")
+ax.set_title("idr3")
+ax.set_xlabel("k")
+ax.set_ylabel("Deltasq")
+ax.legend()
+ax.set_ylim(1e0,1e8)
+
+plt.show()
+"""
 
 
-#dpath = [f"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(7,0,-1)] #8 is z=5.6
-##dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{band_idx}.h5",]
-#selection = len(dpath) * [None,] #len(range(3,0,-1))*[None,] #7:0
-#like_hera = likelihood(datapath=dpath, selections=selection, zero_fill=1e-50,
-#                decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
-#                return_individual_loglikes=False, debug=False,
-#                emupath=None,#'data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
-#                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"},
-#                scaler = scaler,
-#                rank = rank
-#                 )
+dpath = [f"data/observations_H6C_IDR2/Deltasq_Band_{i}.h5" for i in range(7,0,-1)] #8 is z=5.6 #7-3 is up to z=11
+#dpath = [f"/home/azimuth/venvs/inference/lib/python3.9/site-packages/CosmicDawnSynergies/scripts/data/observations_H6C_IDR2/Deltasq_Band_{band_idx}.h5",]
+selection = len(dpath) * [None,] #len(range(3,0,-1))*[None,] #7:0
+like_hera = likelihood(datapath=dpath, selections=selection, zero_fill=1e-50,
+                decimation_factor=2, set_negative_to_zero=True, theory_err=0.2, kstart_modulo=True,
+                return_individual_loglikes=True, debug=False,
+                emupath=None,#'data/trained_emulators_poweremu/dsq_emu_n500_l100100100100_t1e-05_o0.pkl',
+                output_names = {"logL_HERA": r"\log L_\mathrm{HERA}"},
+                scaler = scaler,
+                rank = rank
+                 )
 like_hera.model_dsq = poweremu.model
 like_hera.model_dsq.eval()
+
+
+
+data = like_hera.data
+from matplotlib import pyplot as plt
+fig,axes = plt.subplots(1,len(data.keys()),figsize=(10*len(data.keys()),5), sharey=True)
+for i,key in enumerate(data.keys()):
+    k_vals = data[key]["0"]["k_data"]
+    k_vals = 10**scaler.inverse_standardize(k_vals, **scaler.scale_opt["logk"]["stats"])
+    dsq = data[key]["0"]["dsq"]
+    std = data[key]["0"]["std"]
+    z = data[key]["0"]["z"]
+    z = scaler.inverse_standardize(z, **scaler.scale_opt["z"]["stats"])
+    ind = np.argmin(dsq)
+    print(f"[z={z:.2f}] k_vals: {k_vals[ind]:.2f}, dsq: {dsq[ind]:.2f}, std: {std[ind]:.2f}")
+    axes[i].errorbar(k_vals, dsq, yerr=std, elinewidth=4, capsize=5, capthick=3, label=f"z={z:.2f}", ls="None", fmt='o')
+    axes[i].set_yscale("log")
+    axes[i].legend()
+    axes[i].set_xlabel("k")
+    axes[i].set_ylim(1e-1,1e8)
+axes[0].set_ylabel("Deltasq")
+plt.show()
+
+assert False, "Stop here"
 
 #Setup sampling
 #if rank==0: print([like_hera.data[key]["0"]["z"] for key in like_hera.data.keys()], flush=True)
@@ -234,12 +283,13 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
             logL_nDerived_flattened = np.array([])
             for item in logL_nDerived:
                 if isinstance(item,list):
-                    for sub_item in item:
+                    for sub_item in item[1:]:
                         logL_nDerived_flattened = np.append(logL_nDerived_flattened, sub_item)
                 else:
                     logL_nDerived_flattened = np.append(logL_nDerived_flattened, item)
         except Exception as e:
             print("error was: ", e)
+        #print("logL: ", logL, "logL_nDerived_flattened: ", logL_nDerived_flattened, flush=True)
 
         return logL, logL_nDerived_flattened#, *T_emus]
 
@@ -255,12 +305,13 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
     redshifts = np.array(redshifts)[index] #preserve redshift order
     nDims = len(paramNames) #if not use_MAFs else len(np.array(paramNames)[maf_param_indices])
     nDerived = np.sum([likelihood.nDerived for likelihood in LikelihoodModules[constraints[i]]]) #2 #(bandsNfields*HERA-1)*0 + LikelihoodXRB(use_MAFs=use_MAFs).nDerived + LikelihoodRadioBackground(use_MAFs=use_MAFs).nDerived + LikelihoodSARAS3(use_MAFs=use_MAFs).nDerived #if not use_MAFs else 2 #+3*len(redshifts) #2*9 + 3*9 # (selections, number of bands*fields, +6 temperature outputs) # idr4=(9bands*2fields+3temps*9bands), idr2=(2bands*1fields+3temps*9redshifts(AKA bands)) #2
-    settings = PolyChordSettings(nDims, nDerived)
+
+    settings = PolyChordSettings(nDims, nDerived=0)
     settings.nlive = nlive #00 #2000
-    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_idr3{6}_nlive_{5}_idr3'.format(*constraints[i].astype(int),settings.nlive,"all2")
+    settings.base_dir = path+'/scripts/non-public/{0}HERA_{1}Chandra_{2}LWA_{3}SARAS_{4}xHI_{6}_nlive_{5}'.format(*constraints[i].astype(int),settings.nlive,"highc_bands")
     settings.file_root = 'run'
     settings.do_clustering = True
-    settings.read_resume = False    
+    settings.read_resume = True    
     
     if rank==0:
         start_time = time.time()
@@ -269,7 +320,7 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
         print("Starting sampling. Base dir: {0}".format(settings.base_dir), flush=True)
     
     if True:
-        output = run_polychord(loglikelihood, nDims, nDerived, settings, prior, dumper)
+        output = run_polychord(loglikelihood, nDims, len(like_hera.data.keys()), settings, prior, dumper)
         #output.logZ for evidence
         redshifts_str = [str(z) for z in redshifts]
         polychordnames = []
@@ -278,6 +329,9 @@ for i,(nlive,(HERA,Chandra,LWA,SARAS,xHI)) in enumerate(zip(nlives,constraints))
         for likelihood in LikelihoodModules[constraints[i]]:
             for item in likelihood.output_names.items():
                 polychordnames.append(item)
+
+        for i in range(len(like_hera.data.keys())-1):#nderived 
+            polychordnames.append((f"logL{i}", f"logL_{i}"))
 
         output.make_paramnames_files(polychordnames)
         if rank==0:
