@@ -1,0 +1,50 @@
+#!/bin/bash
+#! This line is a comment
+#! Make sure you only have comments and #SBATCH directives between here and the end of the #SBATCH directives, or things will break
+#! Name of the job:
+#SBATCH -J train_torch_emu
+#! Account name for group, use SL2 for paying queue:
+#SBATCH -A ACEDO-SL2-GPU
+#! Output filename:
+#! %A means slurm job ID and %a means array index
+#SBATCH --output=%A_%a.out
+#! Errors filename:
+#SBATCH --error=%A_%a.err
+
+#! Number of nodes to be allocated for the job (for single core jobs always leave this at 1)
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#!SBATCH --exclusive
+
+#! Estimated runtime: hh:mm:ss (job is force-stopped after if exceeded):
+#SBATCH --time=4:00:00
+
+#!SBATCH --dependency=afterany:60160100
+
+#! This is the partition name.
+#SBATCH -p ampere
+
+#! mail alert at start, end and abortion of execution
+#! emails will default to going to your email address
+#! you can specify a different email address manually if needed.
+#SBATCH --mail-type=ALL
+
+#! Don't put any #SBATCH directives below this line
+
+#! Modify the environment seen by the application. For this example we need the default modules.
+. /etc/profile.d/modules.sh                # This line enables the module command
+module purge                               # Removes all modules still loaded
+module load rhel8/default-icl              # REQUIRED - loads the basic environment
+
+source /home/sp2053/.bashrc
+source /home/sp2053/venvs/testenv/bin/activate
+
+echo "Running script"
+
+#!/home/sp2053/venvs/SR21cmtest/bin/python /home/sp2053/venvs/SR21cmtest/lib/python3.8/site-packages/SR21cm/train.py --channels=8 --nmodels=1 --id=11
+#!/home/sp2053/venvs/SR21cmtest/bin/python /home/sp2053/venvs/SR21cmtest/lib/python3.8/site-packages/SR21cm/train.py 
+/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py
+
+#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/21cmGen/analysis/sampling_512.py
+#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/21cmGen/analysis/sampling_scales.py
+#!torchrun --standalone --nnodes=1 --nproc-per-node=$NUM_TRAINERS /home/sp2053/rds/hpc-work/21cmGAN/analysis/ddp_test.py

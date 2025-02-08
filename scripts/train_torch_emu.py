@@ -7,11 +7,11 @@ from sklearn.model_selection import train_test_split
 import torch
 
 #load data
-path = "/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
-z_array = loadmat(path+'hera_z_mat.mat')['z21cm'][0]
-k_array = loadmat(path+'hera_k_mat.mat')['ks'][0]
-dsq = loadmat(path+'hera_Deltak_mat.mat')['combined_Deltaks']
-parameters = loadmat(path+'hera_parameters_mat.mat')['parameters']
+path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/" #"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
+z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0]
+k_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat')['ks'][0]
+dsq = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat')['combined_Deltaks']
+parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
 
 #convert to pandas dataframe
 z_array = pd.DataFrame(z_array, columns=['z'])
@@ -60,8 +60,8 @@ parameters_train, logdsq_train = shuffle_data(parameters_train, logdsq_train)
 network_opt = dict(in_dim=len(parameters_train.columns), hidden_dim=100, n_hidden = 6, out_dim = 1, dropout = 0.1, use_norm_dropout = False, use_attn = False) #use_norm_dropout = True, use_attn = True)
 optimizer_opt = dict(lr=1e-3, weight_decay=1e-4)
 train_opt = dict(epochs=10000, batch_size=10000, profiling=False, loss_fn="MSELoss", save_after_epochs=5, 
-                    save_model_path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/CosmicDawnSynergies/data/trained_emulators_poweremu/MLP_8_2.pth",
-                    save_progress_plots_path="/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/CosmicDawnSynergies/images/",)
+                    save_model_path=path+"data/trained_emulators_poweremu/MLP_0.pth",
+                    save_progress_plots_path=path+"images/",)
 
 #launch training process
 world_size = torch.cuda.device_count()
