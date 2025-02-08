@@ -138,7 +138,7 @@ class Dataloader(torch.utils.data.Dataset):
 
 
 class MLP(nn.Module):
-    def __init__(self, in_dim, hidden_dim, n_hidden = 1, out_dim = 1, dropout = 0.2, use_norm_dropout = False, use_attn = True):
+    def __init__(self, in_dim = 11, hidden_dim = 100, n_hidden = 1, out_dim = 1, dropout = 0.2, use_norm_dropout = False, use_attn = True):
         super(MLP, self).__init__()
         
         self.use_attn = use_attn
@@ -255,7 +255,8 @@ class poweremu_torch(nn.Module):
         if self.multi_gpu:
             self.model = torch.nn.parallel.DistributedDataParallel(self.model, device_ids=[self.device.index])
         self.optimizer_opt = optimizer_opt #dictionary of optimizer args
-        self.optimizer = optimizer(self.model.parameters(), **optimizer_opt)
+        self.optimizer = optimizer
+        self.opt = optimizer(self.model.parameters(), **optimizer_opt)
         self.train_opt = train_opt
         self.scale_opt = scale_opt
 
@@ -295,12 +296,12 @@ class poweremu_torch(nn.Module):
                 if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push("predict-loss-backward-step")
                 
                 self.model.train()
-                self.optimizer.zero_grad()
+                self.opt.zero_grad()
                 pred_train = self.model(parameters_train)
                 loss = loss_fn(pred_train, target_train)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
-                self.optimizer.step()
+                self.opt.step()
                 
                 if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
                 
@@ -388,7 +389,8 @@ class poweremu_torch(nn.Module):
                 obj = dict(
                     network_opt = self.network_opt,
                     model = self.model.state_dict(), 
-                    optimizer = self.optimizer.state_dict(),
+                    optimizer = self.opt.state_dict(),
+                    optimizer_opt = self.optimizer_opt,
                     train_opt = self.train_opt,
                     scale_opt = self.scale_opt,
                     loss = self.loss,
@@ -404,7 +406,8 @@ class poweremu_torch(nn.Module):
                     obj = dict(
                         network_opt = self.network_opt,
                         model = self.model.module.state_dict(), 
-                        optimizer = self.optimizer.state_dict(),
+                        optimizer = self.opt.state_dict(),
+                        optimizer_opt = self.optimizer_opt,
                         train_opt = self.train_opt,
                         scale_opt = self.scale_opt,
                         loss = self.loss,
@@ -422,7 +425,12 @@ class poweremu_torch(nn.Module):
         if self.multi_gpu:
             self.model.to(self.device)
             self.model = nn.parallel.DistributedDataParallel(self.model, device_ids=[self.rank])
-        self.optimizer.load_state_dict(loaded_state['optimizer'])
+        try:
+            self.optimizer_opt = loaded_state['optimizer_opt']
+        except:
+            self.optimizer_opt = {}
+        self.opt = self.optimizer(self.model.parameters(), **self.optimizer_opt)
+        self.opt.load_state_dict(loaded_state['optimizer'])
         self.train_opt = loaded_state['train_opt']
         self.scale_opt = loaded_state['scale_opt']
         self.loss = loaded_state['loss']
