@@ -13,6 +13,7 @@ import time
 from collections import OrderedDict
 
 import matplotlib.pyplot as plt
+import CosmicDawnSynergies.models as models
 
 
 
@@ -41,7 +42,7 @@ def random_grid_interpolation(parameters, data_dims, data, lims_nsample):
 
 
 
-def gen_training_data(parameters, data_dims, data, lims_nsample, data_dims_log, data_log, n_jobs=-1, verbose=False):
+def gen_training_data(parameters, data, data_dims, data_log, data_dims_log, lims_nsample, n_jobs=-1, verbose=False, **kwargs):
     """
     Generate training data by interpolating along data dimensions.
     Parameters:
@@ -136,131 +137,34 @@ class Dataloader(torch.utils.data.Dataset):
         #target = target.to(self.device)
         return parameters, target
 
-
-class MLP(nn.Module):
-    def __init__(self, in_dim = 11, hidden_dim = 100, n_hidden = 1, out_dim = 1, dropout = 0.2, use_norm_dropout = False, use_attn = True):
-        super(MLP, self).__init__()
-        
-        self.use_attn = use_attn
-        self.use_norm_dropout = use_norm_dropout
-
-        self.bool = True
-        if self.bool:
-            layers = []
-            layers.append(nn.Linear(in_dim, hidden_dim))
-            if self.use_norm_dropout:
-                layers.append(nn.LayerNorm(hidden_dim))
-            layers.append(nn.ReLU())
-            if self.use_norm_dropout:
-                layers.append(nn.Dropout(dropout)) ###
-            for _ in range(n_hidden):
-                layers.append(nn.Linear(hidden_dim, hidden_dim))
-                if self.use_norm_dropout:
-                    layers.append(nn.LayerNorm(hidden_dim))
-                layers.append(nn.ReLU())
-                if self.use_norm_dropout:
-                    layers.append(nn.Dropout(dropout)) ###
-            layers.append(nn.Linear(hidden_dim, out_dim))
-            self.mlp = nn.Sequential(*layers)
-        else:
-            self.fc1 = nn.Linear(1, 64)
-            #self.norm1 = nn.LayerNorm(64)
-            self.act1 = nn.ReLU()
-            self.dropout1 = nn.Dropout(dropout)
-            
-            self.fc2 = nn.Linear(64, 128)
-            #self.norm2 = nn.LayerNorm(128)
-            self.act2 = nn.ReLU()
-            self.dropout2 = nn.Dropout(dropout)
-            
-            transformer_layer = nn.TransformerEncoderLayer(d_model=128, nhead=1, dim_feedforward=256, dropout=dropout, batch_first=True)
-            self.transformer = nn.TransformerEncoder(transformer_layer, num_layers=2, enable_nested_tensor=False)
-            
-            self.fc3 = nn.Linear(128, 64)
-            #self.norm3 = nn.LayerNorm(64)
-            self.act3 = nn.ReLU()
-            self.dropout3 = nn.Dropout(dropout)
-            
-            self.fc4 = nn.Linear(64,32)
-            #self.norm4 = nn.LayerNorm(32)
-            self.act4 = nn.ReLU()
-            self.dropout4 = nn.Dropout(dropout)
-
-            self.fc5 = nn.Linear(32, 16)
-            #self.norm5 = nn.LayerNorm(16)
-            self.act5 = nn.ReLU()
-            self.dropout5 = nn.Dropout(dropout)
-
-            self.fc6 = nn.Linear(16, 8)
-            #self.norm6 = nn.LayerNorm(8)
-            self.act6 = nn.ReLU()
-            self.dropout6 = nn.Dropout(dropout)
-
-            self.fc7 = nn.Linear(8, 4)
-            #self.norm7 = nn.LayerNorm(4)
-            self.act7 = nn.ReLU()
-            self.dropout7 = nn.Dropout(dropout)
-
-            self.fc8 = nn.Linear(4, 1)
-            self.act8 = nn.ReLU()
-            self.dropout8 = nn.Dropout(dropout)
-
-            self.fc9 = nn.Linear(11, 8)
-            #self.norm9 = nn.LayerNorm(8)
-            self.act9 = nn.ReLU()
-            self.dropout9 = nn.Dropout(dropout)
-
-            self.fc10 = nn.Linear(8, 4)
-            #self.norm10 = nn.LayerNorm(4)
-            self.act10 = nn.ReLU()
-            self.dropout10 = nn.Dropout(dropout)
-
-            self.fc11 = nn.Linear(4, 1)
-
-    def forward(self, x):
-        if self.bool:
-            x = self.mlp(x)
-            x = x.squeeze(-1)
-        else:
-            x = x.unsqueeze_(-1)
-            x = self.dropout1(self.act1(self.fc1(x))) #64
-            x = self.dropout2(self.act2(self.fc2(x))) #128
-            x = self.transformer(x) #128
-            x = self.dropout3(self.act3(self.fc3(x))) #64
-            x = self.dropout4(self.act4(self.fc4(x))) #32
-            x = self.dropout5(self.act5(self.fc5(x))) #16
-            x = self.dropout6(self.act6(self.fc6(x))) #8
-            x = self.dropout7(self.act7(self.fc7(x))) #4
-            x = self.dropout8(self.act8(self.fc8(x))) #1
-            x = x.squeeze(-1)
-            x = self.dropout9(self.act9(self.fc9(x))) #8
-            x = self.dropout10(self.act10(self.fc10(x))) #4
-            x = self.fc11(x) #1
-            x = x.squeeze(-1)
-
-        return x
-
 class poweremu_torch(nn.Module):
     def __init__(self, 
-                 network, network_opt, 
-                 optimizer, optimizer_opt, 
-                 train_opt, scale_opt, 
-                 device="cpu"):
+                 network_opt, 
+                 optimizer_opt, 
+                 train_opt, scale_opt, data_opt,
+                 device="cpu",
+                 **kwargs):
         super(poweremu_torch, self).__init__()
         self.device = device
-        self.network = network #MLP
-        self.network_opt = network_opt #dictionary of MLP args
-        self.model = self.network(**self.network_opt).to(self.device)
         self.multi_gpu = torch.cuda.device_count() > 1 and self.device!="cpu"
+        
+        self.network_opt = network_opt
+        self.network_name, network_opt_ = [(key, value) for key, value in network_opt.items()][0] if len(network_opt) == 1 else ("MLP", {})    
+        self.network = getattr(models, self.network_name)
+        self.model = self.network(**network_opt_).to(self.device)
+        
         if self.multi_gpu:
             self.model = torch.nn.parallel.DistributedDataParallel(self.model, device_ids=[self.device.index])
-        self.optimizer_opt = optimizer_opt #dictionary of optimizer args
-        self.optimizer = optimizer
-        self.opt = optimizer(self.model.parameters(), **optimizer_opt)
+        
+        self.optimizer_opt = optimizer_opt
+        self.optimizer_name, optimizer_opt_ = [(key, value) for key, value in optimizer_opt.items()][0] if len(optimizer_opt) == 1 else ("Adam", {})
+        self.optimizer = getattr(torch.optim, self.optimizer_name)
+        self.opt = self.optimizer(self.model.parameters(), **optimizer_opt_)
+        
         self.train_opt = train_opt
+        self.data_opt = data_opt
         self.scale_opt = scale_opt
-
-
+        
         self.epoch = 0
         self.loss = []
         self.validation_loss = []
@@ -268,7 +172,7 @@ class poweremu_torch(nn.Module):
     def train(self, train_dataloader, validation_dataloader, **kwargs):
         epochs = self.train_opt.pop("epochs", 100)
         profiling = self.train_opt.pop("profiling", False)
-        loss_fn = self.train_opt.pop("loss_fn", torch.nn.MSELoss())
+        loss_fn = self.train_opt.pop("loss_fn", "MSELoss")
         save_after_epochs = self.train_opt.pop("save_after_epochs", 5)
         save_progress_plots_path = self.train_opt.pop("save_progress_plots_path", False)
         save_model_path = self.train_opt.pop("save_model_path", None)
@@ -276,16 +180,7 @@ class poweremu_torch(nn.Module):
         parameters_validation = validation_dataloader.dataset.parameters
         target_validation = validation_dataloader.dataset.target
 
-        if loss_fn == "HuberLoss":
-            loss_fn = torch.nn.HuberLoss()
-        elif loss_fn == "L1Loss":
-            loss_fn = torch.nn.L1Loss()
-        elif loss_fn == "KLDivLoss":
-            loss_fn = torch.nn.KLDivLoss(reduction="batchmean", log_target=False)
-        elif loss_fn == "MSELoss":
-            loss_fn = torch.nn.MSELoss()
-        else:
-            loss_fn = torch.nn.MSELoss()
+        loss_fn = getattr(torch.nn, loss_fn)()
         
         if self.device.index == 0 or self.device.type=="cpu":
             print(self.model, flush=True)
@@ -392,6 +287,7 @@ class poweremu_torch(nn.Module):
                     optimizer = self.opt.state_dict(),
                     optimizer_opt = self.optimizer_opt,
                     train_opt = self.train_opt,
+                    data_opt = self.data_opt,
                     scale_opt = self.scale_opt,
                     loss = self.loss,
                     validation_loss = self.validation_loss,
@@ -409,6 +305,7 @@ class poweremu_torch(nn.Module):
                         optimizer = self.opt.state_dict(),
                         optimizer_opt = self.optimizer_opt,
                         train_opt = self.train_opt,
+                        data_opt = self.data_opt,
                         scale_opt = self.scale_opt,
                         loss = self.loss,
                         validation_loss = self.validation_loss,
@@ -420,7 +317,9 @@ class poweremu_torch(nn.Module):
     def load_network(self, path):
         loaded_state = torch.load(path, map_location=self.device)
         self.network_opt = loaded_state['network_opt']
-        self.model = self.network(**self.network_opt)
+        self.network_name, network_opt_ = [(key, value) for key, value in self.network_opt.items()][0] if len(self.network_opt) == 1 else ("MLP", self.network_opt)
+        self.network = getattr(models, self.network_name)
+        self.model = self.network(**network_opt_)
         self.model.load_state_dict(loaded_state['model'])
         if self.multi_gpu:
             self.model.to(self.device)
@@ -429,9 +328,15 @@ class poweremu_torch(nn.Module):
             self.optimizer_opt = loaded_state['optimizer_opt']
         except:
             self.optimizer_opt = {}
-        self.opt = self.optimizer(self.model.parameters(), **self.optimizer_opt)
+        self.optimizer_name, optimizer_opt_ = [(key, value) for key, value in self.optimizer_opt.items()][0] if len(self.optimizer_opt) == 1 else ("Adam", self.optimizer_opt)
+        self.optimizer = getattr(torch.optim, self.optimizer_name)
+        self.opt = self.optimizer(self.model.parameters(), **optimizer_opt_)
         self.opt.load_state_dict(loaded_state['optimizer'])
         self.train_opt = loaded_state['train_opt']
+        try:
+            self.data_opt = loaded_state['data_opt']
+        except:
+            self.data_opt = {}
         self.scale_opt = loaded_state['scale_opt']
         self.loss = loaded_state['loss']
         self.validation_loss = loaded_state['validation_loss']
@@ -458,7 +363,7 @@ def prepare_parameters(parameters, transform_params=['fstarII', 'fstarIII', 'Vc'
 
     return parameters
 
-def train_model(rank, multi_gpu, parameters_train, target_train, parameters_validation, target_validation, network_opt, optimizer_opt, train_opt, scale_opt, **kwargs):
+def train_model(rank, multi_gpu, parameters_train, target_train, parameters_validation, target_validation, network_opt, optimizer_opt, train_opt, scale_opt, data_opt, **kwargs):
     batch_size = train_opt.get("batch_size", 10000)
 
     if multi_gpu:
@@ -480,9 +385,9 @@ def train_model(rank, multi_gpu, parameters_train, target_train, parameters_vali
     validation_dataloader = torch.utils.data.DataLoader(validation_data_module, batch_size=batch_size, shuffle=(validation_sampler is None), sampler = validation_sampler,)
 
 
-    emu = poweremu_torch(network=MLP, network_opt=network_opt,
-                         optimizer=torch.optim.Adam, optimizer_opt=optimizer_opt,
-                         train_opt=train_opt, scale_opt=scale_opt,
+    emu = poweremu_torch(network_opt=network_opt,
+                         optimizer_opt=optimizer_opt,
+                         train_opt=train_opt, scale_opt=scale_opt, data_opt=data_opt,
                          device=device)
 
 
@@ -498,7 +403,7 @@ def train_model(rank, multi_gpu, parameters_train, target_train, parameters_vali
         destroy_process_group()
 
     
-def prepare_validation_data(parameters, data, data_dims, data_dims_log, lims, data_log):
+def prepare_validation_data(parameters, data, data_dims, data_log, data_dims_log, lims, **kwargs):
     """
     Flattens the given data and combines it with the parameters and data dimensions.
 
@@ -591,7 +496,7 @@ def uniform_rebin_data(data):
         indices.extend(np.random.choice(np.where(bin_indices == i)[0], bin_nmin, replace=False))
     return indices
 
-def prepare_scale_opt(parameters, method):        
+def prepare_scale_opt(parameters, method, **kwargs):        
     mean = parameters.mean(axis=0)
     std = parameters.std(axis=0)
     minimum = parameters.min(axis=0)

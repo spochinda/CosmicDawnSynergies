@@ -1,4 +1,4 @@
-from CosmicDawnSynergies.train_tools import poweremu_torch, MLP
+from CosmicDawnSynergies.train_tools import poweremu_torch
 from CosmicDawnSynergies.train_tools import prepare_parameters, gen_training_data, prepare_validation_data, prepare_scale_opt, shuffle_data
 from CosmicDawnSynergies.train_tools import Scaler
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ import pandas as pd
 from scipy.io import loadmat
 
 if __name__ == '__main__':
-    path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/" #"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
+    path = "/Users/simonpochinda/venvs/testenv/lib/python3.8/site-packages/CosmicDawnSynergies/" #"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
     model_path = path + "data/trained_emulators_poweremu/MLP_0.pth"
     model_name = model_path.split("/")[-1].split(".")[0]
     z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0]
@@ -59,12 +59,14 @@ if __name__ == '__main__':
     train_opt = dict()
     scale_opt = dict()
 
-    poweremu = poweremu_torch(network=MLP, network_opt=network_opt, 
-                            optimizer=torch.optim.Adam, optimizer_opt=optimizer_opt, 
+    poweremu = poweremu_torch(network_opt=network_opt, 
+                            optimizer_opt=optimizer_opt, 
                             train_opt=train_opt, scale_opt=scale_opt,
                             device='cpu')
     poweremu.load_network(model_path)
+    print("network_opt: ", poweremu.network_opt)
     scaler = Scaler(poweremu.scale_opt)
+    assert False
 
     parameters_validation = torch.from_numpy(parameters_validation.to_numpy()).to(torch.float32)
     redshifts = np.array([6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27])
