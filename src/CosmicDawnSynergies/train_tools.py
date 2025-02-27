@@ -139,9 +139,9 @@ class Dataloader(torch.utils.data.Dataset):
 
 class poweremu_torch(nn.Module):
     def __init__(self, 
-                 network_opt, 
-                 optimizer_opt, 
-                 train_opt, scale_opt, data_opt,
+                 network_opt={}, 
+                 optimizer_opt={}, 
+                 train_opt={}, scale_opt={}, data_opt={},
                  device="cpu",
                  **kwargs):
         super(poweremu_torch, self).__init__()
@@ -166,16 +166,20 @@ class poweremu_torch(nn.Module):
         self.scale_opt = scale_opt
         
         self.epoch = 0
-        self.loss = []
-        self.validation_loss = []
+        #self.loss = []
+        #self.validation_loss = []
+        self.loss = torch.tensor([], device=self.device)
+        self.validation_loss = torch.tensor([], device=self.device)
+
         
     def train(self, train_dataloader, validation_dataloader, **kwargs):
-        epochs = self.train_opt.pop("epochs", 100)
-        profiling = self.train_opt.pop("profiling", False)
-        loss_fn = self.train_opt.pop("loss_fn", "MSELoss")
-        save_after_epochs = self.train_opt.pop("save_after_epochs", 5)
-        save_progress_plots_path = self.train_opt.pop("save_progress_plots_path", False)
-        save_model_path = self.train_opt.pop("save_model_path", None)
+        print_freq = kwargs.get("print_freq", 20)
+        epochs = self.train_opt.get("epochs", 100)
+        profiling = self.train_opt.get("profiling", False)
+        loss_fn = self.train_opt.get("loss_fn", "MSELoss")
+        save_after_epochs = self.train_opt.get("save_after_epochs", 5)
+        save_progress_plots_path = self.train_opt.get("save_progress_plots_path", False)
+        save_model_path = self.train_opt.get("save_model_path", None)
         
         parameters_validation = validation_dataloader.dataset.parameters
         target_validation = validation_dataloader.dataset.target
@@ -187,9 +191,7 @@ class poweremu_torch(nn.Module):
         for e in range(self.epoch, self.epoch+epochs):
             stime = time.time()
             for i,(parameters_train,target_train) in enumerate(train_dataloader):
-                
-                if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push("predict-loss-backward-step")
-                
+                if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push(f"[{self.device.index}] predict-loss-backward-step-validation")
                 self.model.train()
                 self.opt.zero_grad()
                 pred_train = self.model(parameters_train)
@@ -197,83 +199,71 @@ class poweremu_torch(nn.Module):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
                 self.opt.step()
+                if self.multi_gpu:  torch.distributed.all_reduce(loss, op=torch.distributed.ReduceOp.AVG)
                 
-                if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
-                
-
                 with torch.no_grad():
                     self.model.eval()
-
-                    if self.multi_gpu:  torch.distributed.all_reduce(loss, op=torch.distributed.ReduceOp.AVG)
-                                        
-                    _loss = loss.clone().detach().cpu().item()
                     pred_validation = self.model(parameters_validation)
-                    _vresidlog = pred_validation - target_validation
-                    _vrmselog = 10**torch.sqrt(torch.mean(torch.square(_vresidlog)))
-
-                    if self.multi_gpu:  torch.distributed.all_reduce(_vrmselog, op=torch.distributed.ReduceOp.AVG)
-
-                    _vrmselog = _vrmselog.clone().detach().cpu().item()
-                
-                    self.loss.append(_loss)
-                    self.validation_loss.append(_vrmselog)
+                    if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()    
                     
-                    _residlog = pred_train - target_train
-                    _rmselog = 10**torch.sqrt(torch.mean(torch.square(_residlog))).detach().item()
-                    _q95log = 10**torch.quantile(torch.sqrt(torch.square(_residlog)), 0.95).item()
-                    _percentlog = 100 * torch.abs(_residlog) / target_train
-                    _percentlog = _percentlog[~torch.isinf(_percentlog)]
-                    _percentlogq95 = torch.nanquantile(_percentlog, 0.95)
+                    if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push(f"[{self.device.index}] neccessary stats")
+                    _vrmse = pred_validation - target_validation
+                    _vrmse = torch.sqrt(torch.mean(torch.square(_vrmse)))
+                    _vrmse = 10**_vrmse if self.data_opt["data_log"] else _vrmse
+                    if self.multi_gpu:  torch.distributed.all_reduce(_vrmse, op=torch.distributed.ReduceOp.AVG)
+                    _loss = loss.clone().detach()#.cpu().item() 
+                    _vrmse = _vrmse.clone()#.detach()#.cpu().item() #expensive
+                    self.loss = torch.cat((self.loss, _loss.unsqueeze(0)))
+                    self.validation_loss = torch.cat((self.validation_loss, _vrmse.unsqueeze(0)))
+                    if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
                     
                     if self.device.index == 0 or self.device.type=="cpu":
-                        
-                        print(f"[{str(self.device)}] "
-                              f"Epoch {e} | "
-                              f"Batch {i+1} out of {train_dataloader.__len__()} | "
-                              f"Time: {time.time()-stime:.2f} | "
-                              f"Train: RMSE={_rmselog:.2f} mK2 q95<={_q95log:,.2f} mK2, pct<={_percentlogq95:,.2f}% | "
-                              f"Validation: {_vrmselog:,.2f} mK^2" 
-                              ,flush=True)
-                        
-                        if (_vrmselog == min(self.validation_loss)) and (self.device.index == 0 or self.device.type=="cpu") and (e >= save_after_epochs):
-                            print(f"Saving model with validation loss: {_vrmselog:,.2f}", flush=True)
+                        if (_vrmse == min(self.validation_loss)) and (e >= save_after_epochs):
+                            print(f"Saving model with validation loss: {_vrmse:,.2f}", flush=True)
                             self.save_network(save_model_path)
                             self.epoch = e
 
-                        if save_progress_plots_path:
+                            if save_progress_plots_path:
+                                fig, axes = plt.subplots(1,1, figsize=(12,6))
+                                pred_validation_ = pred_validation.clone().cpu().numpy() #clone tensors to avoid errors in next iteration
+                                target_validation_ = target_validation.clone().cpu().numpy() #clone tensors to avoid errors in next iteration
+                                bin_min = min(pred_validation_.min(), target_validation_.min())
+                                bin_max = max(pred_validation_.max(), target_validation_.max())
+                                bins = np.linspace(bin_min, bin_max, 100)
+                                hist, edges = np.histogram(pred_validation_, bins=bins)
+                                axes.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Predictions')
+                                hist, edges = np.histogram(target_validation_, bins=bins)
+                                axes.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Targets')
+                                axes.set_xlabel('Target')
+                                axes.set_ylabel('Frequency')
+                                axes.legend()
+                                
+                                save_path = os.path.join(save_progress_plots_path, "validation_progress_hist_XRB.png")
+                                plt.savefig(save_path)
+                                plt.close()
 
-                            fig, axes = plt.subplots(1,2, figsize=(12,6))
-                            hist, edges = np.histogram(_residlog.abs().detach().cpu().numpy(), bins=100)
-                            axes[0].bar(edges[:-1], hist, width=np.diff(edges))
-                            axes[0].grid()
-                            axes[0].set_xlabel('absResiduals')
-                            axes[0].set_ylabel('Frequency')
-                            hist, edges = np.histogram(_percentlog.detach().cpu().numpy(), bins=100)
-                            axes[1].bar(edges[:-1], hist, width=np.diff(edges))
-                            axes[1].grid()
-                            axes[1].set_xlabel('Percent Error')
-                            axes[1].set_ylabel('Frequency')                            
-                            
-                            save_path = os.path.join(save_progress_plots_path, "residuals_perc_histogram.png")
-                            plt.savefig(save_path)
-                            plt.close()
-
-                            fig, axes = plt.subplots(1,1, figsize=(12,6))
-                            bin_min = min(pred_validation.detach().cpu().numpy().min(), target_validation.detach().cpu().numpy().min())
-                            bin_max = max(pred_validation.detach().cpu().max(), target_validation.detach().cpu().max())
-                            bins = np.linspace(bin_min, bin_max, 100)
-                            hist, edges = np.histogram(pred_validation.detach().cpu().numpy(), bins=bins)
-                            axes.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Predictions')
-                            hist, edges = np.histogram(target_validation.detach().cpu().numpy(), bins=bins)
-                            axes.bar(edges[:-1], hist, width=np.diff(edges), alpha=0.5, label='Targets')
-                            #axes.hist(target.detach().cpu().numpy(), bins=100, alpha=0.5, label='Targets')
-                            axes.set_xlabel('logDelta^2')
-                            axes.set_ylabel('Frequency')
-                            axes.legend()
-                            
-                            save_path = os.path.join(save_progress_plots_path, "validation_progress_hist.png")
-                            plt.savefig(save_path)
-                            plt.close()
+                    if ((self.device.index == 0 or self.device.type=="cpu") and (i % (train_dataloader.__len__() // print_freq) == 0)) or ((_vrmse == min(self.validation_loss)) and (e >= save_after_epochs)):
+                        if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push(f"[{self.device.index}] optional stats")
+                        _resid = (pred_train - target_train).detach()
+                        _rmse = torch.sqrt(torch.mean(torch.square(_resid)))#.item()
+                        _rmse = 10**_rmse if self.data_opt["data_log"] else _rmse
+                        _q95 = torch.quantile(torch.sqrt(torch.square(_resid)), 0.95)
+                        _q95 = 10**_q95 if self.data_opt["data_log"] else _q95
+                        if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
+                    
+                        if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push(f"[{self.device.index}] print")
+                        device_str = f"[{str(self.device)}] "
+                        epoch_str = f"Epoch {e} | "
+                        batch_str = f"Batch {i+1} out of {train_dataloader.__len__()} | "
+                        time_str = f"Time: {time.time()-stime:.2f} | "
+                        train_str = f"Train: RMSE={_rmse:.2f} "
+                        q95_str = f"q95<={_q95:,.2f} | "
+                        validation_str = f"Validation: {_vrmse:,.2f} "
+                        print(device_str + epoch_str + batch_str + time_str + train_str + q95_str + validation_str, flush=True)
+                        if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
+                    
+                    if i == 20 and profiling: break
+                    
 
 
 
@@ -289,8 +279,10 @@ class poweremu_torch(nn.Module):
                     train_opt = self.train_opt,
                     data_opt = self.data_opt,
                     scale_opt = self.scale_opt,
-                    loss = self.loss,
-                    validation_loss = self.validation_loss,
+                    loss=self.loss,
+                    validation_loss=self.validation_loss, 
+                    #loss = self.loss,
+                    #validation_loss = self.validation_loss,
                     epoch = self.epoch,
                     ),
                     f = path
@@ -307,8 +299,10 @@ class poweremu_torch(nn.Module):
                         train_opt = self.train_opt,
                         data_opt = self.data_opt,
                         scale_opt = self.scale_opt,
-                        loss = self.loss,
-                        validation_loss = self.validation_loss,
+                        #loss = self.loss,
+                        #validation_loss = self.validation_loss,
+                        loss=self.loss,
+                        validation_loss=self.validation_loss,
                         epoch = self.epoch,
                         ),
                         f = path
@@ -376,11 +370,11 @@ def train_model(rank, multi_gpu, parameters_train, target_train, parameters_vali
     else:
         device = torch.device("cpu")
     
-    train_data_module = Dataloader(parameters=parameters_train, target=target_train, device=device)#, data_dims=data_dims, data_dims_log=data_dims_log, vars=vars, data_log=data_log)
+    train_data_module = Dataloader(parameters=parameters_train, target=target_train, device=device)
     train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_data_module, shuffle=True, seed=0) if multi_gpu else None
     train_dataloader = torch.utils.data.DataLoader(train_data_module, batch_size=batch_size, shuffle=(train_sampler is None), sampler = train_sampler,)
 
-    validation_data_module = Dataloader(parameters=parameters_validation, target=target_validation, device=device)#, data_dims=data_dims, data_dims_log=data_dims_log, vars=vars, data_log=data_log)
+    validation_data_module = Dataloader(parameters=parameters_validation, target=target_validation, device=device)
     validation_sampler = torch.utils.data.distributed.DistributedSampler(dataset=validation_data_module, shuffle=True, seed=0) if multi_gpu else None
     validation_dataloader = torch.utils.data.DataLoader(validation_data_module, batch_size=batch_size, shuffle=(validation_sampler is None), sampler = validation_sampler,)
 
@@ -521,13 +515,13 @@ class Scaler:
         self.scale_opt = scale_opt
 
     def standardize(self, data, **kwargs):
-        minimum = kwargs.pop("minimum", data.min())
-        maximum = kwargs.pop("maximum", data.max())
+        minimum = kwargs.get("minimum", data.min())
+        maximum = kwargs.get("maximum", data.max())
         return (2 * (data - minimum) / (maximum - minimum)) - 1
 
     def normalize(self, data, **kwargs):
-        mean = kwargs.pop("mean", data.mean())
-        std = kwargs.pop("std", data.std())
+        mean = kwargs.get("mean", data.mean())
+        std = kwargs.get("std", data.std())
         return (data - mean) / std
     
     def identity(self, data):
@@ -547,10 +541,10 @@ class Scaler:
         data: pd.DataFrame
         """
         if not use_scale_opt:
-            minimum = kwargs.pop("minimum", data.min(axis=0))
-            maximum = kwargs.pop("maximum", data.max(axis=0))
-            mean = kwargs.pop("mean", data.mean(axis=0))
-            std = kwargs.pop("std", data.std(axis=0))
+            minimum = kwargs.get("minimum", data.min(axis=0))
+            maximum = kwargs.get("maximum", data.max(axis=0))
+            mean = kwargs.get("mean", data.mean(axis=0))
+            std = kwargs.get("std", data.std(axis=0))
 
         params = data.columns
         n_sim = len(data)
@@ -575,10 +569,10 @@ class Scaler:
         return data
     
     def inverse_transform(self, data, use_scale_opt = True, **kwargs):
-        minimum = kwargs.pop("minimum", data.min(axis=0))
-        maximum = kwargs.pop("maximum", data.max(axis=0))
-        mean = kwargs.pop("mean", data.mean(axis=0))
-        std = kwargs.pop("std", data.std(axis=0))
+        minimum = kwargs.get("minimum", data.min(axis=0))
+        maximum = kwargs.get("maximum", data.max(axis=0))
+        mean = kwargs.get("mean", data.mean(axis=0))
+        std = kwargs.get("std", data.std(axis=0))
 
         n_sim, n_params = data.shape
         assert n_params == len(self.axes_transform), "Length of data and transform must be the same"
@@ -593,7 +587,7 @@ class Scaler:
                 data[:,i] = self.inverse_identity(data[:,i])
         return data
     
-def shuffle_data(parameters, data):
+def shuffle_data(parameters, data, seed=42):
     """
     Shuffle the given parameters and data in unison.
 
@@ -607,6 +601,7 @@ def shuffle_data(parameters, data):
     Returns:
     tuple: A tuple containing the shuffled `parameters` DataFrame and the shuffled `data` array.
     """
+    np.random.seed(seed)
     indices = np.random.permutation(parameters.index)
     parameters = parameters.reindex(indices).reset_index(drop=True)
     data = data[indices]
