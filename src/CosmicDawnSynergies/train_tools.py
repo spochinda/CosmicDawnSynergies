@@ -42,23 +42,17 @@ def random_grid_interpolation(parameters, data_dims, data, lims_nsample):
 
 
 
-def gen_training_data(parameters, data, data_dims, data_log, data_dims_log, lims_nsample, n_jobs=-1, verbose=False, **kwargs):
+def gen_training_data(parameters, data, data_opt, n_jobs=-1, verbose=False, **kwargs):
     """
     Generate training data by interpolating along data dimensions.
     Parameters:
     -----------
     parameters : pd.DataFrame
         DataFrame containing the parameters for interpolation.
-    data_dims : list of pd.DataFrame
-        List of DataFrames containing the data dimensions.
     data : np.ndarray
         Array containing the data to be interpolated.
-    lims_nsample : list of lists
-        List of lists containing the limits and number of samples to interpolate for each data dimension.
-    data_dims_log : list of bool
-        List indicating whether to apply log10 transformation to each data dimension.
-    data_log : bool
-        Boolean indicating whether to apply log10 transformation to the data.
+    data_opt : dict
+        Dictionary containing the data options.
     n_jobs : int, optional
         Number of jobs to run in parallel (default is -1, which uses all available processors).
     verbose : bool, optional
@@ -74,14 +68,36 @@ def gen_training_data(parameters, data, data_dims, data_log, data_dims_log, lims
     parameters_columns = list(parameters.columns)
     parameters = parameters.to_numpy()
 
-    data_dims_columns = [data_dim.columns[0] for data_dim in data_dims]
-    data_dims_columns = [f"log10{data_dim}" if data_dim_log else data_dim for i, (data_dim, data_dim_log) in enumerate(zip(data_dims_columns, data_dims_log))]
+    data_dims_columns = []
+    data_dims = []
+    lims_nsample = []
+    for dim in data_opt["data_dims"]:
+        key = list(dim.keys())[0]
+        min, max = dim[key]["lims"]
+        nsample = dim[key]["nsample"]
+        if dim[key]["log"]:
+            data_dims_columns.append(f"log10{key}")
+            data_dims.append(np.log10(dim[key]["values"]))
+            lims_nsample.append([float(np.log10(min)), float(np.log10(max)), nsample])
+        else:
+            data_dims_columns.append(key)
+            data_dims.append(dim[key]["values"])
+            nsample = dim[key]["nsample"]
+            lims_nsample.append([min, max, nsample])
 
-    data_dims = [np.log10(data_dim) if data_dim_log else data_dim for data_dim, data_dim_log in zip(data_dims, data_dims_log)]
-    data_dims = [data_dim.to_numpy().ravel() for data_dim in data_dims]
 
-    data = np.log10(data) if data_log else data
-    lims_nsample = [[np.log10(var[0]), np.log10(var[1]), var[2]] if data_dims_log[i] else var for i, var in enumerate(lims_nsample)]
+
+    #data_dims_columns = [data_dim.columns[0] for data_dim in data_dims]
+    #data_dims_columns = [f"log10{data_dim}" if data_dim_log else data_dim for i, (data_dim, data_dim_log) in enumerate(zip(data_dims_columns, data_dims_log))]
+
+    #data_dims = [np.log10(data_dim) if data_dim_log else data_dim for data_dim, data_dim_log in zip(data_dims, data_dims_log)]
+    #data_dims = [data_dim.to_numpy().ravel() for data_dim in data_dims]
+
+    data = np.log10(data) if data_opt["data_log"] else data
+
+    
+
+    #lims_nsample = [[np.log10(var[0]), np.log10(var[1]), var[2]] if data_dims_log[i] else var for i, var in enumerate(lims_nsample)]
 
     results = Parallel(n_jobs=n_jobs)(
         delayed(random_grid_interpolation)(parameters=p, data_dims=data_dims, data=data_i, lims_nsample=lims_nsample)
@@ -339,7 +355,7 @@ class poweremu_torch(nn.Module):
         except:
             pass
              
-def prepare_parameters(parameters, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay']):
+def prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=["alpha", "nu_0", "pop"]):
     """
     Prepares the input parameters by discarding specified parameters and log-transforming others.
     Args:
@@ -349,13 +365,19 @@ def prepare_parameters(parameters, transform_params=['fstarII', 'fstarIII', 'Vc'
     Returns:
         pd.DataFrame: The prepared parameters with specified parameters discarded and others log-transformed.
     """
-    
+    data_opt["discrete_params"] = {}
+    for param in discrete_params:
+        data_opt["discrete_params"][param] = np.unique(parameters[param])
+        if param in transform_params:
+            data_opt["discrete_params"][param] = np.log10(data_opt["discrete_params"][param])
+            data_opt["discrete_params"][f"log10{param}"] = data_opt["discrete_params"].pop(param)
+
     parameters = parameters.drop(columns=discard_params)
     for param in transform_params:
         parameters[param] = np.log10(parameters[param])
         parameters.rename(columns={param: f"log10{param}"}, inplace=True)
-
-    return parameters
+       
+    return parameters, data_opt
 
 def train_model(rank, multi_gpu, parameters_train, target_train, parameters_validation, target_validation, network_opt, optimizer_opt, train_opt, scale_opt, data_opt, **kwargs):
     batch_size = train_opt.get("batch_size", 10000)
@@ -397,7 +419,7 @@ def train_model(rank, multi_gpu, parameters_train, target_train, parameters_vali
         destroy_process_group()
 
     
-def prepare_validation_data(parameters, data, data_dims, data_log, data_dims_log, lims, **kwargs):
+def prepare_validation_data(parameters, data, data_opt, **kwargs):
     """
     Flattens the given data and combines it with the parameters and data dimensions.
 
@@ -407,15 +429,8 @@ def prepare_validation_data(parameters, data, data_dims, data_log, data_dims_log
         A DataFrame containing the parameters to be combined with the data.
     data : numpy.ndarray
         The data array to be flattened and combined with the parameters.
-    data_dims : list of pd.DataFrame
-        List of DataFrames containing the data dimensions.
-    data_dims_log : list of bool
-        List indicating whether to apply log10 transformation to each data dimension.
-    lims : list of lists
-        List of lists containing the limits for each data dimension.
-    data_log : bool
-        Boolean indicating whether to apply log10 transformation to the data.    
-
+    data_opt : dict
+        A dictionary containing the data options.
     Returns:
     --------
     parameters : pandas.DataFrame
@@ -428,21 +443,32 @@ def prepare_validation_data(parameters, data, data_dims, data_log, data_dims_log
     AssertionError
         If the length of the combined parameters and data does not match the length of the flattened data.
     """
-    data = np.log10(data) if data_log else data
+    data = np.log10(data) if data_opt["data_log"] else data
 
     parameters_columns = list(parameters.columns)
     parameters = parameters.to_numpy()
-    data_dims_columns = [data_dim.columns[0] for data_dim in data_dims]
-    data_dims_columns = [f"log10{data_dim}" if data_dim_log else data_dim for i, (data_dim, data_dim_log) in enumerate(zip(data_dims_columns, data_dims_log))]
+
+    data_dims_columns = []
+    data_dims = []
+    lims = []
+    for dim in data_opt["data_dims"]:
+        key = list(dim.keys())[0]
+        min, max = dim[key]["lims"]
+        if dim[key]["log"]:
+            data_dims_columns.append(f"log10{key}")
+            data_dims.append(np.log10(dim[key]["values"]))
+            lims.append([float(np.log10(min)), float(np.log10(max))])
+        else:
+            data_dims_columns.append(key)
+            data_dims.append(dim[key]["values"])
+            lims.append([min, max])
+
 
     
     #log lims
     masks = [np.logical_and(data_dim >= lim[0], data_dim <= lim[1]) for data_dim, lim in zip(data_dims, lims)]
     drop_rows = [np.where(~mask)[0] for mask in masks]
-    data_dims = [data_dim.drop(drop_row) for drop_row,data_dim in zip(drop_rows,data_dims)]
-    #data_dims = [data_dim[mask] for data_dim, mask in zip(data_dims, masks)]
-    data_dims = [np.log10(data_dim) if data_dim_log else data_dim for data_dim, data_dim_log in zip(data_dims, data_dims_log)]
-    data_dims = [data_dim.to_numpy().ravel() for data_dim in data_dims]
+    data_dims = [data_dim[mask] for data_dim, mask in zip(data_dims, masks)]
     
     grids = np.meshgrid(*data_dims, indexing='ij')
     combinations = np.vstack([grid.ravel() for grid in grids]).T
@@ -455,13 +481,12 @@ def prepare_validation_data(parameters, data, data_dims, data_log, data_dims_log
     parameters = np.hstack((combinations, parameters))
 
     parameters = pd.DataFrame(parameters, columns=data_dims_columns + parameters_columns)
-
     for i,drop_row in enumerate(drop_rows):
         data = np.delete(data, drop_row, axis=i+1)
 
     data = data.ravel()
     assert len(parameters) == len(data), f"Length of parameter={parameters.shape} and data={data.shape} do not match."
-
+    
     return parameters, data
 
 def uniform_rebin_data(data):

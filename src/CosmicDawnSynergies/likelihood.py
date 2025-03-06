@@ -8,8 +8,8 @@ import CosmicDawnSynergies.itamar.radio_cutoff_calc as rad
 from .emulator_poweremu import *
 #from margarine.maf import MAF
 
-from tensorflow import keras
-from globalemu.eval import evaluate
+#from tensorflow import keras
+#from globalemu.eval import evaluate
 
 import astropy.constants as c
 import astropy.units as u

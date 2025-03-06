@@ -22,7 +22,7 @@ def emulatorModel2d(emu, z, karr, params):
     z = np.log10(z) if emu.data_opt["data_dims_log"][0] else z
     karr = np.log10(karr) if emu.data_opt["data_dims_log"][1] else karr
 
-    params = np.array([z, np.NaN, *params])
+    params = np.array([z, np.nan, *params])
     params=np.tile(params, (len(karr), 1))
     params[:,1] = karr
     #print(params)
@@ -30,7 +30,7 @@ def emulatorModel2d(emu, z, karr, params):
 
 def emulatorModel1d(emu, arr, params):
     arr = np.log10(arr) if emu.data_opt["data_dims_log"] else arr
-    params = np.array([np.NaN, *params])
+    params = np.array([np.nan, *params])
     params=np.tile(params, (len(arr), 1))
     params[:,0] = arr
     with torch.no_grad():
@@ -45,8 +45,8 @@ def emulatorModel1d(emu, arr, params):
 
 class LikelihoodRadioBackground:
     def __init__(self, 
-                 emulator,
                  prior_dict,
+                 emulator,
                  data_dims = ["log10nu_today",],
                  datapath='codes/itamar/LWA1_with_err.npy',
                  output_names = [r"\log L_\mathrm{Radio}",],
@@ -86,7 +86,7 @@ class LikelihoodRadioBackground:
         nu_today = np.log10(nu_today) if self.emulator.data_opt["data_dims_log"] else nu_today
         nu_today = self.scaler.standardize(nu_today, **self.emulator.scale_opt["log10nu_today"]["stats"])
 
-        params = np.array([np.NaN, *params])
+        params = np.array([np.nan, *params])
         params=np.tile(params, (len(nu_today), 1))
         params[:,0] = nu_today
         with torch.no_grad():
@@ -123,8 +123,8 @@ class LikelihoodRadioBackground:
 
 class LikelihoodXRB:
     def __init__(self, 
-                 emulator,
                  prior_dict,
+                 emulator,
                  data_dims = ["log10E_min",],
                  output_names = [r"\log L_\mathrm{CXB,tot}",],
                  **kwargs    
@@ -169,7 +169,7 @@ class LikelihoodXRB:
             ])
         
         minE, maxE = min(self.X_limits[:,0]), max(self.X_limits[:,1])
-        self.E_min = np.logspace(minE, maxE, 100)
+        self.E_min = np.geomspace(minE, maxE, 100)
   
     
     def computeLikelihood(self,params):
@@ -183,10 +183,15 @@ class LikelihoodXRB:
 
         logL = 0
         for xmin,xmax,XRB,std in self.X_limits: #integrate model from xmin to xmax and compare to data to get logL
-            E_min = np.logspace(xmin, xmax, 100)
+            E_min = np.geomspace(xmin, xmax, 100)
             E_min = np.log10(E_min) if self.emulator.data_opt["data_dims_log"] else E_min
             XRB_pred_ = XRB_pred(E_min)
-            XRB_pred_ = np.trapz(XRB_pred_, E_min)
+            
+            E_min = 10**E_min if self.emulator.data_opt["data_dims_log"] else E_min
+            XRB_pred_ = 10**XRB_pred_ if self.emulator.data_opt["data_log"] else XRB_pred_
+            XRB_pred_ = XRB_pred_ * self.units
+            
+            XRB_pred_ = np.trapezoid(XRB_pred_, E_min)
             P = 0.5 * (1 + ssp.erf( (XRB - XRB_pred_) / np.sqrt(2) / np.sqrt(std**2+(XRB_pred_*0.05)**2) ))
             logL += np.log(P)
         return logL, [logL,]
@@ -195,7 +200,7 @@ class LikelihoodXRB:
         E_min = np.log10(E_min) if self.emulator.data_opt["data_dims_log"] else E_min
         E_min = self.scaler.standardize(E_min, **self.emulator.scale_opt["log10E_min"]["stats"])
 
-        params = np.array([np.NaN, *params])
+        params = np.array([np.nan, *params])
         params=np.tile(params, (len(E_min), 1))
         params[:,0] = E_min
         with torch.no_grad():
@@ -217,8 +222,8 @@ class LikelihoodXRB:
 
 class LikelihoodHERA:
     def __init__(self, 
-                 emulator,
                  prior_dict,
+                 emulator,
                  files, 
                  data_dims = ["z", "log10k",],
                  output_names = [r"\log L_\mathrm{HERA}",],
@@ -275,7 +280,7 @@ class LikelihoodHERA:
         karr = np.log10(karr) if self.emulator.data_opt["data_dims_log"][1] else karr
         karr = self.scaler.standardize(karr, **self.emulator.scale_opt["log10k"]["stats"])
 
-        params = np.array([z, np.NaN, *params])
+        params = np.array([z, np.nan, *params])
         params=np.tile(params, (len(karr), 1))
         params[:,1] = karr
         with torch.no_grad():

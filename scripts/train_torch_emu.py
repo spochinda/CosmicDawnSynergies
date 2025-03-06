@@ -6,52 +6,123 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 from copy import deepcopy
+from collections import OrderedDict
 
 if __name__ == '__main__':
-    path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/" #"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/" #os.path.join(current_dir, 'data/models_21cmSim/HERA_IDR4_Emulator_Data/')
-    
-    #little_h = 0.6704
-    #define network, optimizer, training, and data options
-    network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
-    optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
-    train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
-                        save_after_epochs=5, 
-                        save_model_path=path+"data/trained_emulators_poweremu/T21_emu.pth",
-                        save_progress_plots_path=path+"images/",)
-    data_opt = dict(data_log=False, 
-                    data_dims_log=[False,], #[False, True]
-                    lims_nsample=[[6., 27., 200],], #[[6, 27, 10], [3e-2/little_h, 0.99/little_h, 10]]
-                    lims=[[6., 27.],], #[[6, 27], [3e-2/little_h, 0.99/little_h]]
-                    train_test_split_opt = dict(test_size=0.2, train_size=0.8, random_state=42),
-                    scale_method=dict(tau="normalize")
-                    )
+    path = "/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/" #"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/"
+    ############################################################## Delta21^2 emu ##############################################################
+    if True:
+        #define network, optimizer, training, and data options
+        little_h = 0.6704
+        network_opt = {"MLP": {"in_dim": 11, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
+        train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
+                            save_after_epochs=5, 
+                            save_model_path=path+"data/trained_emulators_poweremu/dsq_emu.pth",
+                            save_progress_plots_path=path+"images/",)
+        data_opt = {"data_log": True,
+                    "data_dims":[ 
+                        {"z": {"log": False, "lims": [6., 27.], "nsample": 10}},
+                        {"k": {"log": True, "lims": [3e-2/little_h, 0.99/little_h], "nsample": 10}}
+                        ],
+                    "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
+                    "scale_method": {"tau": "normalize"},
+                    }
 
-    #load data
-    #nu_today = np.logspace(-2, 1.1, 100)*1e9
-    z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
-    #k_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat')['ks'][0]
-    #k_array = k_array / little_h
-    #nu_keV = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_nu_mat.mat')['nu_keV'][0]
-    #target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat')['combined_Deltaks']
-    #target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_XRB_mat.mat')['combined_XRBs']
-    #target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_SFR_mat.mat')['combined_SFRs']
-    target = loadmat('/home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/analysis_joint_paper/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_T21_mat.mat')['combined_T21s']
-    parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
+        #load data
+        z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
+        k_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat')['ks'][0]
+        k_array = k_array / little_h
+        data_opt["data_dims"][0]["z"]["values"] = z_array
+        data_opt["data_dims"][1]["k"]["values"] = k_array
+        
+        target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat')['combined_Deltaks']
+        parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
+        parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
+                
+        #discard irrelevant parameters, annd log-transform selected parameters
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
 
-    #convert to pandas dataframe
-    z_array = pd.DataFrame(z_array, columns=['z'])
-    #k_array = pd.DataFrame(k_array, columns=['k'])
-    #nu_keV = pd.DataFrame(nu_keV, columns=['E_min'])
-    #nu_today = pd.DataFrame(nu_today, columns=['nu_today'])
-    data_dims = [z_array, ] #[nu_today, ] #[nu_keV,] #[z_array, k_array]
-    parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
-    
-    #discard irrelevant parameters, annd log-transform selected parameters
-    parameters = prepare_parameters(parameters, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'])
+        ############################################################## XRB emu ##############################################################
+    if False:
+        network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
+        train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
+                            save_after_epochs=5, 
+                            save_model_path=path+"data/trained_emulators_poweremu/xrb_emu.pth",
+                            save_progress_plots_path=path+"images/",)
+        data_opt = {"data_log": True,
+                    "data_dims":[ 
+                        {"E_min": {"log": True, "lims": [0.8, 70.], "nsample": 200}},
+                        ],
+                    "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
+                    "scale_method": {"tau": "normalize"},
+                    }
+        
+        nu_keV = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_nu_mat.mat')['nu_keV'][0]
+        data_opt["data_dims"][0]["E_min"]["values"] = nu_keV
 
-    #calculate T_today for LWA/ARCADE constraints emulator
-    #target = np.array([LikelihoodRadioBackground().get_T_radio_today_Jiten(zs=z_array, sfr=sfr, frad=10**frad)[1] for sfr,frad in zip(target, parameters['log10fradio'].values)])
-    
+        target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_XRB_mat.mat')['combined_XRBs']
+        parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
+        parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
+        
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
+
+        ############################################################## T_today emu ##############################################################
+    if False:
+        network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
+        train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
+                            save_after_epochs=5, 
+                            save_model_path=path+"data/trained_emulators_poweremu/T21_emu2.pth.pth",
+                            save_progress_plots_path=path+"images/",)
+        data_opt = {"data_log": True,
+                    "data_dims":[ 
+                        {"nu_today": {"log": True, "lims": [1e7, 1.1e10], "nsample": 200}},
+                        ],
+                    "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
+                    "scale_method": {"tau": "normalize"},
+                    }
+
+        
+        nu_today = np.logspace(-2, 1.1, 100)*1e9
+        data_opt["data_dims"][0]["nu_today"]["values"] = nu_today
+        
+        target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_SFR_mat.mat')['combined_SFRs']
+        parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
+        parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
+        
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
+
+        #calculate T_today for LWA/ARCADE constraints emulator
+        z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
+        target = np.array([LikelihoodRadioBackground().get_T_radio_today_Jiten(zs=z_array, sfr=sfr, frad=10**frad)[1] for sfr,frad in zip(target, parameters['log10fradio'].values)])
+
+    ############################################################## T21 emu ##############################################################
+    if False:
+        network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
+        train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
+                            save_after_epochs=5, 
+                            save_model_path=path+"data/trained_emulators_poweremu/T21_emu2.pth",
+                            save_progress_plots_path=path+"images/",)
+        data_opt = {"data_log": False,
+                    "data_dims":[ 
+                        {"z": {"log": False, "lims": [6., 27.], "nsample": 200}},
+                        ],
+                    "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
+                    "scale_method": {"tau": "normalize"},
+                    }
+        
+        z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
+        data_opt["data_dims"][0]["z"]["values"] = z_array
+
+        target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_T21_mat.mat')['combined_T21s']
+        parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
+        parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
+
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
+
     ############################################################## EDIT ABOVE THIS LINE ##############################################################
 
     #randomly truncate zeros down to 3 orders of magnitude below minimum if data_log is True
@@ -61,12 +132,11 @@ if __name__ == '__main__':
 
     #Split data and parameters into training set and test set
     parameters_train, parameters_validation, target_train, target_validation = train_test_split(parameters, target, **data_opt["train_test_split_opt"])
-
     #generate training data and prepare validation data
-    assert (len(target.shape)-1) == len(data_dims) == len(data_opt["lims_nsample"]) == len(data_opt["lims"]) == len(data_opt["data_dims_log"]), "Number of data dimensions does not match number of limits and transformation options in data options"
-    parameters_train, target_train = gen_training_data(parameters=parameters_train, data=target_train, data_dims=data_dims, verbose=True, **data_opt)
+    assert (len(target.shape)-1) == len(data_opt["data_dims"]), "Number of data dimensions does not match number of limits and transformation options in data options"
+    parameters_train, target_train = gen_training_data(parameters=parameters_train, data=target_train, data_opt=data_opt, verbose=True)
     assert len(parameters_train.columns) == network_opt["MLP"]["in_dim"], f"Number of input parameters ({len(parameters_train.columns)}) does not match network input dimension ({network_opt['MLP']['in_dim']})"
-    parameters_validation, target_validation = prepare_validation_data(parameters=parameters_validation, data=target_validation, data_dims=data_dims, **data_opt)
+    parameters_validation, target_validation = prepare_validation_data(parameters=parameters_validation, data=target_validation, data_opt=data_opt)
     ##save
     #parameters_train.to_csv(path+"data/parameters_train.csv", index=False)
     #parameters_validation.to_csv(path+"data/parameters_validation.csv", index=False)
