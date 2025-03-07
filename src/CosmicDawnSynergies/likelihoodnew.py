@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 
 from scipy.io import loadmat
@@ -29,7 +30,11 @@ def emulatorModel2d(emu, z, karr, params):
     return emu.predict(params)
 
 def emulatorModel1d(emu, arr, params):
-    arr = np.log10(arr) if emu.data_opt["data_dims_log"] else arr
+    key = list(emu.data_opt["data_dims"][0].keys())[0]
+    dim_log = emu.data_opt["data_dims"][0][key]["log"]
+    data_log = emu.data_opt["data_log"]
+
+    arr = np.log10(arr) if dim_log else arr
     params = np.array([np.nan, *params])
     params=np.tile(params, (len(arr), 1))
     params[:,0] = arr
@@ -37,9 +42,9 @@ def emulatorModel1d(emu, arr, params):
         params = torch.from_numpy(params).to(dtype=torch.float32)
         pred = emu.model(params)
         pred = pred.detach().cpu().numpy()
-        if emu.data_opt["data_log"]:
+        if data_log:
             pred = 10**pred
-        if emu.data_opt["data_dims_log"]:
+        if dim_log:
             arr = 10**arr
     return arr, pred
 
@@ -74,28 +79,31 @@ class LikelihoodRadioBackground:
     def computeLikelihood(self, params):
         params = np.array(params)
         params = params[self.prior_indices]
-        arr = self.nu_obs
-        arr, T_model = emulatorModel1d(emu=self.emulator, arr=arr, params=params)
+
+        nu_today, T_model = self.predict(nu_today=self.nu_obs, params=params)
         dT_model = T_model*0.05
 
         P = 0.5 * (1 + ssp.erf( (self.T_obs - T_model) / np.sqrt(2) / np.sqrt(self.dT_obs**2+dT_model**2))) 
         logL = np.log(P).sum()
+        logL = float(logL)
         return logL, [logL,]
-    
+
     def predict(self, nu_today, params):
-        nu_today = np.log10(nu_today) if self.emulator.data_opt["data_dims_log"] else nu_today
-        nu_today = self.scaler.standardize(nu_today, **self.emulator.scale_opt["log10nu_today"]["stats"])
+
+        nu_today = np.log10(nu_today) if self.emulator.data_opt["data_dims"][0]["nu_today"]["log"] else nu_today
 
         params = np.array([np.nan, *params])
         params=np.tile(params, (len(nu_today), 1))
         params[:,0] = nu_today
         with torch.no_grad():
+            params = self.scaler.transform(params, use_scale_opt=True)
+            print(f"params in radio: {params}", flush=True)
             params = torch.from_numpy(params).to(dtype=torch.float32)
             pred = self.emulator.model(params)
             pred = pred.detach().cpu().numpy()
             if self.emulator.data_opt["data_log"]:
                 pred = 10**pred
-            if self.emulator.data_opt["data_dims_log"]:
+            if self.emulator.data_opt["data_dims"][0]["nu_today"]["log"]:
                 nu_today = 10**nu_today
         return nu_today, pred
 
@@ -151,67 +159,70 @@ class LikelihoodXRB:
     def pre_compute(self):
         """precomputed variables not necessary to put inside and slow down computeLikelihood"""
         eV_toHz = physical_constants['electron volt-hertz relationship'][0]
-        keV_toHz = eV_toHz*1e3
-        sr_todeg2 = (180/np.pi)**2
+        self.keV_toHz = eV_toHz*1e3
+        self.sr_todeg2 = (180/np.pi)**2
         Mpc_tom = 1e6 * parsec
         Mpc_tocm = Mpc_tom * 1e2
-        cm_toMpc = 1/Mpc_tocm
+        self.cm_toMpc = 1/Mpc_tocm
         
-        self.units = keV_toHz * cm_toMpc**2 / sr_todeg2
+        self.units = self.keV_toHz * self.cm_toMpc**2 / self.sr_todeg2
 
         ###Data###
         self.X_limits = np.array([ #nu_min, nu_max, mean, std 
             #[0.5, 2, 8.15*1e-12, 0.58*1e-12], #Lehmer+2012 
             [1, 2, 1.04*1e-12, 0.14*1e-12], #Hickox & Markevitch (2006)
             [2, 8, 3.4*1e-12, 1.7*1e-12], #Hickox & Markevitch (2006)
-            [8, 24, 6.013*1e-8/sr_todeg2, 0.14*1e-8/sr_todeg2], #Harrison et al. (2016) #6.773*1e-8/sr_todeg2, 0.348*1e-8/sr_todeg2
-            [20, 50, 6.56*1e-8/sr_todeg2, 0.273*1e-8/sr_todeg2], #Harrison et al. (2016) #6.205*1e-8/sr_todeg2, 0.17*1e-8/sr_todeg2
+            [8, 24, 6.013*1e-8/self.sr_todeg2, 0.14*1e-8/self.sr_todeg2], #Harrison et al. (2016) #6.773*1e-8/sr_todeg2, 0.348*1e-8/sr_todeg2
+            [20, 50, 6.56*1e-8/self.sr_todeg2, 0.273*1e-8/self.sr_todeg2], #Harrison et al. (2016) #6.205*1e-8/sr_todeg2, 0.17*1e-8/sr_todeg2
             ])
         
         minE, maxE = min(self.X_limits[:,0]), max(self.X_limits[:,1])
         self.E_min = np.geomspace(minE, maxE, 100)
   
     
-    def computeLikelihood(self,params):
+    def computeLikelihood(self, params):
         params = np.array(params)
         params = params[self.prior_indices]
 
         E_min, XRB_pred = self.predict(E_min=self.E_min, params=params)
-        E_min = np.log10(E_min) if self.emulator.data_opt["data_dims_log"] else E_min
+        E_min = np.log10(E_min) if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
         XRB_pred = np.log10(XRB_pred) if self.emulator.data_opt["data_log"] else XRB_pred
         XRB_pred = interp1d(E_min, XRB_pred, kind='linear', fill_value='extrapolate') #model interpolator
 
         logL = 0
         for xmin,xmax,XRB,std in self.X_limits: #integrate model from xmin to xmax and compare to data to get logL
             E_min = np.geomspace(xmin, xmax, 100)
-            E_min = np.log10(E_min) if self.emulator.data_opt["data_dims_log"] else E_min
+            E_min = np.log10(E_min) if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
             XRB_pred_ = XRB_pred(E_min)
             
-            E_min = 10**E_min if self.emulator.data_opt["data_dims_log"] else E_min
+            E_min = 10**E_min if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
             XRB_pred_ = 10**XRB_pred_ if self.emulator.data_opt["data_log"] else XRB_pred_
-            XRB_pred_ = XRB_pred_ * self.units
+            XRB_pred_ = XRB_pred_
             
-            XRB_pred_ = np.trapezoid(XRB_pred_, E_min)
+            XRB_pred_ = np.trapezoid(XRB_pred_, E_min*self.keV_toHz) * self.cm_toMpc**2 / self.sr_todeg2
             P = 0.5 * (1 + ssp.erf( (XRB - XRB_pred_) / np.sqrt(2) / np.sqrt(std**2+(XRB_pred_*0.05)**2) ))
             logL += np.log(P)
+        logL = float(logL)
         return logL, [logL,]
     
     def predict(self, E_min, params):
-        E_min = np.log10(E_min) if self.emulator.data_opt["data_dims_log"] else E_min
+        E_min = np.log10(E_min) if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
         E_min = self.scaler.standardize(E_min, **self.emulator.scale_opt["log10E_min"]["stats"])
 
         params = np.array([np.nan, *params])
         params=np.tile(params, (len(E_min), 1))
         params[:,0] = E_min
         with torch.no_grad():
+            params = self.scaler.transform(params, use_scale_opt=True)
             params = torch.from_numpy(params).to(dtype=torch.float32)
             pred = self.emulator.model(params)
             pred = pred.detach().cpu().numpy()
             if self.emulator.data_opt["data_log"]:
                 pred = 10**pred
-            if self.emulator.data_opt["data_dims_log"]:
+            if self.emulator.data_opt["data_dims"][0]["E_min"]["log"]:
                 E_min = 10**E_min
         return E_min, pred
+
 
 
 
@@ -271,35 +282,36 @@ class LikelihoodHERA:
             r = dsq - dsq_pred
             logL_ = np.sum(np.log(0.5 * (1 + ssp.erf(r / np.sqrt(2) / np.sqrt(std**2+(0.2*dsq_pred)**2)))))
             logL.append(logL_)
-        logL = np.sum(logL)        
+        logL = np.sum(logL)
+        logL = float(logL)
         return logL, [logL,]
     
     def predict(self, z, karr, params):
-        z = np.log10(z) if self.emulator.data_opt["data_dims_log"][0] else z
-        z = self.scaler.standardize(z, **self.emulator.scale_opt["z"]["stats"])
-        karr = np.log10(karr) if self.emulator.data_opt["data_dims_log"][1] else karr
-        karr = self.scaler.standardize(karr, **self.emulator.scale_opt["log10k"]["stats"])
+        dim_log_0 = self.emulator.data_opt["data_dims"][0]["z"]["log"]
+        dim_log_1 = self.emulator.data_opt["data_dims"][1]["k"]["log"]
+        data_log = self.emulator.data_opt["data_log"]
+
+        z = np.log10(z) if dim_log_0 else z
+        karr = np.log10(karr) if dim_log_1 else karr
 
         params = np.array([z, np.nan, *params])
         params=np.tile(params, (len(karr), 1))
         params[:,1] = karr
         with torch.no_grad():
+            params = self.scaler.transform(params, use_scale_opt=True)
             params = torch.from_numpy(params).to(dtype=torch.float32)
             pred = self.emulator.model(params)
             pred = pred.detach().cpu().numpy()
-            if self.emulator.data_opt["data_log"]:
+            if data_log:
                 pred = 10**pred
         return pred
         
     def extract_data(self, **kwargs):        
         if self.mask_to_emulator_range:
             z_index = list(self.emulator.scale_opt.keys()).index(self.z_name_in_scale_opt)
-            z_opt = self.emulator.data_opt["lims_nsample"][z_index]
-            zmin, zmax, _ = z_opt
+            zmin, zmax = self.emulator.data_opt["data_dims"][z_index]["z"]["lims"]
             k_index = list(self.emulator.scale_opt.keys()).index(self.k_name_in_scale_opt)
-            k_opt = self.emulator.data_opt["lims_nsample"][k_index]
-            kmin, kmax, _ = k_opt
-            kmin, kmax
+            kmin, kmax = self.emulator.data_opt["data_dims"][k_index]["k"]["lims"]
 
         self.data = dict()
         i=0

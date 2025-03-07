@@ -1,4 +1,5 @@
 import os
+import sys
 from scipy.interpolate import RegularGridInterpolator
 from joblib import Parallel, delayed
 import numpy as np
@@ -325,7 +326,7 @@ class poweremu_torch(nn.Module):
                         )
 
     def load_network(self, path):
-        loaded_state = torch.load(path, map_location=self.device)
+        loaded_state = torch.load(path, map_location=self.device, weights_only=False)
         self.network_opt = loaded_state['network_opt']
         self.network_name, network_opt_ = [(key, value) for key, value in self.network_opt.items()][0] if len(self.network_opt) == 1 else ("MLP", self.network_opt)
         self.network = getattr(models, self.network_name)
@@ -549,7 +550,7 @@ class Scaler:
         std = kwargs.get("std", data.std())
         return (data - mean) / std
     
-    def identity(self, data):
+    def identity(self, data, **kwargs):
         return data
 
     def inverse_standardize(self, data, minimum, maximum):
@@ -561,37 +562,39 @@ class Scaler:
     def inverse_identity(self, data):
         return data
     
-    def transform(self, data, use_scale_opt = True, **kwargs):
+    def transform(self, parameters, use_scale_opt = True, **kwargs):
         """
-        data: pd.DataFrame
+        parameters: pd.DataFrame or np.ndarray
         """
         if not use_scale_opt:
-            minimum = kwargs.get("minimum", data.min(axis=0))
-            maximum = kwargs.get("maximum", data.max(axis=0))
-            mean = kwargs.get("mean", data.mean(axis=0))
-            std = kwargs.get("std", data.std(axis=0))
-
-        params = data.columns
-        n_sim = len(data)
-        n_params = len(params)
+            minimum = kwargs.get("minimum", parameters.min(axis=0))
+            maximum = kwargs.get("maximum", parameters.max(axis=0))
+            mean = kwargs.get("mean", parameters.mean(axis=0))
+            std = kwargs.get("std", parameters.std(axis=0))
         
         scale_opt_keys = np.array([*self.scale_opt.keys()])
-        scale_opt_key_in_params = np.array([key in params for key in scale_opt_keys])
-        missing_keys = scale_opt_keys[~scale_opt_key_in_params]
         
-        assert len(missing_keys) == 0, f"Missing keys in data: {missing_keys}"
-        assert n_params == len(scale_opt_keys), "number of features and number of transforms in scale_opt must be the same"
-        
-        for i,key in enumerate(scale_opt_keys):
-            if self.scale_opt[key]["method"] == 'standardize':
-                stats = self.scale_opt[key]["stats"] if use_scale_opt else {"minimum": minimum[i], "maximum": maximum[i]}
-                data[key] = self.standardize(data[key], **stats)
-            elif self.scale_opt[key]["method"] == 'normalize':
-                stats = self.scale_opt[key]["stats"] if use_scale_opt else {"mean": mean[i], "std": std[i]}
-                data[key] = self.normalize(data[key], **stats)
-            else:
-                data[key] = self.identity(data[key])
-        return data
+        if isinstance(parameters, pd.DataFrame):        
+            params = parameters.columns
+            scale_opt_key_in_params = np.array([key in params for key in scale_opt_keys])
+            missing_keys = scale_opt_keys[~scale_opt_key_in_params]
+            
+            assert len(missing_keys) == 0, f"Missing keys in data: {missing_keys}"
+            assert len(params) == len(scale_opt_keys), "number of features and number of transforms in scale_opt must be the same"
+            
+            for i,key in enumerate(scale_opt_keys):
+                scale_fn = getattr(self, self.scale_opt[key]["method"])
+                parameters[key] = scale_fn(parameters[key], **self.scale_opt[key]["stats"])
+
+        elif isinstance(parameters, np.ndarray):
+            n_params = parameters.shape[1]
+            assert n_params == len(self.scale_opt), "Length of data and transform must be the same"
+            for i,key in enumerate(scale_opt_keys):
+                scale_fn = getattr(self, self.scale_opt[key]["method"])
+                parameters[:,i] = scale_fn(parameters[:,i], **self.scale_opt[key]["stats"])
+
+        return parameters
+
     
     def inverse_transform(self, data, use_scale_opt = True, **kwargs):
         minimum = kwargs.get("minimum", data.min(axis=0))

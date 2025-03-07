@@ -11,14 +11,21 @@ class UniformDiscretePrior:
         index = np.floor(self.b * x).astype(int)
         return self.a[ index ] #+ (self.b-self.a) * x
     
-def prepare_prior_dict(inference_dict):
+def prepare_prior_dict(inference_dict, use_scaler_in_prior=False):
     prior_dict = {}
     for key in inference_dict["LikelihoodModules"].keys():
         emulator = inference_dict["LikelihoodModules"][key]["likelihood_kwargs"]["emulator"]
         scaler = Scaler(emulator.scale_opt)
         for param in emulator.scale_opt.keys():
-            scale_fn = getattr(scaler, emulator.scale_opt[param]["method"])
-            if param not in emulator.data_opt["data_dims"]:
+            if use_scaler_in_prior:
+                method = emulator.scale_opt[param]["method"]
+            else:
+                method = "identity"
+            scale_fn = getattr(scaler, method)
+            
+            data_dims_keys = [list(dim.keys())[0] for dim in emulator.data_opt["data_dims"]]
+            log_data_dims_keys = [f"log10{dim}" for dim in data_dims_keys]
+            if not ((param in data_dims_keys) or (param in log_data_dims_keys)):
                 if param not in prior_dict.keys():
                     prior_dict[param] = {}
                 

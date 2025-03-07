@@ -49,7 +49,7 @@ if __name__ == '__main__':
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
                             save_after_epochs=5, 
-                            save_model_path=path+"data/trained_emulators_poweremu/xrb_emu.pth",
+                            save_model_path=path+"data/trained_emulators_poweremu/xrb_emu_tmp.pth",
                             save_progress_plots_path=path+"images/",)
         data_opt = {"data_log": True,
                     "data_dims":[ 
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
                             save_after_epochs=5, 
-                            save_model_path=path+"data/trained_emulators_poweremu/T21_emu2.pth.pth",
+                            save_model_path=path+"data/trained_emulators_poweremu/T_today_emu_temp.pth",
                             save_progress_plots_path=path+"images/",)
         data_opt = {"data_log": True,
                     "data_dims":[ 
@@ -104,7 +104,7 @@ if __name__ == '__main__':
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
                             save_after_epochs=5, 
-                            save_model_path=path+"data/trained_emulators_poweremu/T21_emu2.pth",
+                            save_model_path=path+"data/trained_emulators_poweremu/T21_emu_tmp.pth",
                             save_progress_plots_path=path+"images/",)
         data_opt = {"data_log": False,
                     "data_dims":[ 
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     #shuffle
     parameters_validation, target_validation = shuffle_data(parameters_validation, target_validation)
     parameters_train, target_train = shuffle_data(parameters_train, target_train)
-
+    
     #launch training process
     world_size = torch.cuda.device_count()
     multi_gpu = world_size > 1

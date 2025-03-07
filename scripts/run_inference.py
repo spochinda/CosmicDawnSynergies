@@ -23,69 +23,50 @@ if __name__ == "__main__":
             "read_resume": False,
         },
         "LikelihoodModules": {
+            #"LikelihoodHERA": {
+            #    "likelihood_kwargs": {
+            #        "files": files,
+            #        "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
+            #        }, 
+            #    },
+            #"LikelihoodRadioBackground": {
+            #    "likelihood_kwargs": {
+            #        "datapath": path+"/src/CosmicDawnSynergies/itamar/LWA1_with_err.npy",
+            #        "emulator": path+"/data/trained_emulators_poweremu/T_today_emu_tmp.pth"
+            #    },
+            #},
             "LikelihoodXRB": {
                 "likelihood_kwargs": {
-                    "emulator": path+"/data/trained_emulators_poweremu/XRB_emu.pth",
+                    "emulator": path+"/data/trained_emulators_poweremu/XRB_emu_tmp.pth",
                 },
-                },
-            "LikelihoodRadioBackground": {
-                "likelihood_kwargs": {
-                    "datapath": path+"/src/CosmicDawnSynergies/itamar/LWA1_with_err.npy",
-                    "emulator": path+"/data/trained_emulators_poweremu/T_today_emu.pth"
-                },
-            },
-            "LikelihoodHERA": {
-                "likelihood_kwargs": {
-                    "files": files,
-                    "emulator": path+"/data/trained_emulators_poweremu/MLP_0.pth",
-                    }, 
                 },
             }
         }
     
-    ######################## temporary solution: manually add data_dims and discrete_params to emulator.data_opt ########################
     for key in inference_dict["LikelihoodModules"].keys():
         emulator = poweremu_torch()
         emulator.load_network(inference_dict["LikelihoodModules"][key]["likelihood_kwargs"]["emulator"])
-        scaler = Scaler(emulator.scale_opt)
-        emulator.data_opt["discrete_params"] = {
-        "alpha": scaler.standardize(np.array([1., 1.3, 1.5]), **emulator.scale_opt["alpha"]["stats"]),
-        "nu_0": scaler.standardize(np.array([*range(100,1500,100), 1500, 2000, 3000]), **emulator.scale_opt["nu_0"]["stats"]),
-        "pop": scaler.standardize(np.array([231, 232, 233]), **emulator.scale_opt["pop"]["stats"])
-        }
         inference_dict["LikelihoodModules"][key]["likelihood_kwargs"]["emulator"] = emulator
 
-    inference_dict["LikelihoodModules"]["LikelihoodXRB"]["likelihood_kwargs"]["emulator"].data_opt["data_dims"] = ["log10E_min",]
-    inference_dict["LikelihoodModules"]["LikelihoodRadioBackground"]["likelihood_kwargs"]["emulator"].data_opt["data_dims"] = ["log10nu_today",]
-    inference_dict["LikelihoodModules"]["LikelihoodHERA"]["likelihood_kwargs"]["emulator"].data_opt["data_dims"] = ["z","log10k"]
-    ######################## end of temporary solution ########################
-
-    assert False
-    
     #define prior
-    prior_dict = prepare_prior_dict(inference_dict)
+    prior_dict = prepare_prior_dict(inference_dict, use_scaler_in_prior=False) #decide to use scaler later
 
     def prior(cube):
-        try:
-            theta = np.zeros_like(cube)
-            for i,param in enumerate(prior_dict.keys()):
-                prior = prior_dict[param]
-                is_discrete_param = param in emulator.data_opt["discrete_params"].keys()
-                if is_discrete_param:
-                    a, b = 0., len(prior)
-                    theta[i] = UniformPrior(a=a, b=b)(cube[i])
-                    index = np.floor(theta[i]).astype(int)
-                    theta[i] = prior[index]
-                else:
-                    a, b = prior 
-                    theta[i] = UniformPrior(a=a, b=b)(cube[i])    
-                    #theta[i] = LogUniformPrior(*prior)(cube[i])
-            return theta
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno)
-            assert False
+        theta = np.zeros_like(cube)
+        for i,param in enumerate(prior_dict.keys()):
+            prior = prior_dict[param]
+            is_discrete_param = param in emulator.data_opt["discrete_params"].keys()
+            if is_discrete_param:
+                a, b = 0., len(prior)
+                theta[i] = UniformPrior(a=a, b=b)(cube[i])
+                index = np.floor(theta[i]).astype(int)
+                theta[i] = prior[index]
+            else:
+                a, b = prior 
+                theta[i] = UniformPrior(a=a, b=b)(cube[i])    
+                #theta[i] = LogUniformPrior(*prior)(cube[i])
+        return theta
+
     
     def dumper(live, dead, logweights, logZ, logZerr):
         # params, derived, b0 (lowest loglikelihood at birth), l0 (loglike)
@@ -96,6 +77,7 @@ if __name__ == "__main__":
         This function computes the log-likelihood of the model and derived
         parameters (phi) from the physical coordinates (theta).
         """
+        
         try:
             logL = 0.
             logL_nDerived = []
@@ -104,8 +86,10 @@ if __name__ == "__main__":
                 logL += logL_
                 logL_nDerived += logL_nDerived_
         except Exception as e:
-            print("Exception in loglikelihood:", i, e, flush=True)
-
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(i, exc_type, fname, exc_tb.tb_lineno)
+            assert False
 
         return logL, logL_nDerived
 
@@ -133,7 +117,7 @@ if __name__ == "__main__":
 
     #triangle
     files = [settings.base_dir+"/run",]
-    paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "tau", "log10fradio"]
+    paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "log10fradio"]
     basename = os.path.basename(settings.base_dir)
     image_dir = path+"/images/"
     plot_path = os.path.join(image_dir, basename) + f"_nlive_{settings.nlive}.png"
