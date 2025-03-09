@@ -14,12 +14,12 @@ from pypolychord.priors import UniformPrior, LogUniformPrior
 from pypolychord.output import PolyChordOutput
 
 if __name__ == "__main__":
-    path = "/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies"
+    path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies"
     inference_dict = {
         "inference_id": "_h1cidr3_radio_xrb_saras3",
         "polychord_settings": {
             "nlive": 500,
-            "read_resume": False,
+            "read_resume": True,
         },
         "LikelihoodModules": {
             "LikelihoodHERA": {
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     settings.nlive = 500
     settings.base_dir = path+"/scripts/non-public/"+"_".join( list(inference_dict["LikelihoodModules"].keys()) ) + inference_dict["inference_id"]
     settings.file_root = 'run'
-    settings.read_resume = False
+    settings.read_resume = inference_dict["polychord_settings"]["read_resume"]
     
     polychordnames = list(prior_dict.keys())
     derivednames = []

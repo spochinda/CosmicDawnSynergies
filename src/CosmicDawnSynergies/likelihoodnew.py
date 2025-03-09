@@ -180,29 +180,38 @@ class LikelihoodXRB:
   
     
     def computeLikelihood(self, params):
-        params = np.array(params)
-        params = params[self.prior_indices]
+        try:
+            params = np.array(params)
+            params = params[self.prior_indices]
 
-        E_min, XRB_pred = self.predict(E_min=self.E_min, params=params)
-        E_min = np.log10(E_min) if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
-        XRB_pred = np.log10(XRB_pred) if self.emulator.data_opt["data_log"] else XRB_pred
-        XRB_pred = interp1d(E_min, XRB_pred, kind='linear', fill_value='extrapolate') #model interpolator
-
-        logL = 0
-        for xmin,xmax,XRB,std in self.X_limits: #integrate model from xmin to xmax and compare to data to get logL
-            E_min = np.geomspace(xmin, xmax, 100)
+            E_min, XRB_pred = self.predict(E_min=self.E_min, params=params)
             E_min = np.log10(E_min) if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
-            XRB_pred_ = XRB_pred(E_min)
-            
-            E_min = 10**E_min if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
-            XRB_pred_ = 10**XRB_pred_ if self.emulator.data_opt["data_log"] else XRB_pred_
-            XRB_pred_ = XRB_pred_
-            
-            XRB_pred_ = np.trapezoid(XRB_pred_, E_min*self.keV_toHz) * self.cm_toMpc**2 / self.sr_todeg2
-            P = 0.5 * (1 + ssp.erf( (XRB - XRB_pred_) / np.sqrt(2) / np.sqrt(std**2+(XRB_pred_*0.05)**2) ))
-            logL += np.log(P)
-        logL = float(logL)
-        return logL, [logL,]
+            XRB_pred = np.log10(XRB_pred) if self.emulator.data_opt["data_log"] else XRB_pred
+            XRB_pred = interp1d(E_min, XRB_pred, kind='linear', fill_value='extrapolate') #model interpolator
+
+            logL = 0
+            for xmin,xmax,XRB,std in self.X_limits: #integrate model from xmin to xmax and compare to data to get logL
+                E_min = np.geomspace(xmin, xmax, 100)
+                E_min = np.log10(E_min) if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
+                XRB_pred_ = XRB_pred(E_min)
+                
+                E_min = 10**E_min if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
+                XRB_pred_ = 10**XRB_pred_ if self.emulator.data_opt["data_log"] else XRB_pred_
+                XRB_pred_ = XRB_pred_
+                
+                try:
+                    XRB_pred_ = np.trapezoid(XRB_pred_, E_min*self.keV_toHz) * self.cm_toMpc**2 / self.sr_todeg2
+                except Exception as e:
+                    XRB_pred_ = np.trapz(XRB_pred_, E_min*self.keV_toHz) * self.cm_toMpc**2 / self.sr_todeg2
+                P = 0.5 * (1 + ssp.erf( (XRB - XRB_pred_) / np.sqrt(2) / np.sqrt(std**2+(XRB_pred_*0.05)**2) ))
+                logL += np.log(P)
+            logL = float(logL)
+            return logL, [logL,]
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
+            assert False
     
     def predict(self, E_min, params):
         E_min = np.log10(E_min) if self.emulator.data_opt["data_dims"][0]["E_min"]["log"] else E_min
@@ -435,6 +444,7 @@ class LikelihoodSARAS3:
             - 0.5 * (self.T_SARAS - Tfg - T21_pred)**2
             /(std**2+(0.25*T21_pred)**2)
             ).sum()
+        logL = float(logL)
         
         return logL, [logL,]
     
