@@ -197,6 +197,8 @@ class poweremu_torch(nn.Module):
         save_after_epochs = self.train_opt.get("save_after_epochs", 5)
         save_progress_plots_path = self.train_opt.get("save_progress_plots_path", False)
         save_model_path = self.train_opt.get("save_model_path", None)
+        terminate_time = self.train_opt.get("terminate_time", False)
+        model_id = self.train_opt.get("model_id", "")
         
         parameters_validation = validation_dataloader.dataset.parameters
         target_validation = validation_dataloader.dataset.target
@@ -205,6 +207,7 @@ class poweremu_torch(nn.Module):
         
         if self.device.index == 0 or self.device.type=="cpu":
             print(self.model, flush=True)
+        training_stime = time.time()
         for e in range(self.epoch, self.epoch+epochs):
             stime = time.time()
             for i,(parameters_train,target_train) in enumerate(train_dataloader):
@@ -255,7 +258,7 @@ class poweremu_torch(nn.Module):
                                 axes.set_ylabel('Frequency')
                                 axes.legend()
                                 
-                                save_path = os.path.join(save_progress_plots_path, "validation_progress_hist_XRB.png")
+                                save_path = os.path.join(save_progress_plots_path, f"validation_progress_hist{model_id}.png")
                                 plt.savefig(save_path)
                                 plt.close()
 
@@ -280,6 +283,11 @@ class poweremu_torch(nn.Module):
                         if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
                     
                     if i == 20 and profiling: break
+
+            #end training if time exceeds terminate_time
+            if (terminate_time!=False) and (time.time()-training_stime > terminate_time):
+                print(f"Training time exceeded {terminate_time} seconds. Terminating training.", flush=True)
+                break
                     
 
 
