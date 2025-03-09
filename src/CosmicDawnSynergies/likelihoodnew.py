@@ -391,6 +391,7 @@ class LikelihoodSARAS3:
         """
         Likelihood module for the SARAS3 constraints.
         """
+        self.convert_mK_to_K = kwargs.get("convert_mK_to_K", True)
         self.emulator = emulator
         self.prior_dict = prior_dict
         self.file = file
@@ -452,6 +453,8 @@ class LikelihoodSARAS3:
                 pred = 10**pred
             if self.emulator.data_opt["data_dims"][0]["z"]["log"]:
                 redshifts = 10**redshifts
+            if self.convert_mK_to_K:
+                pred *= 1e-3
         return redshifts, pred
 
 class LikelihoodPowerSpectrum:

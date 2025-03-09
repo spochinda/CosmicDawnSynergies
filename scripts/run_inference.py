@@ -15,7 +15,6 @@ from pypolychord.output import PolyChordOutput
 
 if __name__ == "__main__":
     path = "/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies"
-    files = glob.glob(path+"/data/observations_H1C_IDR3/*.h5")
     inference_dict = {
         "inference_id": "_h1cidr3_radio_xrb_saras3",
         "polychord_settings": {
@@ -25,7 +24,7 @@ if __name__ == "__main__":
         "LikelihoodModules": {
             "LikelihoodHERA": {
                 "likelihood_kwargs": {
-                    "files": files,
+                    "files": glob.glob(path+"/data/observations_H1C_IDR3/*.h5"),
                     "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
                     },
                     },
@@ -45,7 +44,7 @@ if __name__ == "__main__":
                     "emulator": path+"/data/trained_emulators_poweremu/T21_emu.pth",
                     "file": path+"/data/SARAS3/SARAS_3_averaged_spectrum.txt",
                     "data_dims": ["z",],
-                    "poly_coeff": {"fg_a0": [3., 4.], "fg_a1": [-1., 1.], "fg_a2": [-1., 1.], "fg_a3": [-1., 1.], "fg_a4": [-1., 1.], "fg_a5": [-1., 1.], "fg_a6": [-1., 1.]},
+                    "poly_coeff": {"fg_a0": [3.25, 3.75], "fg_a1": [-0.5, -0.5], "fg_a2": [-0.5, 0.5], "fg_a3": [-0.5, 0.5], "fg_a4": [-0.5, 0.5], "fg_a5": [-0.05, 0.05], "fg_a6": [-0.5, 0.5]},
                     "noise": {"fg_std21": [1e-2, 0.5]},
                     }, 
                 },
