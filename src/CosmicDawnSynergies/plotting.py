@@ -182,6 +182,8 @@ def axes_triangle_plot(files : list,
 
     plt.savefig(plot_path, bbox_inches="tight")
 
+    plt.close()
+
     return fig, axes, grid
 
 def triangle_plot(files, paramNames, plot_path="", **kwargs):

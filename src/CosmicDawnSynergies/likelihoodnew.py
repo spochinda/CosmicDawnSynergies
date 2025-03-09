@@ -97,7 +97,6 @@ class LikelihoodRadioBackground:
         params[:,0] = nu_today
         with torch.no_grad():
             params = self.scaler.transform(params, use_scale_opt=True)
-            print(f"params in radio: {params}", flush=True)
             params = torch.from_numpy(params).to(dtype=torch.float32)
             pred = self.emulator.model(params)
             pred = pred.detach().cpu().numpy()
@@ -146,7 +145,7 @@ class LikelihoodXRB:
         self.output_names = output_names
         self.nDerived = len(self.output_names)
         self.scaler = Scaler(self.emulator.scale_opt)
-        self.pre_compute()
+        self.preprocessing()
         
 
         prior_keys = list(self.prior_dict.keys())
@@ -156,7 +155,7 @@ class LikelihoodXRB:
             if key not in data_dims:
                 self.prior_indices.append(prior_keys.index(key))        
 
-    def pre_compute(self):
+    def preprocessing(self):
         """precomputed variables not necessary to put inside and slow down computeLikelihood"""
         eV_toHz = physical_constants['electron volt-hertz relationship'][0]
         self.keV_toHz = eV_toHz*1e3
@@ -222,13 +221,6 @@ class LikelihoodXRB:
             if self.emulator.data_opt["data_dims"][0]["E_min"]["log"]:
                 E_min = 10**E_min
         return E_min, pred
-
-
-
-
-
-
-
 
 
 class LikelihoodHERA:
@@ -387,50 +379,189 @@ class LikelihoodHERA:
 
 class LikelihoodSARAS3:
     def __init__(self, 
-                 emulator,
                  prior_dict,
-                 data_dims = ["log10E_min",],
+                 emulator,
+                 file,
+                 data_dims,
+                 poly_coeff,
+                 noise,
                  output_names = [r"\log L_\mathrm{SARAS3}"],
                  **kwargs
                  ):
         """
         Likelihood module for the SARAS3 constraints.
         """
+        self.emulator = emulator
+        self.prior_dict = prior_dict
+        self.file = file
         self.output_names = output_names
-        self.datapath = datapath
-        self.emupath = emupath
-        #reduce_data
-        self.freq, self.T_SARAS, self.weights, self.fg_fit, self.fg_fit_T_resid = np.loadtxt(datapath).T
-        log_freq = np.log10(self.freq)
-        self.reduced_freq = 2*((log_freq - log_freq.min())/ \
-                          (log_freq.max()-log_freq.min())) - 1
-        self.z = 1420/self.freq-1
-        #setup
-        self.model = keras.models.load_model(self.emupath + 'model.h5', compile=False)
-        #self.predictor = evaluate(base_dir=self.emupath, model=self.model, z=self.z, gc=False, logs=[]) #0,1,2,3,7], )
-        self.nDerived = len(self.output_names.items()) 
+        self.nDerived = len(self.output_names)
+        self.scaler = Scaler(self.emulator.scale_opt)
 
-    def foreground(self, p):
-        log_fit = 10**(np.sum([
-                        p[i] * self.reduced_freq**i
-                        for i in range(len(p))],
-                        axis=0))
-        return log_fit
-
-    def computeLikelihood(self,p):
-        fg = self.foreground(p[9:-1])
-        noise = p[-1]
+        prior_keys = list(self.prior_dict.keys())
+        emulator_keys = list(self.emulator.scale_opt.keys())
+        self.prior_indices = []
+        for key in emulator_keys: #find non-data_dim indices of emulator_keys in prior_keys
+            if key not in data_dims:
+                self.prior_indices.append(prior_keys.index(key))
         
-        assert False, "Need to fix this"
-        signal = self.predictor(p[:9])[0]/1000 #select signal and convert to K
+        self.poly_coeff_indices = [prior_keys.index(name) for name in poly_coeff]
+        self.noise_indices = [prior_keys.index(name) for name in noise]
+
+        self.preprocessing()
+    
+    def preprocessing(self):
+        self.freq, self.T_SARAS, self.weights, self.fg_fit, self.fg_fit_T_resid = np.loadtxt(self.file).T
+        log_freq = np.log10(self.freq)
+        self.reduced_freq = 2 * ((log_freq - log_freq.min()) / (log_freq.max()-log_freq.min())) - 1
+        self.redshifts = 1420/self.freq-1
+
+    def foreground(self, params):
+        fg_coeff = params
+        Tfg = 10**np.sum([a_i * R_i**i for i,(a_i,R_i) in enumerate(zip(fg_coeff, self.reduced_freq))], axis=0)
+        return Tfg
+
+    def computeLikelihood(self, params):
+        params = np.array(params)
+
+        Tfg = self.foreground(params[self.poly_coeff_indices])
+        std = params[self.noise_indices]
+
+        redshifts, T21_pred = self.predict(params[self.prior_indices])
 
         logL = (
-            -0.5*np.log(2*np.pi*(noise**2+(0.25*signal)**2)) 
-            - 0.5 * (self.T_SARAS - fg - signal)**2
-            /(noise**2+(0.25*signal)**2)
+            -0.5*np.log(2*np.pi*(std**2+(0.25*T21_pred)**2)) 
+            - 0.5 * (self.T_SARAS - Tfg - T21_pred)**2
+            /(std**2+(0.25*T21_pred)**2)
             ).sum()
-        return logL#, [None]
+        
+        return logL, [logL,]
+    
+    def predict(self, params):
+        redshifts = np.log10(self.redshifts) if self.emulator.data_opt["data_dims"][0]["z"]["log"] else self.redshifts
 
+        params = np.array([np.nan, *params])
+        params=np.tile(params, (len(redshifts), 1))
+        params[:,0] = redshifts
+        with torch.no_grad():
+            params = self.scaler.transform(params, use_scale_opt=True)
+            params = torch.from_numpy(params).to(dtype=torch.float32)
+            pred = self.emulator.model(params)
+            pred = pred.detach().cpu().numpy()
+            if self.emulator.data_opt["data_log"]:
+                pred = 10**pred
+            if self.emulator.data_opt["data_dims"][0]["z"]["log"]:
+                redshifts = 10**redshifts
+        return redshifts, pred
+
+class LikelihoodPowerSpectrum:
+    def __init__(self, 
+                 prior_dict,
+                 emulator,
+                 files, 
+                 data_dims = ["z", "log10k",],
+                 output_names = [r"\log L_\mathrm{dsq}",],
+                 **kwargs
+                 ):
+        self.set_negative_to_zero = kwargs.get("set_negative_to_zero", True)
+        self.decimate_data = kwargs.get("decimate_data", False)
+        self.mask_to_emulator_range = kwargs.get("mask_to_emulator_range", True)
+        self.k_name_in_scale_opt = kwargs.get("k_name_in_scale_opt", "log10k")
+        
+        self.emulator = emulator
+        self.prior_dict = prior_dict
+        self.files = files
+        self.output_names = output_names
+        self.nDerived = len(self.output_names)
+        self.scaler = Scaler(self.emulator.scale_opt)        
+
+        prior_keys = list(self.prior_dict.keys())
+        emulator_keys = list(self.emulator.scale_opt.keys())
+        self.prior_indices = []
+        for key in emulator_keys: #find non-data_dim indices of emulator_keys in prior_keys
+            if key not in data_dims:
+                self.prior_indices.append(prior_keys.index(key))
+
+        self.extract_data()
+
+
+    def computeLikelihood(self, params):
+        # Important: model must take k as h/cMpc!
+        params = np.array(params)
+        params = params[self.prior_indices]
+
+        logL = []
+        for i,band in enumerate(self.data.keys()):
+            dsq = self.data[band]["dsq"]
+            std = self.data[band]["std"]
+            z = self.data[band]["z"]
+            k_mag = self.data[band]["k_mag"]
+            dsq_pred = self.predict(z, k_mag, params)
+            assert np.shape(dsq_pred) == np.shape(dsq), "Shape mismatch"
+            r = dsq - dsq_pred
+            logL_ = np.sum(np.log(0.5 * (1 + ssp.erf(r / np.sqrt(2) / np.sqrt(std**2+(0.2*dsq_pred)**2)))))
+            logL.append(logL_)
+        logL = np.sum(logL)
+        logL = float(logL)
+        return logL, [logL,]
+    
+    def predict(self, z, karr, params):
+        is_log_z = self.emulator.data_opt["data_dims"][0]["z"]["log"]
+        is_log_k = self.emulator.data_opt["data_dims"][1]["k"]["log"]
+        data_log = self.emulator.data_opt["data_log"]
+
+        z = np.log10(z) if is_log_z else z
+        karr = np.log10(karr) if is_log_k else karr
+
+        params = np.array([z, np.nan, *params])
+        params=np.tile(params, (len(karr), 1))
+        params[:,1] = karr
+        with torch.no_grad():
+            params = self.scaler.transform(params, use_scale_opt=True)
+            params = torch.from_numpy(params).to(dtype=torch.float32)
+            pred = self.emulator.model(params)
+            pred = pred.detach().cpu().numpy()
+            if data_log:
+                pred = 10**pred
+        return pred
+        
+    def extract_data(self, **kwargs):        
+        if self.mask_to_emulator_range:
+            k_index = list(self.emulator.scale_opt.keys()).index(self.k_name_in_scale_opt)
+            kmin, kmax = self.emulator.data_opt["data_dims"][k_index]["k"]["lims"]
+
+        self.data = dict()
+        for i,file in enumerate(self.files):
+            loaded_data = np.load(file, allow_pickle=True).item()
+            z = np.array(loaded_data["z"])
+            k_mag = np.array(loaded_data["k_mag"])
+            dsq = np.array(loaded_data["dsq"])
+            std = np.array(loaded_data["std"])
+            
+            if self.mask_to_emulator_range:
+                k_mask = np.logical_and(k_mag >= kmin, k_mag <= kmax)
+                k_mag = k_mag[k_mask]
+                dsq = dsq[k_mask]
+                std = std[k_mask]
+            
+            if self.set_negative_to_zero:
+                dsq[dsq < 0] = 0
+            
+            if self.decimate_data:
+                k_mag, dsq, std = self.decimate(k_mag, dsq, std)
+            
+            self.data[i] = {"k_mag": k_mag, "dsq": dsq, "std": std, "z": z}
+        return self.data
+
+    def decimate(self, k_mag, dsq, std):
+        idx = np.argmin(dsq+2*std)
+        is_odd = idx % 2
+        mask = np.arange(len(k_mag)) % 2 == is_odd
+        k_mag = k_mag[mask]
+        dsq = dsq[mask]
+        std = std[mask]
+        return k_mag, dsq, std
+    
 
 class LikelihoodNeutralFraction:
     def __init__(self, 

@@ -43,3 +43,22 @@ def prepare_prior_dict(inference_dict, use_scaler_in_prior=False):
                         prior_dict[param][0] = max(prior_dict[param][0], minimum)
                         prior_dict[param][1] = min(prior_dict[param][1], maximum)
     return prior_dict
+
+def add_SARAS3_foreground_parameters(prior_dict, inference_dict):
+    if "LikelihoodSARAS3" in inference_dict["LikelihoodModules"].keys():
+        likelihood_kwargs = inference_dict["LikelihoodModules"]["LikelihoodSARAS3"]["likelihood_kwargs"]
+        has_poly_coeff = "poly_coeff" in likelihood_kwargs.keys()
+        has_noise = "noise" in likelihood_kwargs.keys()
+        if has_poly_coeff:
+            for a_i, v in likelihood_kwargs["poly_coeff"].items():
+                prior_dict[a_i] = v
+        else:
+            assert has_poly_coeff, "poly_coeff not found in SARAS3 likelihood_kwargs"
+        if has_noise:
+            for noise, v in likelihood_kwargs["noise"].items():
+                prior_dict[noise] = v
+        else:
+            assert has_noise, "noise not found in SARAS3 likelihood_kwargs"
+    else:
+        pass
+    return prior_dict
