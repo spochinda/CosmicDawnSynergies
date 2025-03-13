@@ -424,11 +424,11 @@ class LikelihoodSARAS3:
         self.freq, self.T_SARAS, self.weights, self.fg_fit, self.fg_fit_T_resid = np.loadtxt(self.file).T
         log_freq = np.log10(self.freq)
         self.reduced_freq = 2 * ((log_freq - log_freq.min()) / (log_freq.max()-log_freq.min())) - 1
-        self.redshifts = 1420/self.freq-1
+        self.redshifts = 1420/self.freq - 1
 
     def foreground(self, params):
-        fg_coeff = params
-        Tfg = 10**np.sum([a_i * R_i**i for i,(a_i,R_i) in enumerate(zip(fg_coeff, self.reduced_freq))], axis=0)
+        log10Tfg = np.sum(np.array([a_i * self.reduced_freq**i for i,a_i in enumerate(params)]), axis=0)
+        Tfg = 10**log10Tfg
         return Tfg
 
     def computeLikelihood(self, params):
@@ -445,7 +445,6 @@ class LikelihoodSARAS3:
             /(std**2+(0.25*T21_pred)**2)
             ).sum()
         logL = float(logL)
-        
         return logL, [logL,]
     
     def predict(self, params):

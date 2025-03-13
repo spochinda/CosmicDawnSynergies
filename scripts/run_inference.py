@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import torch
 import glob
 import numpy as np
@@ -14,38 +15,41 @@ from pypolychord.priors import UniformPrior, LogUniformPrior
 from pypolychord.output import PolyChordOutput
 
 if __name__ == "__main__":
-    path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies"
+    path = "/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies"
     inference_dict = {
-        "inference_id": "_h1cidr3_radio_xrb_saras3",
+        "inference_id": "_h1cidr3_radio_xrb_saras3_2",
         "polychord_settings": {
-            "nlive": 500,
-            "read_resume": True,
+            "nlive": 50,
+            "read_resume": False,
+            "precision_criterion": 1.,
         },
         "LikelihoodModules": {
-            "LikelihoodHERA": {
-                "likelihood_kwargs": {
-                    "files": glob.glob(path+"/data/observations_H1C_IDR3/*.h5"),
-                    "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
-                    },
-                    },
-            "LikelihoodRadioBackground": {
-                "likelihood_kwargs": {
-                    "datapath": path+"/src/CosmicDawnSynergies/itamar/LWA1_with_err.npy",
-                    "emulator": path+"/data/trained_emulators_poweremu/T_today_emu.pth"
-                },
-                },
-            "LikelihoodXRB": {
-                "likelihood_kwargs": {
-                    "emulator": path+"/data/trained_emulators_poweremu/xrb_emu.pth",
-                },
-                },
+            #"LikelihoodHERA": {
+            #    "likelihood_kwargs": {
+            #        "files": glob.glob(path+"/data/observations_H1C_IDR3/*.h5"),
+            #        "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
+            #        },
+            #        },
+            #"LikelihoodRadioBackground": {
+            #    "likelihood_kwargs": {
+            #        "datapath": path+"/src/CosmicDawnSynergies/itamar/LWA1_with_err.npy",
+            #        "emulator": path+"/data/trained_emulators_poweremu/T_today_emu.pth"
+            #    },
+            #    },
+            #"LikelihoodXRB": {
+            #    "likelihood_kwargs": {
+            #        "emulator": path+"/data/trained_emulators_poweremu/xrb_emu.pth",
+            #    },
+            #    },
             "LikelihoodSARAS3": {
                 "likelihood_kwargs": {
                     "emulator": path+"/data/trained_emulators_poweremu/T21_emu.pth",
                     "file": path+"/data/SARAS3/SARAS_3_averaged_spectrum.txt",
                     "data_dims": ["z",],
-                    "poly_coeff": {"fg_a0": [3.25, 3.75], "fg_a1": [-0.5, -0.5], "fg_a2": [-0.5, 0.5], "fg_a3": [-0.5, 0.5], "fg_a4": [-0.5, 0.5], "fg_a5": [-0.05, 0.05], "fg_a6": [-0.5, 0.5]},
-                    "noise": {"fg_std21": [1e-2, 0.5]},
+                    "poly_coeff": {"fg_a0": [-10., 10.], "fg_a1": [-10., 10.], "fg_a2": [-10., 10.], "fg_a3": [-10., 10.], "fg_a4": [-10., 10.], "fg_a5": [-10., 10.], "fg_a6": [-10., 10.]},
+                    #"poly_coeff": {"fg_a0": [3.54425, 3.54430], "fg_a1": [-0.2195, -0.2194], "fg_a2": [0.001, 0.00125], "fg_a3": [-0.000225, -0.002], "fg_a4": [0.0015, 0.002], "fg_a5": [-0.00035, 0.0], "fg_a6": [-0.001, 0.0005]},
+                    "noise": {"fg_std21": [0.01, 1.]},
+                    #"noise": {"fg_std21": [0.01, 0.02]},
                     }, 
                 },
         #    "LikelihoodPowerSpectrum": {
@@ -119,11 +123,9 @@ if __name__ == "__main__":
     
     nDims = len(prior_dict.keys())
     nDerived = sum([likelihood.nDerived for likelihood in LikelihoodModules])
-    settings = PolyChordSettings(nDims=nDims, nDerived=nDerived)
-    settings.nlive = 500
+    settings = PolyChordSettings(nDims=nDims, nDerived=nDerived, **inference_dict["polychord_settings"])
     settings.base_dir = path+"/scripts/non-public/"+"_".join( list(inference_dict["LikelihoodModules"].keys()) ) + inference_dict["inference_id"]
     settings.file_root = 'run'
-    settings.read_resume = inference_dict["polychord_settings"]["read_resume"]
     
     polychordnames = list(prior_dict.keys())
     derivednames = []
