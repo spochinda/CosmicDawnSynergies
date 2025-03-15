@@ -1,5 +1,6 @@
 import numpy as np
 from CosmicDawnSynergies.train_tools import poweremu_torch, Scaler
+from pypolychord.priors import UniformPrior, LogUniformPrior
 
 class UniformDiscretePrior:
     def __init__(self, a):
@@ -10,6 +11,13 @@ class UniformDiscretePrior:
     def __call__(self, x):
         index = np.floor(self.b * x).astype(int)
         return self.a[ index ] #+ (self.b-self.a) * x
+    
+def initialize_emulators(inference_dict):
+    for key in inference_dict["LikelihoodModules"].keys():
+        emulator = poweremu_torch()
+        emulator.load_network(inference_dict["LikelihoodModules"][key]["likelihood_kwargs"]["emulator"])
+        inference_dict["LikelihoodModules"][key]["likelihood_kwargs"]["emulator"] = emulator
+    return inference_dict
     
 def prepare_prior_dict(inference_dict, use_scaler_in_prior=False):
     prior_dict = {}
@@ -62,3 +70,60 @@ def add_SARAS3_foreground_parameters(prior_dict, inference_dict):
     else:
         pass
     return prior_dict
+
+def get_prior(inference_dict, prior_dict):
+    LikelihoodModules = inference_dict["LikelihoodModules"]
+    discrete_params = np.array([])
+    for key in LikelihoodModules.keys():
+        emulator_discrete_params = list(LikelihoodModules[key]["likelihood_kwargs"]["emulator"].data_opt["discrete_params"].keys())
+        discrete_params = np.append(discrete_params, emulator_discrete_params)
+        
+    discrete_params = np.unique(discrete_params)
+
+    def prior(cube):
+        theta = np.zeros_like(cube)
+        for i,(param,prior) in enumerate(prior_dict.items()):
+            is_discrete_param = param in discrete_params
+            if is_discrete_param:
+                a, b = 0., len(prior)
+                theta[i] = UniformPrior(a=a, b=b)(cube[i])
+                index = np.floor(theta[i]).astype(int)
+                theta[i] = prior[index]
+            elif "fg_" in param:
+                a,b = prior
+                if "std" in param:
+                    theta[i] = LogUniformPrior(a=a, b=b)(cube[i])
+                else:
+                    theta[i] = UniformPrior(a=a, b=b)(cube[i])
+            else:
+                a,b = prior 
+                theta[i] = UniformPrior(a=a, b=b)(cube[i])    
+        return theta
+    return prior
+
+def get_loglikelihood(LikelihoodModules):
+    def loglikelihood(params):
+        """
+        This function computes the log-likelihood of the model and derived
+        parameters (phi) from the physical coordinates (theta).
+        """
+        
+        try:
+            logL = 0.
+            logL_nDerived = []
+            for i,likelihood in enumerate(LikelihoodModules):
+                logL_, logL_nDerived_ = likelihood.computeLikelihood(params)
+                logL += logL_
+                logL_nDerived += logL_nDerived_
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(i, exc_type, fname, exc_tb.tb_lineno)
+            assert False
+
+        return logL, logL_nDerived
+    return loglikelihood
+
+def dumper(live, dead, logweights, logZ, logZerr):
+    # params, derived, b0 (lowest loglikelihood at birth), l0 (loglike)
+    print("Last dead point:", dead[-1], flush=True)
