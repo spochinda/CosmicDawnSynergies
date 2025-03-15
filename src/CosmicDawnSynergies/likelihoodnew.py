@@ -339,12 +339,12 @@ class LikelihoodHERA:
                 try:
                     wfn = uvp.get_window_function((band,blpair,polpair))[0]
                 except AttributeError:
-                    print(f"AttributeError: Setting window funciton to identity matrix for z={z:.2f} in file {fn}")
+                    print(f"AttributeError: Setting window funciton to identity matrix for z={z:.2f} in file {fn}", flush=True)
                     wfn = np.identity(dsq.shape[0])
                 try:
                     var = uvp.get_cov((band,blpair,polpair))[0].diagonal().real.copy()
                 except AttributeError:
-                    print(f"AttributeError: Getting variance from stats for z={z:.2f} in file {fn}")
+                    print(f"AttributeError: Getting variance from stats for z={z:.2f} in file {fn}", flush=True)
                     var = uvp.get_stats('P_SN', (band,blpair,polpair)).real[0]
                 std = np.sqrt(var)
 
@@ -404,16 +404,22 @@ class LikelihoodSARAS3:
         self.emulator = emulator
         self.prior_dict = prior_dict
         self.file = file
+        self.data_dims = data_dims
         self.output_names = output_names
         self.nDerived = len(self.output_names)
         self.scaler = Scaler(self.emulator.scale_opt)
 
         prior_keys = list(self.prior_dict.keys())
         emulator_keys = list(self.emulator.scale_opt.keys())
-        self.prior_indices = []
-        for key in emulator_keys: #find non-data_dim indices of emulator_keys in prior_keys
-            if key not in data_dims:
-                self.prior_indices.append(prior_keys.index(key))
+        self.astro_indices = []
+        self.emulator_indices = []
+        self.data_dims_indices = []
+        for i,key in enumerate(emulator_keys): #find non-data_dim indices of emulator_keys in prior_keys
+            if key in prior_keys:
+                self.astro_indices.append(prior_keys.index(key))
+                self.emulator_indices.append(i)
+            else:
+                self.data_dims_indices.append(i)
         
         self.poly_coeff_indices = [prior_keys.index(name) for name in poly_coeff]
         self.noise_indices = [prior_keys.index(name) for name in noise]
@@ -437,7 +443,7 @@ class LikelihoodSARAS3:
         Tfg = self.foreground(params[self.poly_coeff_indices])
         std = params[self.noise_indices]
 
-        redshifts, T21_pred = self.predict(params[self.prior_indices])
+        redshifts, T21_pred = self.predict(params[self.astro_indices])
 
         logL = (
             -0.5*np.log(2*np.pi*(std**2+(0.25*T21_pred)**2)) 
@@ -450,9 +456,14 @@ class LikelihoodSARAS3:
     def predict(self, params):
         redshifts = np.log10(self.redshifts) if self.emulator.data_opt["data_dims"][0]["z"]["log"] else self.redshifts
 
-        params = np.array([np.nan, *params])
-        params=np.tile(params, (len(redshifts), 1))
-        params[:,0] = redshifts
+        #params = np.array([np.nan, *params])
+        #params=np.tile(params, (len(redshifts), 1))
+        #params[:,0] = redshifts
+        params_ = np.empty((redshifts.size, params.size + len(self.data_dims)))
+        params_[:,self.data_dims_indices] = redshifts[:,None]
+        params_[:,self.emulator_indices] = params
+        params = params_
+
         with torch.no_grad():
             params = self.scaler.transform(params, use_scale_opt=True)
             params = torch.from_numpy(params).to(dtype=torch.float32)
