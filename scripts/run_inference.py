@@ -15,49 +15,50 @@ from pypolychord.output import PolyChordOutput
 if __name__ == "__main__":
     path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies"
     inference_dict = {
-        "inference_id": "_lofar_Acharya",
+        "inference_id": "_h6cidr2new",
         "polychord_settings": {
             "nlive": 10000,
             "read_resume": False,
-            "precision_criterion": 0.001,
+            "precision_criterion": 1.,
         },
         "LikelihoodModules": {
-        #    "LikelihoodHERA": {
-        #        "likelihood_kwargs": {
-        #            "files": glob.glob(path+"/data/observations_H1C_IDR3/*.h5"),
-        #            "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
-        #            },
-        #            },
-        #    "LikelihoodRadioBackground": {
-        #        "likelihood_kwargs": {
-        #            "datapath": path+"/src/CosmicDawnSynergies/itamar/LWA1_with_err.npy",
-        #            "emulator": path+"/data/trained_emulators_poweremu/T_today_emu.pth"
-        #        },
-        #        },
-        #    "LikelihoodXRB": {
-        #        "likelihood_kwargs": {
-        #            "emulator": path+"/data/trained_emulators_poweremu/xrb_emu.pth",
-        #            "data_dims": ["log10E_min",],
-        #        },
-        #        },
-        #    "LikelihoodSARAS3": {
-        #        "likelihood_kwargs": {
-        #            "emulator": path+"/data/trained_emulators_poweremu/T21_emu.pth",
-        #            "file": path+"/data/SARAS3/SARAS_3_averaged_spectrum.txt",
-        #            "data_dims": ["z",],
-        #            "poly_coeff": {"fg_a0": [-10., 10.], "fg_a1": [-10., 10.], "fg_a2": [-10., 10.], "fg_a3": [-10., 10.], "fg_a4": [-10., 10.], "fg_a5": [-10., 10.], "fg_a6": [-10., 10.]},
-        #            #"poly_coeff": {"fg_a0": [3.54425, 3.54430], "fg_a1": [-0.2195, -0.2194], "fg_a2": [0.001, 0.00125], "fg_a3": [-0.000225, -0.002], "fg_a4": [0.0015, 0.002], "fg_a5": [-0.00035, 0.0], "fg_a6": [-0.001, 0.0005]},
-        #            "noise": {"fg_std21": [0.01, 1.]},
-        #            #"noise": {"fg_std21": [0.01, 0.02]},
-        #            }, 
-        #        },
-            "LikelihoodPowerSpectrum": {
+            "LikelihoodHERA": {
                 "likelihood_kwargs": {
-                    "files": [path+"/data/observations_LOFAR/lofar_limits_Acharya_hpc.npy"],
+                    "files": glob.glob(path+"/data/observations_H6C_IDR2/all_baselines*.h5"),
                     "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
-                    "data_dims": ["z", "log10k",]
-                    }, 
-                },
+                    "decimate_data": False,
+                    },
+                    },
+            #"LikelihoodRadioBackground": {
+            #    "likelihood_kwargs": {
+            #        "datapath": path+"/src/CosmicDawnSynergies/itamar/LWA1_with_err.npy",
+            #        "emulator": path+"/data/trained_emulators_poweremu/T_today_emu.pth"
+            #    },
+            #    },
+            #"LikelihoodXRB": {
+            #    "likelihood_kwargs": {
+            #        "emulator": path+"/data/trained_emulators_poweremu/xrb_emu.pth",
+            #        "data_dims": ["log10E_min",],
+            #    },
+            #    },
+            #"LikelihoodSARAS3": {
+            #    "likelihood_kwargs": {
+            #        "emulator": path+"/data/trained_emulators_poweremu/T21_emu.pth",
+            #        "file": path+"/data/SARAS3/SARAS_3_averaged_spectrum.txt",
+            #        "data_dims": ["z",],
+            #        "poly_coeff": {"fg_a0": [-10., 10.], "fg_a1": [-10., 10.], "fg_a2": [-10., 10.], "fg_a3": [-10., 10.], "fg_a4": [-10., 10.], "fg_a5": [-10., 10.], "fg_a6": [-10., 10.]},
+            #        #"poly_coeff": {"fg_a0": [3.54425, 3.54430], "fg_a1": [-0.2195, -0.2194], "fg_a2": [0.001, 0.00125], "fg_a3": [-0.000225, -0.002], "fg_a4": [0.0015, 0.002], "fg_a5": [-0.00035, 0.0], "fg_a6": [-0.001, 0.0005]},
+            #        "noise": {"fg_std21": [0.01, 1.]},
+            #        #"noise": {"fg_std21": [0.01, 0.02]},
+            #        }, 
+            #    },
+            #"LikelihoodPowerSpectrum": {
+            #    "likelihood_kwargs": {
+            #        "files": [path+"/data/observations_LOFAR/lofar_limits_Acharya_hpc.npy"],
+            #        "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
+            #        "data_dims": ["z", "log10k",]
+            #        }, 
+            #    },
             }
     }
 
@@ -91,8 +92,8 @@ if __name__ == "__main__":
     #triangle plot
     files = [
         settings.base_dir+"/run",
-        path+"/scripts/non-public/LikelihoodHERA_h6cidr2_3/run",
-        path+"/scripts/non-public/LikelihoodHERA_h1cidr3/run",
+        path + "/scripts/non-public/LikelihoodHERA_h1cidr3/run",
+        #path+"/scripts/non-public/LikelihoodHERA_LikelihoodRadioBackground_LikelihoodXRB_LikelihoodSARAS3_h1cidr3_radio_xrb_saras3_3/run",
         ]
     paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "log10fradio"]
     basename = os.path.basename(settings.base_dir)
