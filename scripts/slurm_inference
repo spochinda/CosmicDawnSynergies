@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#! sbatch directives begin here ###############################
+#SBATCH -J inference2
+#SBATCH -A ACEDO-SL2-CPU
+#SBATCH -p icelake
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=38
+#SBATCH --cpus-per-task=1
+#SBATCH --time=11:50:00
+#SBATCH --output=%A_%a.out
+#SBATCH --error=%A_%a.err
+#SBATCH --mail-type=ALL
+
+#! Modify the environment seen by the application. For this example we need the default modules.
+. /etc/profile.d/modules.sh                # This line enables the module command
+module purge                               # Removes all modules still loaded
+module load rhel8/default-icl
+
+# Source venv
+source /home/sp2053/venvs/testenv/bin/activate
+
+echo "SLURM_NTASKS: $SLURM_NTASKS"
+
+mpirun -n $SLURM_NTASKS /home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/run_inference.py
