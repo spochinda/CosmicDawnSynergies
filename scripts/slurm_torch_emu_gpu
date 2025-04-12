@@ -17,7 +17,7 @@
 #!SBATCH --exclusive
 
 #! Estimated runtime: hh:mm:ss (job is force-stopped after if exceeded):
-#SBATCH --time=4:00:00
+#SBATCH --time=07:00:00
 
 #!SBATCH --dependency=afterany:60160100
 
@@ -41,10 +41,12 @@ source /home/sp2053/venvs/testenv/bin/activate
 
 echo "Running script"
 
-#!/home/sp2053/venvs/SR21cmtest/bin/python /home/sp2053/venvs/SR21cmtest/lib/python3.8/site-packages/SR21cm/train.py --channels=8 --nmodels=1 --id=11
-#!/home/sp2053/venvs/SR21cmtest/bin/python /home/sp2053/venvs/SR21cmtest/lib/python3.8/site-packages/SR21cm/train.py 
-/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py
+#!module load nsight/systems-2020.3.1
+#!nsys profile --trace=cuda,nvtx,cudnn --export=none 
+#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py
 
-#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/21cmGen/analysis/sampling_512.py
-#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/21cmGen/analysis/sampling_scales.py
-#!torchrun --standalone --nnodes=1 --nproc-per-node=$NUM_TRAINERS /home/sp2053/rds/hpc-work/21cmGAN/analysis/ddp_test.py
+#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py --emulator Delta21
+/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py --emulator Ts
+#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py --emulator Trad
+#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py --emulator T21
+#!/home/sp2053/venvs/testenv/bin/python /home/sp2053/rds/hpc-work/CosmicDawnSynergies/scripts/train_torch_emu.py --emulator TK
