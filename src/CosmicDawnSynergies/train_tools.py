@@ -290,7 +290,49 @@ class poweremu_torch(nn.Module):
                 break
                     
 
+    def predict(self, params, data_dims, **kwargs):
+        self.model.eval()
+        
+        ###### get input indices ######
+        emulator_indices = list(range(len(self.scale_opt)))
+        emulator_keys = list(self.scale_opt.keys())
+        data_dims_items = list(data_dims.items())
+        for key,value in data_dims_items:
+            if key in emulator_keys:
+                pass
+            elif f"log10{key}" in emulator_keys:
+                data_dims[f"log10{key}"] = np.log10(data_dims.pop(key))
+                key = f"log10{key}"
+            else:
+                assert False, f"{key} or log10{key} not found in emulator parameters."
+            index = emulator_keys.index(key)
+            emulator_indices.remove(index)
+        ###### determine tiling ######
+        tile = 1
+        for key,value in data_dims.items():
+            index = emulator_keys.index(key)
+            data_dims[key] = [index, value]
+            if hasattr(value, "__len__"):
+                tile = max(tile, len(value))
+        #####################################################
 
+        params_ = np.empty((tile, params.size + len(data_dims)))
+        for key,(index,value) in data_dims.items():
+            params_[:,index] = value
+        params_[:,emulator_indices] = params
+        params = params_
+        
+        with torch.no_grad():
+            params = self.scaler.transform(params, use_scale_opt=True)
+            params = torch.from_numpy(params).to(dtype=torch.float32)
+            pred = self.model(params)
+            pred = pred.detach().cpu().numpy()
+            if self.data_opt["data_log"]:
+                pred = 10**pred
+
+            #if self.convert_mK_to_K:
+            #    pred *= 1e-3
+        return data_dims, pred
 
 
     def save_network(self, path):
@@ -357,6 +399,7 @@ class poweremu_torch(nn.Module):
         except:
             self.data_opt = {}
         self.scale_opt = loaded_state['scale_opt']
+        self.scaler = Scaler(self.scale_opt)
         self.loss = loaded_state['loss']
         self.validation_loss = loaded_state['validation_loss']
         try:

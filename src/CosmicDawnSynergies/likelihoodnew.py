@@ -390,6 +390,34 @@ class LikelihoodHERA:
         std = std[mask]
         wfn = wfn[mask][:,mask]
         return k_mag, dsq, std, wfn
+    
+    def plot_data(self, axes, **kwargs):
+        xlabel = kwargs.get("xlabel", r"$k$ [$h$/Mpc]")
+        ylabel = kwargs.get("ylabel", r"$\Delta^2(k)$")
+        xmin = kwargs.get("xmin", None)
+        xmax = kwargs.get("xmax", None)
+        ymin = kwargs.get("ymin", None)
+        ymax = kwargs.get("ymax", None)
+        yscale = kwargs.get("yscale", None)
+        xscale = kwargs.get("xscale", None)
+
+        rows, cols = np.shape(axes)
+        axes_flattened = axes.flatten()
+        for i,band in enumerate(self.data.keys()):
+            data = self.data[band]
+            dsq = data["dsq"]
+            std = data["std"]
+            k_mag = data["k_mag"]
+            z = data["z"]
+            axes_flattened[i].errorbar(k_mag, dsq, yerr=std, fmt='o', label=f"z={z:.2f}")
+            axes_flattened[i].set_xscale(xscale)
+            axes_flattened[i].set_yscale(yscale)
+            axes_flattened[i].set_xlabel(xlabel)
+            axes_flattened[i].set_ylabel(ylabel)
+            axes_flattened[i].legend()
+        axes = axes_flattened.reshape((rows,cols))
+        return axes
+
 
 
 class LikelihoodSARAS3:
