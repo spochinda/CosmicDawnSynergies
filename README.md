@@ -68,3 +68,8 @@ More info will follow...
     ```bash
     pip install git+https://github.com/PolyChord/PolyChordLite@master
     ```
+
+## How to install pypolychord on Cosma
+module load intel_comp/2023.2.0
+module load gnu_comp/13.1.0
+module load openmpi/4.1.5 

@@ -13,19 +13,20 @@ from pypolychord.settings import PolyChordSettings
 from pypolychord.output import PolyChordOutput
 
 if __name__ == "__main__":
-    path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies"
+    #get file absolute path
+    path = os.path.dirname(os.path.abspath(__file__)).split("/scripts")[0]
     inference_dict = {
-        "inference_id": "_h6cidr2new",
+        "inference_id": "_Arad_h1cidr3",
         "polychord_settings": {
             "nlive": 10000,
             "read_resume": False,
-            "precision_criterion": 1.,
+            "precision_criterion": 0.001,
         },
         "LikelihoodModules": {
             "LikelihoodHERA": {
                 "likelihood_kwargs": {
-                    "files": glob.glob(path+"/data/observations_H6C_IDR2/all_baselines*.h5"),
-                    "emulator": path+"/data/trained_emulators_poweremu/dsq_emu.pth",
+                    "files": glob.glob(path+"/data/observations_H1C_IDR3/*.h5"), #[*glob.glob(path+"/data/observations_H6C_IDR2/all_baselines*.h5"), *glob.glob(path+"/data/observations_H1C_IDR3/*.h5")],
+                    "emulator": path+"/data/trained_emulators_poweremu/dsq_Arad_emu.pth",
                     "decimate_data": False,
                     },
                     },
@@ -91,11 +92,11 @@ if __name__ == "__main__":
 
     #triangle plot
     files = [
+        path + "/scripts/non-public/LikelihoodHERA_Arad_h1cidr3_h6cidr2/run",
+        path + "/scripts/non-public/LikelihoodHERA_Arad_h6cidr2/run",
         settings.base_dir+"/run",
-        path + "/scripts/non-public/LikelihoodHERA_h1cidr3/run",
-        #path+"/scripts/non-public/LikelihoodHERA_LikelihoodRadioBackground_LikelihoodXRB_LikelihoodSARAS3_h1cidr3_radio_xrb_saras3_3/run",
         ]
-    paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "log10fradio"]
+    paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "log10Arad"]
     basename = os.path.basename(settings.base_dir)
     image_dir = path+"/images/"
     plot_path = os.path.join(image_dir, basename) + f"_nlive_{settings.nlive}.png"

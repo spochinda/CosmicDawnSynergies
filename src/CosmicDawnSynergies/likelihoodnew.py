@@ -253,14 +253,17 @@ class LikelihoodHERA:
         self.files = files
         self.output_names = output_names
         self.nDerived = len(self.output_names)
-        self.scaler = Scaler(self.emulator.scale_opt)        
+        
+        if self.emulator is not None:
+            self.scaler = Scaler(self.emulator.scale_opt)
 
-        prior_keys = list(self.prior_dict.keys())
-        emulator_keys = list(self.emulator.scale_opt.keys())
-        self.prior_indices = []
-        for key in emulator_keys: #find non-data_dim indices of emulator_keys in prior_keys
-            if key not in data_dims:
-                self.prior_indices.append(prior_keys.index(key))
+        if self.prior_dict is not None:
+            prior_keys = list(self.prior_dict.keys())
+            emulator_keys = list(self.emulator.scale_opt.keys())
+            self.prior_indices = []
+            for key in emulator_keys: #find non-data_dim indices of emulator_keys in prior_keys
+                if key not in data_dims:
+                    self.prior_indices.append(prior_keys.index(key))
 
         self.extract_data()
 
@@ -361,8 +364,11 @@ class LikelihoodHERA:
                     wfn = wfn[mask][:,mask]
                 
                 #decimate around 2 sigma minimum
-                if self.decimate_data:
+                if "H1C_IDR3" in file: #self.decimate_data:
+                    print(f"Decimating data for z={z:.2f} in file {os.path.basename(file)}")
                     k_mag, dsq, std, wfn = self.decimate(k_mag, dsq, std, wfn)
+                else:
+                    print(f"Not decimating data for z={z:.2f} in file {os.path.basename(file)}")
 
                 self.data[i] = {"k_mag": k_mag, "dsq": dsq, "std": std, "wfn": wfn, "z": z, "file": fn}
                 i+=1
