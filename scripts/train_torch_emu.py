@@ -13,7 +13,7 @@ import argparse
 if __name__ == '__main__':
     path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/" # "/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/"
     parser = argparse.ArgumentParser(description="Train different emulators.")
-    parser.add_argument('--emulator', type=str, choices=['Delta21', 'XRB', 'T_today', 'T21', 'Ts', 'TK', 'Trad'], default='Ts', help="Choose which emulator to train.")
+    parser.add_argument('--emulator', type=str, choices=['Delta21', 'XRB', 'T_today', 'T21', 'Ts', 'TK', 'Trad', 'SDC3b'], default='SDC3b', help="Choose which emulator to train.")
     args = parser.parse_args()
 
     emulator_choice = args.emulator
@@ -23,59 +23,108 @@ if __name__ == '__main__':
     if emulator_choice == 'Delta21':
         #define network, optimizer, training, and data options
         little_h = 0.6704
-        network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        network_opt = {"MLP": {"in_dim": 11, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
-                            save_after_epochs=10, 
-                            save_model_path=path+"data/trained_emulators_poweremu/dsq_frad_Stefan_emu.pth",
+                            save_after_epochs=5, 
+                            save_model_path=path+"data/trained_emulators_poweremu/dsq_frad_emu.pth",
                             save_progress_plots_path=path+"images/",
                             terminate_time=3600*2,
-                            model_id=f"_{emulator_choice}",
+                            model_id=f"_{emulator_choice}_frad",
                             )
         data_opt = {"data_log": True,
                     "data_dims":[ 
-                        {"z": {"log": False, "lims": [6., 27.], "nsample": 40}},
-                        {"k": {"log": True, "lims": [3e-2/little_h, 0.99/little_h], "nsample": 40}}
+                        {"z": {"log": False, "lims": [6., 27.], "nsample": 20}},
+                        {"k": {"log": True, "lims": [3e-2/little_h, 0.99/little_h], "nsample": 20}}
                         ],
                     "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
                     "scale_method": {"tau": "normalize"},
+                    "offset": 1.
                     }
 
         #load data
-        #z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
+        z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
         #z_array = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_z_mat.mat')['z21cm'][0].astype(float)
-        z_array = np.arange(6, 51, 1, dtype=np.float32)
+        #z_array = np.arange(6, 51, 1, dtype=np.float32)
         #k_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat')['ks'][0]
-        #k_array = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_k_mat.mat')['ks'][0]
-        k_array = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/K_sims_fRad.mat')['Kout'][0]
+        k_array = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_k_mat.mat')['ks'][0]
+        #k_array = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/K_sims_fRad.mat')['Kout'][0]
         k_array = k_array / little_h
         
         data_opt["data_dims"][0]["z"]["values"] = z_array
         data_opt["data_dims"][1]["k"]["values"] = k_array
         
-        #target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat')['combined_Deltaks']
+        target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat')['combined_Deltaks']
         #target = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_Deltak_mat.mat')['combined_Deltaks']
-        target = np.real(loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/Pk_sims_fRad.mat')['PKout'])
+        #target = np.real(loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/Pk_sims_fRad.mat')['PKout'])
         #find simulations with nans and remove them
         nan_indices = np.argwhere(np.isnan(target))
         nan_indices = np.unique(nan_indices[:,0])
         print(f"Removing {len(nan_indices)} simulations from shape {target.shape}")
         target = np.delete(target, nan_indices, axis=0)
         
-        #parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
+        parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
         #parameters = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_parameters_mat.mat')['parameters']
-        parameters = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/PT_sims_fRad.mat')['PTout']
+        #parameters = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/PT_sims_fRad.mat')['PTout']
         parameters = np.delete(parameters, nan_indices, axis=0)
 
-        #parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
+        parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
         #parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'Arad', 'pop', 'feed', 'delay'])
-        parameters = pd.DataFrame(parameters, columns=['Rmfp', 'fstar', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio'])
+        #parameters = pd.DataFrame(parameters, columns=['Rmfp', 'fstar', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio'])
                 
         #discard irrelevant parameters, annd log-transform selected parameters
-        #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
         #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'Arad'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
-        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstar', 'Vc', 'fX', 'fradio'], discard_params=['zeta'], discrete_params=['alpha', 'nu_0'])
+        #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstar', 'Vc', 'fX', 'fradio'], discard_params=['zeta'], discrete_params=['alpha', 'nu_0'])
 
+    ############################################################## SDC3b emu ##############################################################
+    if emulator_choice == 'SDC3b':
+        #define network, optimizer, training, and data options
+        network_opt = {"MLP": {"in_dim": 4+3, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
+        train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
+                            save_after_epochs=10, 
+                            save_model_path=path+"data/trained_emulators_poweremu/powerspec3.pth",
+                            save_progress_plots_path=path+"images/",
+                            terminate_time=3600*3,
+                            model_id=f"_{emulator_choice}_3",
+                            )
+        data_opt = {"data_log": False,
+                    "data_dims":[ 
+                        {"z": {"log": False, "lims": [(1420/((196+181)/2)) - 1, (1420/((166+151)/2)) - 1], "nsample": 20}},
+                        {"kperp": {"log": True, "lims": [5e-02, 5e-01], "nsample": 20}},
+                        {"kpar": {"log": True, "lims": [5e-02, 5e-01], "nsample": 20}}
+                        ],
+                    "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
+                    "scale_method": {},
+                    "offset": 0.
+                    }
+
+        #load data
+        z_array = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/z_power_spectra.npy')
+        kperp_array = np.loadtxt('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/TestDataset/bins_kper.txt')
+        kpar_array = np.loadtxt('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/TestDataset/bins_kpar.txt')
+        
+        data_opt["data_dims"][0]["z"]["values"] = z_array
+        data_opt["data_dims"][1]["kperp"]["values"] = kperp_array
+        data_opt["data_dims"][2]["kpar"]["values"] = kpar_array
+
+        
+        target = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/power_spectra.npy')
+        #find simulations with nans and remove them
+        nan_indices = np.argwhere(np.isnan(target))
+        nan_indices = np.unique(nan_indices[:,0])
+        print(f"Removing {len(nan_indices)} simulations from shape {target.shape}")
+        target = np.delete(target, nan_indices, axis=0)
+        
+        parameters = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/parameters.npy')
+        parameters = np.delete(parameters, nan_indices, axis=0)
+
+        parameters = pd.DataFrame(parameters, columns=["zeta_eff", "zeta_exp", "rmfp", "Vc"])
+
+        #discard irrelevant parameters, annd log-transform selected parameters
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=[], discard_params=[], discrete_params=[])
+        
         ############################################################## XRB emu ##############################################################
     if emulator_choice == 'XRB':
         network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
@@ -178,14 +227,14 @@ if __name__ == '__main__':
 
     ############################################################## Ts emu ##############################################################
     if emulator_choice == 'Ts':
-        network_opt = {"MLP": {"in_dim": 9, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
-                            save_after_epochs=10, 
-                            save_model_path=path+"data/trained_emulators_poweremu/Ts_frad_Stefan_emu.pth",
+                            save_after_epochs=2, 
+                            save_model_path=path+"data/trained_emulators_poweremu/Ts_Arad_emu3.pth",
                             save_progress_plots_path=path+"images/",
                             terminate_time=3600*2,
-                            model_id=f"_{emulator_choice}",
+                            model_id=f"_{emulator_choice}_Arad",
                             )
         data_opt = {"data_log": True,
                     "data_dims":[ 
@@ -193,16 +242,17 @@ if __name__ == '__main__':
                         ],
                     "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
                     "scale_method": {"tau": "normalize"},
+                    "offset": 1.
                     }
         
         #z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
-        #z_array = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_z_mat.mat')['z21cm'][0].astype(float)
-        z_array = np.arange(6, 51, 1, dtype=np.float32)
+        z_array = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_z_mat.mat')['z21cm'][0].astype(float)
+        #z_array = np.arange(6, 51, 1, dtype=np.float32)
         data_opt["data_dims"][0]["z"]["values"] = z_array
 
         #target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Ts_mat.mat')['combined_Tss']
-        #target = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_Ts_mat.mat')['combined_Tss']
-        target = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/TS_sims_fRad.mat')['TSout']        
+        target = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_Ts_mat.mat')['combined_Tss']
+        #target = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/TS_sims_fRad.mat')['TSout']        
         #find simulations with nans and remove them
         nan_indices = np.argwhere(np.isnan(target))
         nan_indices = np.unique(nan_indices[:,0])
@@ -210,17 +260,16 @@ if __name__ == '__main__':
         target = np.delete(target, nan_indices, axis=0)
         
         #parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
-        #parameters = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_parameters_mat.mat')['parameters']
-        parameters = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/PT_sims_fRad.mat')['PTout']
+        parameters = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_parameters_mat.mat')['parameters']
+        #parameters = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/PT_sims_fRad.mat')['PTout']
         parameters = np.delete(parameters, nan_indices, axis=0)
-        
         #parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
-        #parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'Arad', 'pop', 'feed', 'delay'])
-        parameters = pd.DataFrame(parameters, columns=['Rmfp', 'fstar', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio'])
+        parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'Arad', 'pop', 'feed', 'delay'])
+        #parameters = pd.DataFrame(parameters, columns=['Rmfp', 'fstar', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio'])
 
         #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
-        #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'Arad'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
-        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstar', 'Vc', 'fX', 'fradio'], discard_params=['zeta'], discrete_params=['alpha', 'nu_0'])
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'Arad'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
+        #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstar', 'Vc', 'fX', 'fradio'], discard_params=['zeta'], discrete_params=['alpha', 'nu_0'])
         
 
     ############################################################## TK emu ##############################################################
@@ -269,14 +318,14 @@ if __name__ == '__main__':
 
     ############################################################## Trad emu ##############################################################
     if emulator_choice == 'Trad':
-        network_opt = {"MLP": {"in_dim": 9, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        network_opt = {"MLP": {"in_dim": 10, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
-                            save_after_epochs=50, 
-                            save_model_path=path+"data/trained_emulators_poweremu/Trad_frad_Stefan_emu.pth",
+                            save_after_epochs=5, 
+                            save_model_path=path+"data/trained_emulators_poweremu/Trad_frad_emu.pth",
                             save_progress_plots_path=path+"images/",
                             terminate_time=3600*2,
-                            model_id=f"_{emulator_choice}",
+                            model_id=f"_{emulator_choice}_frad",
                             )
         data_opt = {"data_log": True,
                     "data_dims":[ 
@@ -284,40 +333,46 @@ if __name__ == '__main__':
                         ],
                     "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
                     "scale_method": {"tau": "normalize"},
+                    "offset": 1.
                     }
         
-        #z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
+        z_array = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat')['z21cm'][0].astype(float)
         #z_array = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_z_mat.mat')['z21cm'][0].astype(float)
-        z_array = np.arange(6, 51, 1, dtype=np.float32)
+        #z_array = np.arange(6, 51, 1, dtype=np.float32)
         data_opt["data_dims"][0]["z"]["values"] = z_array
 
-        #target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_TradLOS_mat.mat')['combined_TradLOSs']
+        target = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_TradLOS_mat.mat')['combined_TradLOSs']
         #target = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_TradLOS_mat.mat')['combined_TradLOSs']
-        target = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/Trad_sims_fRad.mat')['Tradout']
+        #target = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/Trad_sims_fRad.mat')['Tradout']
         #find simulations with nans and remove them
         nan_indices = np.argwhere(np.isnan(target))
         nan_indices = np.unique(nan_indices[:,0])
         print(f"Removing {len(nan_indices)} simulations from shape {target.shape}")
         target = np.delete(target, nan_indices, axis=0)
 
-        #parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
+        parameters = loadmat(path+'data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat')['parameters']
         #parameters = loadmat(path+'data/models_21cmSim/HERA_Cosmic_String_Dataset/hera_parameters_mat.mat')['parameters']
-        parameters = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/PT_sims_fRad.mat')['PTout']
+        #parameters = loadmat('/home/sp2053/rds/rds-cosmicdawnruns2-PJtLerV8oy0/H1C_Stefan/Sims2021/PT_sims_fRad.mat')['PTout']
         parameters = np.delete(parameters, nan_indices, axis=0)
-        #parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
+        parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'])
         #parameters = pd.DataFrame(parameters, columns=['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'Arad', 'pop', 'feed', 'delay'])
-        parameters = pd.DataFrame(parameters, columns=['Rmfp', 'fstar', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio'])
+        #parameters = pd.DataFrame(parameters, columns=['Rmfp', 'fstar', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio'])
 
-        #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
         #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'Arad'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
-        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstar', 'Vc', 'fX', 'fradio'], discard_params=['zeta'], discrete_params=['alpha', 'nu_0'])
+        #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstar', 'Vc', 'fX', 'fradio'], discard_params=['zeta'], discrete_params=['alpha', 'nu_0'])
 
     ############################################################## EDIT ABOVE THIS LINE ##############################################################
 
     #randomly truncate zeros down to 3 orders of magnitude below minimum if data_log is True
     if data_opt["data_log"]:
-        minimum = target[target!=0].min()
-        target[target==0] = minimum * 10**np.random.uniform(-3, 0, target[target==0].shape)
+        if data_opt.get("offset", None) is not None:
+            print("Adding offset to target", flush=True)
+            target = target + data_opt["offset"]
+        else:
+            print("Randomly truncating zeros down to 3 orders of magnitude below minimum", flush=True)
+            minimum = target[target!=0].min()
+            target[target==0] = minimum * 10**np.random.uniform(-3, 0, target[target==0].shape)
 
     #Split data and parameters into training set and test set
     parameters_train, parameters_validation, target_train, target_validation = train_test_split(parameters, target, **data_opt["train_test_split_opt"])
@@ -346,7 +401,21 @@ if __name__ == '__main__':
     #shuffle
     parameters_validation, target_validation = shuffle_data(parameters_validation, target_validation)
     parameters_train, target_train = shuffle_data(parameters_train, target_train)
-    
+
+    #discard values below minimum
+    if data_opt.get("data_log", False) and data_opt.get("offset", None) is None:
+        minimum = np.log10(minimum)
+        
+        mask = target_train > minimum
+        print(f"Discarding {len(target_train) - mask.sum()} values from training set (Fraction of dataset discarded: {(len(target_train) - mask.sum())/len(target_train)}), new length: {mask.sum()}")
+        parameters_train = parameters_train[mask]
+        target_train = target_train[mask]
+        
+        mask = target_validation > minimum
+        print(f"Discarding {len(target_validation) - mask.sum()} values from validation set (Fraction of dataset discarded: {(len(target_validation) - mask.sum())/len(target_validation)}), new length: {mask.sum()}")
+        parameters_validation = parameters_validation[mask]
+        target_validation = target_validation[mask]
+
     #launch training process
     world_size = torch.cuda.device_count()
     multi_gpu = world_size > 1

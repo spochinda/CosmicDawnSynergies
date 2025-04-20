@@ -125,7 +125,7 @@ def ddp_setup(rank: int, world_size: int):
         print("Did not find master address variable. Setting manually...", flush=True)
         os.environ["MASTER_ADDR"] = "localhost"
 
-    os.environ["MASTER_PORT"] = "2595"#"12355" 
+    os.environ["MASTER_PORT"] = "2599"#"12355" 
     torch.cuda.set_device(rank)
     init_process_group(backend="nccl", rank=rank, world_size=world_size) #backend gloo for cpus? nccl for gpus
 
@@ -257,6 +257,7 @@ class poweremu_torch(nn.Module):
                                 axes.set_xlabel('Target')
                                 axes.set_ylabel('Frequency')
                                 axes.legend()
+                                axes.set_yscale('log')#'symlog', linthresh=1e-3)
                                 
                                 save_path = os.path.join(save_progress_plots_path, f"validation_progress_hist{model_id}.png")
                                 plt.savefig(save_path)
@@ -276,9 +277,9 @@ class poweremu_torch(nn.Module):
                         epoch_str = f"Epoch {e} | "
                         batch_str = f"Batch {i+1} out of {train_dataloader.__len__()} | "
                         time_str = f"Time: {time.time()-stime:.2f} | "
-                        train_str = f"Train: RMSE={_rmse:.2f} "
-                        q95_str = f"q95<={_q95:,.2f} | "
-                        validation_str = f"Validation: {_vrmse:,.2f} "
+                        train_str = f"Train: RMSE={_rmse:.4f} "
+                        q95_str = f"q95<={_q95:,.4f} | "
+                        validation_str = f"Validation: {_vrmse:,.4f} "
                         print(device_str + epoch_str + batch_str + time_str + train_str + q95_str + validation_str, flush=True)
                         if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
                     
