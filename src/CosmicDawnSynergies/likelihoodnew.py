@@ -8,8 +8,9 @@ import hera_pspec as hp
 
 import scipy.special as ssp
 import CosmicDawnSynergies.itamar.radio_cutoff_calc as rad
-from CosmicDawnSynergies.train_tools import Scaler
 from .emulator_poweremu import *
+from CosmicDawnSynergies.train_tools import Scaler, poweremu_torch
+
 
 #from tensorflow import keras
 #from globalemu.eval import evaluate
@@ -266,49 +267,133 @@ class LikelihoodHERA:
                     self.prior_indices.append(prior_keys.index(key))
 
         self.extract_data()
+        
+        
+        
+        
+
+
+        #self.redshifts = np.unique(np.array([self.data[i]["z"] for i in range(len(self.data))]))
+        self.redshifts = np.loadtxt("/cosma/apps/dp140/dc-poch1/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/data/redshifts.txt")
+        self.Trad_emu = poweremu_torch()
+        self.Trad_emu.load_network("/cosma/apps/dp140/dc-poch1/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/data/trained_emulators_poweremu/Trad_Arad_emu.pth")
+        self.scaler_Trad = Scaler(scale_opt=self.Trad_emu.scale_opt)
+        self.Ts_emu = poweremu_torch()
+        self.Ts_emu.load_network("/cosma/apps/dp140/dc-poch1/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/data/trained_emulators_poweremu/Ts_Arad_emu2.pth")
+        self.scaler_Ts = Scaler(scale_opt=self.Ts_emu.scale_opt)
+        
+        self.output_names = [f"log10Trad_z{z:.2f}" for z in self.redshifts] + [f"log10Ts_z{z:.2f}" for z in self.redshifts]
+        self.nDerived = len(self.output_names)
+    
+    @torch.no_grad()
+    def get_log10Trad_log10Ts(self, z, p):
+        try:
+            #z_Trad = self.scaler_Trad.normalize(z, mean=self.scaler_Trad.scale_opt["z"]["stats"]["mean"], std=self.scaler_Trad.scale_opt["z"]["stats"]["std"])
+            p_Trad = np.array([np.nan, *p])
+            p_Trad=np.tile(p_Trad, (len(z), 1))
+            p_Trad[:,0] = z
+            p_Trad = self.scaler_Trad.transform(p_Trad, use_scale_opt=True)
+            p_Trad = torch.from_numpy(p_Trad).to(dtype=torch.float32)
+            log10Trad = self.Trad_emu.model(p_Trad)
+            log10Trad = log10Trad.detach().cpu().numpy()
+            log10Trad = log10Trad#[0]
+            if self.Trad_emu.data_opt.get("data_log", False):
+                log10Trad = 10**log10Trad
+            if self.Trad_emu.data_opt.get("offset", False):
+                log10Trad = log10Trad - self.Trad_emu.data_opt["offset"]
+            if self.Trad_emu.data_opt.get("data_log", False):
+                log10Trad = np.log10(log10Trad)
+
+            
+            #z_Ts = self.scaler_Ts.normalize(z, mean=self.scaler_Ts.scale_opt["z"]["stats"]["mean"], std=self.scaler_Ts.scale_opt["z"]["stats"]["std"])
+            p_Ts = np.array([np.nan, *p])
+            p_Ts=np.tile(p_Ts, (len(z), 1))
+            p_Ts[:,0] = z
+            p_Ts = self.scaler_Ts.transform(p_Ts, use_scale_opt=True)
+            p_Ts = torch.from_numpy(p_Ts).to(dtype=torch.float32)
+            log10Ts = self.Ts_emu.model(p_Ts)
+            log10Ts = log10Ts.detach().cpu().numpy()
+            log10Ts = log10Ts#[0]
+            if self.Ts_emu.data_opt.get("data_log", False):
+                log10Ts = 10**log10Ts
+            if self.Ts_emu.data_opt.get("offset", False):
+                log10Ts = log10Ts - self.Ts_emu.data_opt["offset"]
+            if self.Ts_emu.data_opt.get("data_log", False):
+                log10Ts = np.log10(log10Ts)
+            
+
+            nDerived_params = [*log10Trad, *log10Ts]
+            
+            return nDerived_params
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, e, fname, exc_tb.tb_lineno)
 
 
     def computeLikelihood(self, params):
-        # Important: model must take k as h/cMpc!
-        params = np.array(params)
-        params = params[self.prior_indices]
+        try:
+            # Important: model must take k as h/cMpc!
+            params = np.array(params)
+            params = params[self.prior_indices]
 
-        logL = []
-        for i,band in enumerate(self.data.keys()):
-            dsq = self.data[band]["dsq"]
-            std = self.data[band]["std"]
-            wfn = self.data[band]["wfn"]
-            z = self.data[band]["z"]
-            k_mag = self.data[band]["k_mag"]
-            dsq_pred = self.predict(z, k_mag, params)
-            dsq_pred = wfn @ dsq_pred #theory=model for diag(wfn), @=matrix multiplication
-            assert np.shape(dsq_pred) == np.shape(dsq), "Shape mismatch"
-            r = dsq - dsq_pred
-            logL_ = np.sum(np.log(0.5 * (1 + ssp.erf(r / np.sqrt(2) / np.sqrt(std**2+(0.2*dsq_pred)**2)))))
-            logL.append(logL_)
-        logL = np.sum(logL)
-        logL = float(logL)
-        return logL, [logL,]
+            logL = []
+            for i,band in enumerate(self.data.keys()):
+                dsq = self.data[band]["dsq"]
+                std = self.data[band]["std"]
+                wfn = self.data[band]["wfn"]
+                z = self.data[band]["z"]
+                k_mag = self.data[band]["k_mag"]
+                dsq_pred = self.predict(z, k_mag, params)
+                dsq_pred = wfn @ dsq_pred #theory=model for diag(wfn), @=matrix multiplication
+                assert np.shape(dsq_pred) == np.shape(dsq), "Shape mismatch"
+                r = dsq - dsq_pred
+                logL_ = np.sum(np.log(0.5 * (1 + ssp.erf(r / np.sqrt(2) / np.sqrt(std**2+(0.2*dsq_pred)**2)))))
+                logL.append(logL_)
+            logL = np.sum(logL)
+            logL = float(logL)
+
+            
+            nDerived_params = self.get_log10Trad_log10Ts(z=self.redshifts, p=params)
+            return logL, [*nDerived_params]
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, e, fname, exc_tb.tb_lineno)
     
     def predict(self, z, karr, params):
-        dim_log_0 = self.emulator.data_opt["data_dims"][0]["z"]["log"]
-        dim_log_1 = self.emulator.data_opt["data_dims"][1]["k"]["log"]
-        data_log = self.emulator.data_opt["data_log"]
+        try:
+            dim_log_0 = self.emulator.data_opt["data_dims"][0]["z"]["log"]
+            dim_log_1 = self.emulator.data_opt["data_dims"][1]["k"]["log"]
+            data_log = self.emulator.data_opt["data_log"]
+            offset = self.emulator.data_opt.get("offset", False)
 
-        z = np.log10(z) if dim_log_0 else z
-        karr = np.log10(karr) if dim_log_1 else karr
+            z = np.log10(z) if dim_log_0 else z
+            karr = np.log10(karr) if dim_log_1 else karr
 
-        params = np.array([z, np.nan, *params])
-        params=np.tile(params, (len(karr), 1))
-        params[:,1] = karr
-        with torch.no_grad():
-            params = self.scaler.transform(params, use_scale_opt=True)
-            params = torch.from_numpy(params).to(dtype=torch.float32)
-            pred = self.emulator.model(params)
-            pred = pred.detach().cpu().numpy()
-            if data_log:
-                pred = 10**pred
-        return pred
+            params = np.array([z, np.nan, *params])
+            params=np.tile(params, (len(karr), 1))
+            params[:,1] = karr
+            with torch.no_grad():
+                params = self.scaler.transform(params, use_scale_opt=True)
+                params = torch.from_numpy(params).to(dtype=torch.float32)
+                pred = self.emulator.model(params)
+                pred = pred.detach().cpu().numpy()
+
+                if dim_log_1:
+                    karr = 10**karr
+                if data_log:
+                    pred = 10**pred
+                if offset:
+                    pred = pred - offset
+                
+                factor = 1. #karr**3/(2*np.pi**2)
+                pred =  factor * pred
+            return pred
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
         
     def extract_data(self, **kwargs):        
         if self.mask_to_emulator_range:
@@ -364,6 +449,7 @@ class LikelihoodHERA:
                     wfn = wfn[mask][:,mask]
                 
                 #decimate around 2 sigma minimum
+                print(file)
                 if "H1C_IDR3" in file: #self.decimate_data:
                     print(f"Decimating data for z={z:.2f} in file {os.path.basename(file)}")
                     k_mag, dsq, std, wfn = self.decimate(k_mag, dsq, std, wfn)

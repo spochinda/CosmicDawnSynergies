@@ -1,3 +1,5 @@
+import os
+import sys
 import numpy as np
 from CosmicDawnSynergies.train_tools import poweremu_torch, Scaler
 from pypolychord.priors import UniformPrior, LogUniformPrior
