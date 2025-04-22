@@ -73,6 +73,19 @@ def add_SARAS3_foreground_parameters(prior_dict, inference_dict):
         pass
     return prior_dict
 
+def add_SDC3b_noise(prior_dict, inference_dict):
+    if "LikelihoodSDC3b" in inference_dict["LikelihoodModules"].keys():
+        likelihood_kwargs = inference_dict["LikelihoodModules"]["LikelihoodSDC3b"]["likelihood_kwargs"]
+        has_noise = "noise" in likelihood_kwargs.keys()
+        if has_noise:
+            for noise, v in likelihood_kwargs["noise"].items():
+                prior_dict[noise] = v
+        else:
+            assert has_noise, "noise not found in SDC3b likelihood_kwargs"
+    else:
+        pass
+    return prior_dict
+
 def get_prior(inference_dict, prior_dict):
     LikelihoodModules = inference_dict["LikelihoodModules"]
     discrete_params = np.array([])

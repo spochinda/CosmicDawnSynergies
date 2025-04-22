@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import torch
 
 from scipy.io import loadmat
 from scipy.constants import parsec, physical_constants
@@ -8,7 +9,7 @@ import hera_pspec as hp
 
 import scipy.special as ssp
 import CosmicDawnSynergies.itamar.radio_cutoff_calc as rad
-from .emulator_poweremu import *
+#from .emulator_poweremu import *
 from CosmicDawnSynergies.train_tools import Scaler, poweremu_torch
 
 
@@ -736,8 +737,177 @@ class LikelihoodNeutralFraction:
 
 
 
+class LikelihoodSDC3b:
+    def __init__(self, 
+                 prior_dict,
+                 emulator,
+                 files,
+                 averaged_noise_files,
+                 noise,
+                 xHI_file = None,  
+                 data_dims = ["z", "kperp", "kpar"],
+                 output_names = [r"\log L_\mathrm{dsq}",],
+                 **kwargs
+                 ):
+        
+        self.emulator = emulator
+        self.prior_dict = prior_dict
+        self.files = files
+        self.averaged_noise_files = averaged_noise_files
+        self.xHI_file = xHI_file
+        self.output_names = output_names
+        self.nDerived = len(self.output_names)
+        if self.emulator is not None:
+            self.scaler = Scaler(self.emulator.scale_opt)
 
+        if self.prior_dict is not None:
+            prior_keys = list(self.prior_dict.keys())
+            emulator_keys = list(self.emulator.scale_opt.keys())
+            self.astro_indices = []
+            self.emulator_indices = []
+            self.data_dims_indices = []
+            for i,key in enumerate(emulator_keys): #find non-data_dim indices of emulator_keys in prior_keys
+                if key in prior_keys:
+                    self.astro_indices.append(prior_keys.index(key))
+                    self.emulator_indices.append(i)
+                else:
+                    self.data_dims_indices.append(i)
+            
+            self.noise_indices = [prior_keys.index(name) for name in noise]
+        
+        self.extract_data()
 
+        if self.xHI_file is not None:
+            self.xHI_emulator = poweremu_torch()
+            self.xHI_emulator.load_network(xHI_file)
+            self.xHI_scaler = Scaler(scale_opt=self.xHI_emulator.scale_opt)
+            self.z_xHI = np.array([(1420/((196.+181.)/2))-1, (1420/((181.+166.)/2))-1, (1420/((166.+151.)/2))-1])
+            self.output_names = [f"xHI_z{z:.2f}" for z in self.z_xHI]
+            self.nDerived = len(self.output_names)
 
+            self.xHI_astro_indices = []
+            emulator_keys = list(self.xHI_emulator.scale_opt.keys())
+            for i,key in enumerate(emulator_keys):
+                if key in prior_keys:
+                    self.xHI_astro_indices.append(prior_keys.index(key))
 
+    
+    def predict_xHI(self, params):
+        z = np.log10(self.z_xHI) if self.xHI_emulator.data_opt["data_dims"][0]["z"]["log"] else self.z_xHI
+        params = np.array([np.nan, *params])
+        params = np.tile(params, (len(z), 1))
+        params[:,0] = z
+        with torch.no_grad():
+            params = self.xHI_scaler.transform(params, use_scale_opt=True)
+            params = torch.from_numpy(params).to(dtype=torch.float32)
+            pred = self.xHI_emulator.model(params)
+            pred = pred.detach().cpu().numpy()
+            if self.xHI_emulator.data_opt["data_log"]:
+                pred = 10**pred
+        return pred.tolist()
+
+    def computeLikelihood(self, params):
+        params = np.array(params)
+
+        std = 10**params[self.noise_indices]
+
+        logL = 0
+        for i in range(len(self.files)):
+            for j in range(len(self.files[i])):
+                Pk = self.data[f"PS{i+1}"].get(f"Pk{j}", None)
+                z = self.data[f"PS{i+1}"][f"z{j}"]
+                pred = self.predict(params[self.astro_indices], z)
+                residual = Pk - pred
+
+                logL += (
+                    -0.5*np.log(2*np.pi*(std**2+(0.10*pred)**2)) 
+                    - 0.5 * (residual)**2
+                    /(std**2+(0.10*pred)**2)
+                    ).sum()
+        logL = float(logL)
+        
+        if self.xHI_file is not None:
+            nDerived = self.predict_xHI(params[self.xHI_astro_indices]) # xHI
+        else:
+            nDerived = [logL,]
+
+        return logL, nDerived
+    
+    def predict(self, params, z):
+        is_log_z = self.emulator.data_opt["data_dims"][0]["z"]["log"]
+        is_log_kperp = self.emulator.data_opt["data_dims"][1]["kperp"]["log"]
+        is_log_kpar = self.emulator.data_opt["data_dims"][2]["kpar"]["log"]
+        data_log = self.emulator.data_opt["data_log"]
+
+        kcoord = self.data["kcoord"]
+        kperp = kcoord[:,0]
+        kpar = kcoord[:,1]
+        
+        z = np.log10(z) if is_log_z else z
+        kperp = np.log10(kperp) if is_log_kperp else kperp
+        kpar = np.log10(kpar) if is_log_kpar else kpar
+
+        #params_xHI = np.array([z, np.nan, np.nan, *params])
+        params = np.array([z, np.nan, np.nan, *params])
+        params=np.tile(params, (len(kperp), 1))
+        params[:,1] = kperp
+        params[:,2] = kpar
+        with torch.no_grad():
+            params = self.scaler.transform(params, use_scale_opt=True)
+            params = torch.from_numpy(params).to(dtype=torch.float32)
+            pred = self.emulator.model(params)
+            pred = pred.detach().cpu().numpy()
+            if data_log:
+                pred = 10**pred
+        #if self.xHI_file
+        return pred
+        
+    def extract_data(self, **kwargs):
+        self.data = dict()
+        for i,PS in enumerate(self.files):
+            self.data[f"PS{i+1}"] = {}
+            for j,(file,avg_noise_file) in enumerate(zip(PS, self.averaged_noise_files)):
+                f2,f1 = os.path.basename(os.path.splitext(file)[0]).split("Pk_PS")[-1][2:].split("_")
+                f2, f1 = float(f2), float(f1)
+                f = (f2 + f1) / 2
+                z = (1420/f) - 1
+                averaged_noise = np.loadtxt(avg_noise_file)
+                self.data[f"PS{i+1}"][f"z{j}"] = z
+                self.data[f"PS{i+1}"][f"Pk{j}"] = np.loadtxt(file)
+                self.data[f"PS{i+1}"][f"Pk{j}"] -= averaged_noise
+                self.data[f"PS{i+1}"][f"Pk{j}"] = self.data[f"PS{i+1}"][f"Pk{j}"].reshape(-1)
+        self.data["kperp"] = np.loadtxt("/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/PS1_PS2_Data/bins_kper.txt")
+        self.data["kpar"] = np.loadtxt("/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/PS1_PS2_Data/bins_kpar.txt")
+        self.data["kcoord"] = np.array(np.meshgrid(self.data["kperp"], self.data["kpar"]))
+        self.data["kcoord"] = self.data["kcoord"].reshape(2, -1).T
+
+    
+if __name__ == "__main__":
+    #try LikelihoodSDC3b
+    import os
+    data_path = "/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/PS1_PS2_Data/"
+    likelihood_kwargs = {
+        "files": [[os.path.join(data_path, "Pk_PS1_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS1_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS1_151.0_165.9.txt")],
+                    [os.path.join(data_path, "Pk_PS2_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS2_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS2_151.0_165.9.txt")]],
+        "averaged_noise_files": [os.path.join(data_path, "Pk_PS_averaged_noise_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS_averaged_noise_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS_averaged_noise_151.0_165.9.txt")],
+        "emulator": None,#"/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/trained_emulators_poweremu/powerspec3.pth",
+        "data_dims": ["z", "kperp", "kpar"],
+        "noise": {"noise": [0.01, 0.02]},
+        }
+
+    likesdc3b = LikelihoodSDC3b(prior_dict=None, **likelihood_kwargs)
+    print(f"likesdc3b data: {likesdc3b.data}, keys {likesdc3b.data.keys()}")
+    #meshgrid of self.data["kperp"] and self.data["kpar"] with shape (2,kperp.size,kpar.size)
+    kperp = likesdc3b.data["kperp"]
+    kpar = likesdc3b.data["kpar"]
+    grid = np.array(np.meshgrid(kperp, kpar))
+    print(f"grid shape: {grid.shape}")
+    grid = grid.reshape(2, -1).T
+    print(f"grid shape: {grid.shape}")
+    Pk = likesdc3b.data["PS1"]["Pk1"]
+    for k,v in likesdc3b.data["PS1"].items():
+        try:
+            print(f"{k}: {v.shape}, min: {v.min()}, max: {v.max()}")
+        except:
+            pass
 

@@ -13,7 +13,7 @@ import argparse
 if __name__ == '__main__':
     path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/" # "/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/"
     parser = argparse.ArgumentParser(description="Train different emulators.")
-    parser.add_argument('--emulator', type=str, choices=['Delta21', 'XRB', 'T_today', 'T21', 'Ts', 'TK', 'Trad', 'SDC3b'], default='SDC3b', help="Choose which emulator to train.")
+    parser.add_argument('--emulator', type=str, choices=['Delta21', 'XRB', 'T_today', 'T21', 'Ts', 'TK', 'Trad', 'SDC3b_Pk', 'SDC3b_xHI'], default='SDC3b_xHI', help="Choose which emulator to train.")
     args = parser.parse_args()
 
     emulator_choice = args.emulator
@@ -77,8 +77,8 @@ if __name__ == '__main__':
         #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstarII', 'fstarIII', 'Vc', 'fX', 'Arad'], discard_params=['zeta', 'feed', 'delay'], discrete_params=['alpha', 'nu_0', 'pop'])
         #parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=['fstar', 'Vc', 'fX', 'fradio'], discard_params=['zeta'], discrete_params=['alpha', 'nu_0'])
 
-    ############################################################## SDC3b emu ##############################################################
-    if emulator_choice == 'SDC3b':
+    ############################################################## SDC3b_Pk ##############################################################
+    if emulator_choice == 'SDC3b_Pk':
         #define network, optimizer, training, and data options
         network_opt = {"MLP": {"in_dim": 4+3, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
@@ -111,6 +111,48 @@ if __name__ == '__main__':
 
         
         target = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/power_spectra.npy')
+        #find simulations with nans and remove them
+        nan_indices = np.argwhere(np.isnan(target))
+        nan_indices = np.unique(nan_indices[:,0])
+        print(f"Removing {len(nan_indices)} simulations from shape {target.shape}")
+        target = np.delete(target, nan_indices, axis=0)
+        
+        parameters = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/parameters.npy')
+        parameters = np.delete(parameters, nan_indices, axis=0)
+
+        parameters = pd.DataFrame(parameters, columns=["zeta_eff", "zeta_exp", "rmfp", "Vc"])
+
+        #discard irrelevant parameters, annd log-transform selected parameters
+        parameters, data_opt = prepare_parameters(parameters, data_opt, transform_params=[], discard_params=[], discrete_params=[])
+
+    ############################################################## SDC3b_xHI ##############################################################
+    if emulator_choice == 'SDC3b_xHI':
+        #define network, optimizer, training, and data options
+        network_opt = {"MLP": {"in_dim": 4+1, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
+        optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
+        train_opt = dict(epochs=10000, batch_size=10000, profiling=False, loss_fn="MSELoss", 
+                            save_after_epochs=40, 
+                            save_model_path=path+"data/trained_emulators_poweremu/SDC3b_xHI_emu.pth",
+                            save_progress_plots_path=path+"images/",
+                            terminate_time=3600*2,
+                            model_id=f"_{emulator_choice}",
+                            )
+        data_opt = {"data_log": False,
+                    "data_dims":[ 
+                        {"z": {"log": False, "lims": [6.1036, 8.726], "nsample": 2000}},
+                        ],
+                    "train_test_split_opt": {"test_size": 0.2, "train_size": 0.8, "random_state": 42},
+                    "scale_method": {},
+                    "offset": 0.
+                    }
+
+        #load data
+        z_array = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/z_xHI.npy')
+        
+        data_opt["data_dims"][0]["z"]["values"] = z_array
+
+        target = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/averaged_xHI.npy')
+        
         #find simulations with nans and remove them
         nan_indices = np.argwhere(np.isnan(target))
         nan_indices = np.unique(nan_indices[:,0])

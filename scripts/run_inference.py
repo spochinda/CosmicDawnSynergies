@@ -6,7 +6,7 @@ import glob
 import numpy as np
 import CosmicDawnSynergies.likelihoodnew as like
 #import CosmicDawnSynergies.likelihood_hera as like_hera
-from CosmicDawnSynergies.inference import prepare_prior_dict, add_SARAS3_foreground_parameters, initialize_emulators, get_prior, get_loglikelihood, dumper
+from CosmicDawnSynergies.inference import prepare_prior_dict, add_SARAS3_foreground_parameters, add_SDC3b_noise, initialize_emulators, get_prior, get_loglikelihood, dumper
 from CosmicDawnSynergies.plotting import triangle_plot
 from pypolychord import run_polychord
 from pypolychord.settings import PolyChordSettings
@@ -15,20 +15,32 @@ from pypolychord.output import PolyChordOutput
 if __name__ == "__main__":
     #get file absolute path
     path = os.path.dirname(os.path.abspath(__file__)).split("/scripts")[0]
+    data_path = "/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/PS1_PS2_Data/"
     inference_dict = {
-        "inference_id": "_final_Arad_h1cidr3_h6cidr2",
+        "inference_id": "_SDC3b_2",
         "polychord_settings": {
-            "nlive": 10000,
+            "nlive": 1000,
             "read_resume": False,
-            "precision_criterion": 0.0001,
+            "precision_criterion": 1.,
         },
         "LikelihoodModules": {
-            "LikelihoodHERA": {
+            #"LikelihoodHERA": {
+            #    "likelihood_kwargs": {
+            #        "files": [*glob.glob(path+"/data/observations_H6C_IDR2/all_baselines*.h5"), *glob.glob(path+"/data/observations_H1C_IDR3/*.h5")],
+            #        "emulator": path+"/data/trained_emulators_poweremu/dsq_Arad_emu.pth",
+            #        "decimate_data": False,
+            #        },
+            #        },
+            "LikelihoodSDC3b": {
                 "likelihood_kwargs": {
-                    "files": [*glob.glob(path+"/data/observations_H6C_IDR2/all_baselines*.h5"), *glob.glob(path+"/data/observations_H1C_IDR3/*.h5")],
-                    "emulator": path+"/data/trained_emulators_poweremu/dsq_Arad_emu.pth",
-                    "decimate_data": False,
-                    },
+                    "files": [[os.path.join(data_path, "Pk_PS1_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS1_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS1_151.0_165.9.txt")],
+                              [os.path.join(data_path, "Pk_PS2_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS2_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS2_151.0_165.9.txt")]],
+                    "averaged_noise_files": [os.path.join(data_path, "Pk_PS_averaged_noise_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS_averaged_noise_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS_averaged_noise_151.0_165.9.txt")],
+                    "emulator": "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/trained_emulators_poweremu/powerspec3.pth",
+                    "xHI_file": "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/trained_emulators_poweremu/SDC3b_xHI_emu.pth", 
+                    "data_dims": ["z", "kperp", "kpar"],
+                    "noise": {"noise": [-6., -0.5]},
+                    }
                     },
             #"LikelihoodRadioBackground": {
             #    "likelihood_kwargs": {
@@ -83,6 +95,7 @@ if __name__ == "__main__":
     #        print(f"Key {key} not found in prior_dict")
 
     prior_dict = add_SARAS3_foreground_parameters(prior_dict, inference_dict) #add SARAS3 foreground parameters if SARAS3 likelihood is present otherwise does nothing
+    prior_dict = add_SDC3b_noise(prior_dict, inference_dict) #add SDC3b noise if SDC3b likelihood is present otherwise does nothing
     prior = get_prior(inference_dict, prior_dict)
     
     LikelihoodModules = [getattr(like, key)(prior_dict, **inference_dict["LikelihoodModules"][key]["likelihood_kwargs"]) for key in inference_dict["LikelihoodModules"].keys()]
@@ -94,7 +107,7 @@ if __name__ == "__main__":
     settings = PolyChordSettings(nDims=nDims, nDerived=nDerived, **inference_dict["polychord_settings"])
     settings.base_dir = path+"/scripts/non-public/"+"_".join( list(inference_dict["LikelihoodModules"].keys()) ) + inference_dict["inference_id"]
     settings.file_root = 'run'
-    
+
     polychordnames = list(prior_dict.keys())
     derivednames = []
     for likelihood in LikelihoodModules:
@@ -112,8 +125,9 @@ if __name__ == "__main__":
         #path + "/scripts/non-public/LikelihoodHERA_Arad_h6cidr2/run",
         settings.base_dir+"/run",
         ]
-    paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "log10Arad"]
+    #paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "log10Arad"]
     #paramNames = ["log10fstar", "log10Vc", "log10fX", "tau", "log10fradio"]    
+    paramNames =["zeta_eff", "zeta_exp", "rmfp", "Vc"]
     basename = os.path.basename(settings.base_dir)
     image_dir = path+"/images/"
     plot_path = os.path.join(image_dir, basename) + f"_nlive_{settings.nlive}.png"
