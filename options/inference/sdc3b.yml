@@ -1,0 +1,32 @@
+inference_id: demo_SDC3b_PS1_minmax
+num_gpu: 0
+polychord_settings:
+  nlive: 250
+  read_resume: !!bool false
+  precision_criterion: !!float 1
+
+LikelihoodModules:
+  LikelihoodSDC3b:
+    likelihood_kwargs:
+      files: 
+        - - data/SDC3b/Pk_PS1_181.0_195.9.txt
+          - data/SDC3b/Pk_PS_averaged_noise_181.0_195.9.txt
+          - !!float 181.0
+          - !!float 195.9
+        - - data/SDC3b/Pk_PS1_166.0_180.9.txt
+          - data/SDC3b/Pk_PS_averaged_noise_166.0_180.9.txt
+          - !!float 166.0
+          - !!float 180.9
+        - - data/SDC3b/Pk_PS1_151.0_165.9.txt
+          - data/SDC3b/Pk_PS_averaged_noise_151.0_165.9.txt
+          - !!float 151.0
+          - !!float 165.9
+      kperp_file: data/SDC3b/bins_kper.txt
+      kpar_file: data/SDC3b/bins_kpar.txt
+      emulator: trained_emulators/demo_Pk_SDC3b_minmax_emulator/models/net_g_10000.pth
+      emulator_xHI: trained_emulators/demo_xHI_SDC3b_minmax/models/net_g_9000.pth
+      in_dim: 7 #kper, kpar, z, zeta_eff, zeta_exp, rmfp, Vc
+      lognoise: 
+        -  !!float -6
+        -  !!float -0.5
+

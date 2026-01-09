@@ -1,0 +1,13 @@
+inference_id: SDC3b_PS2_minmax
+num_gpu: 0
+polychord_settings:
+  nlive: 250
+  read_resume: !!bool false
+  precision_criterion: !!float 1
+
+LikelihoodModules:
+  #LikelihoodPowerSpectrum:
+  #  likelihood_kwargs:
+  #    files: ["path/data/observations_LOFAR/lofar_limits_Acharya_hpc.npy"]
+  #    emulator: "path/data/trained_emulators_poweremu/dsq_emu.pth"
+  #    data_dims: ["z", "log10k"]

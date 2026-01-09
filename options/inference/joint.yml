@@ -1,0 +1,45 @@
+inference_id: joint
+num_gpu: 0
+polychord_settings:
+  nlive: 100
+  read_resume: !!bool false
+  precision_criterion: !!float 1
+
+LikelihoodModules:
+  LikelihoodHERA:
+    likelihood_kwargs:
+      files:
+        # - "data/observations_H6C_IDR2/all_baselines*.h5"
+        # - data/observations_H6C_IDR2/deltasq-1d-uvp/all_baselines_interleaved_IDR2.3_500ns_14band.deltasq.1d.spw01.h5
+        # - data/observations_H6C_IDR2/deltasq-1d-uvp/all_baselines_interleaved_IDR2.3_500ns_14band.deltasq.1d.spw08.h5
+        - data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5
+        - data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5
+      emulator: trained_emulators/Delta21_emulator/models/net_g_10000.pth
+      in_dim: 11
+      decimate_data: false
+
+  LikelihoodRadioBackground:
+    likelihood_kwargs:
+      files: data/LWA1_ARCADE2/LWA1_with_err.npy
+      emulator: trained_emulators/T_today_emulator/models/net_g_10000.pth
+      in_dim: 10
+
+  LikelihoodXRB:
+    likelihood_kwargs:
+      emulator: trained_emulators/Xray_emulator/models/net_g_10000.pth
+      in_dim: 10
+
+  LikelihoodSARAS3:
+    likelihood_kwargs:
+      files: data/SARAS3/SARAS_3_averaged_spectrum.txt
+      emulator: trained_emulators/T21_emulator/models/net_g_10000.pth
+      in_dim: 10
+      poly_coeff:
+        fg_a0: [3,4] #[-10.0, 10.0]
+        fg_a1: [-1,1] #[-10.0, 10.0]
+        fg_a2: [-0.1,0.1] #[-10.0, 10.0]
+        fg_a3: [-0.1,0.1] #[-10.0, 10.0]
+        fg_a4: [-0.1,0.1] #[-10.0, 10.0]
+        fg_a5: [-0.1,0.1] #[-10.0, 10.0]
+        fg_a6: [-0.1,0.1] #[-10.0, 10.0]
+      lognoise: [-2, 0]

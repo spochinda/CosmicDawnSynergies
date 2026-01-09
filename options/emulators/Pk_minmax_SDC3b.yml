@@ -1,0 +1,79 @@
+# Delta21 Power Spectrum Emulator Configuration
+# Converted from train_torch_emu.py Delta21 settings
+
+# general settings
+name: Pk_SDC3b_minmax_emulator
+num_gpu: auto  # automatic GPU detection
+manual_seed: !!int 10
+
+# network architecture
+network_opt:
+  hidden_dim: !!int 100
+  n_hidden: !!int 6
+  out_dim: !!int 1
+  activation: ReLU
+
+
+# training settings
+train:
+  total_iter: !!int 100000
+  ema_decay: !!float 0.999
+  optimizer_opt:
+    type: AdamW
+    lr: !!float 0.001
+    weight_decay: !!float 0.0001
+  scheduler:
+    type: MultiStepLR
+    milestones: [30000, 60000]
+    gamma: !!float 0.5
+
+# dataset options
+dataset:
+  type: BaseDataset
+  batch_size_per_gpu: !!int 20000
+  num_worker_per_gpu: !!int 4
+  params_opt:
+    file: data/SDC3b/parameters_old.npy
+    key: parameters
+    names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
+    log: []
+    discard: []
+    normalization: norm_minmax
+  targets_opt:
+    file: data/SDC3b/power_spectra_old.npy
+    offset: !!float 0.0
+    log: !!bool false
+  data_dims:
+    z:
+      file: data/SDC3b/z_power_spectra.npy
+      log: !!bool false
+      lims_nsample: [6.4, 10, 20]
+    kperp:
+      file: data/SDC3b/bins_kper.txt
+      log: !!bool false
+      lims_nsample: [!!float 5e-2, !!float 5e-1, 20]
+    kpar:
+      file: data/SDC3b/bins_kpar.txt
+      log: !!bool false
+      lims_nsample: [!!float 5e-2, !!float 5e-1, 20]
+
+path:
+  pretrain_network_g: ~
+  strict_load_g: true
+  resume_state: ~
+
+# validation settings
+val:
+  val_freq: !!float 1000
+
+logger:
+  print_freq: !!int 200
+  save_checkpoint_freq: !!float 1000
+  use_tb_logger: !!bool true
+  wandb:
+    project: ~
+    resume_id: ~
+
+dist_params:
+  backend: nccl
+  port: !!int 29500

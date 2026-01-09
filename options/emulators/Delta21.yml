@@ -1,0 +1,82 @@
+# Delta21 Power Spectrum Emulator Configuration
+# Converted from train_torch_emu.py Delta21 settings
+
+# general settings
+name: Delta21_emulator
+num_gpu: auto  # automatic GPU detection
+manual_seed: !!int 10
+
+# network architecture
+network_opt:
+  hidden_dim: !!int 100
+  n_hidden: !!int 6
+  out_dim: !!int 1
+  activation: ReLU
+
+
+# training settings
+train:
+  total_iter: !!int 10000
+  ema_decay: !!float 0.999
+  optimizer_opt:
+    type: AdamW
+    lr: !!float 0.001
+    weight_decay: !!float 0.0001
+  scheduler:
+    type: MultiStepLR
+    milestones: [5000, 7500]
+    gamma: !!float 0.5
+  
+# dataset options
+dataset:
+  type: BaseDataset
+  batch_size_per_gpu: !!int 20000
+  num_worker_per_gpu: !!int 4
+  params_opt:
+    file: data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat
+    key: parameters
+    names: ['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay']
+    log: ['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio']
+    discard: ['zeta', 'feed', 'delay']
+    normalization: norm_minmax
+  targets_opt:
+    file: data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat
+    key: combined_Deltaks
+    offset: !!float 1e-6
+    log: !!bool true
+  data_dims:
+    z:
+      file: data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat
+      key: z21cm
+      log: !!bool false
+      lims_nsample: [6, 27, 20]
+    k:
+      file: data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat
+      key: ks
+      log: !!bool true
+      lims_nsample: [0.1, 0.99, 20]
+      transform: transform_dim_little_h
+      transform_kwargs:
+        little_h: !!float 0.674
+
+path:
+  pretrain_network_g: ~
+  strict_load_g: true
+  resume_state: ~
+
+# validation settings
+val:
+  val_freq: !!float 400
+
+logger:
+  print_freq: !!int 200
+  save_checkpoint_freq: !!float 400
+  use_tb_logger: !!bool true
+  wandb:
+    project: ~
+    resume_id: ~
+
+dist_params:
+  backend: nccl
+  port: !!int 29500
+

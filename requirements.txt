@@ -1,0 +1,20 @@
+#git+https://github.com/HERA-Team/hera_pspec
+#Note on hera_pspec: a) you need the wf_delay branch, and b) remove hera_cal from dependencies and install manually hera-pspec-0.3.1.dev346+g5c394f9
+git+https://github.com/HERA-Team/hera_cal
+git+https://github.com/nkern/simpleQE
+git+https://github.com/williamjameshandley/anesthetic
+git+https://github.com/williamjameshandley/fgivenx
+git+https://github.com/PolyChord/PolyChordLite
+git+https://github.com/htjb/margarine
+numpy
+matplotlib
+pandas
+scikit-learn
+fastkde
+#torch
+#tqdm
+#astropy
+#tf-keras
+#globalemu
+#seaborn
+
