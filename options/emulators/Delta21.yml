@@ -6,6 +6,7 @@ name: Delta21_emulator
 num_gpu: auto  # automatic GPU detection
 manual_seed: !!int 10
 
+model_type: MLPModel
 # network architecture
 network_opt:
   hidden_dim: !!int 100

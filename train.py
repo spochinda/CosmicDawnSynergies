@@ -12,7 +12,7 @@ from src.CosmicDawnSynergies.dataset import BaseDataset
 from basicsr.utils import (AvgTimer, MessageLogger, check_resume, get_root_logger,
                            init_tb_logger, init_wandb_logger, scandir)
 from src.CosmicDawnSynergies.utils import parse_emu_options, copy_file, dict2str, make_emu_dirs, mkdir_and_rename, get_time_str
-from src.CosmicDawnSynergies.model import MLPModel
+import src.CosmicDawnSynergies.model as models
 
 
 def init_tb_loggers(opt):
@@ -198,7 +198,7 @@ def train_pipeline(root_path):
 
     # create model
     opt['network_opt']['in_dim'] = train_loader.dataset.params.shape[1]
-    model = MLPModel(opt)
+    model = getattr(models, opt['model_type'])(opt)
 
     # Store normalization stats in model if available (before resume, in case resume overwrites)
     if param_stats is not None:
