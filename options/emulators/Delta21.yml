@@ -50,12 +50,12 @@ dataset:
       file: data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat
       key: z21cm
       log: !!bool false
-      lims_nsample: [6, 27, 20]
+      lims_nsample: [6, 27, 0]
     k:
       file: data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat
       key: ks
       log: !!bool true
-      lims_nsample: [0.1, 0.99, 20]
+      lims_nsample: [0.1, 0.99, 0]
       transform: transform_dim_little_h
       transform_kwargs:
         little_h: !!float 0.674

@@ -186,32 +186,102 @@ def gen_training_data(params, targets, data_dims, n_jobs=-1, verbose=False, **kw
     params_columns = list(params.columns)
     params = params.to_numpy()
 
-    data_dims_columns = []
-    data_dims_ = []
-    lims_nsample = []
-    for key in data_dims.keys():
-        if data_dims[key]["log"]:
-            data_dims[key]["lims_nsample"][0] = np.log10(data_dims[key]["values"]).min() #np.log10(data_dims[key]["lims_nsample"][0])
-            data_dims[key]["lims_nsample"][1] = np.log10(data_dims[key]["values"]).max() #np.log10(data_dims[key]["lims_nsample"][1])
-            lims_nsample.append(data_dims[key]["lims_nsample"])
-            data_dims_columns.append(f"log10{key}")
-            data_dims_.append(np.log10(data_dims[key]["values"]))
-        else:
-            data_dims[key]["lims_nsample"][0] = data_dims[key]["values"].min() #np.log10(data_dims[key]["lims_nsample"][0])
-            data_dims[key]["lims_nsample"][1] = data_dims[key]["values"].max() #np.log10(data_dims[key]["lims_nsample"][1])
-            lims_nsample.append(data_dims[key]["lims_nsample"])
-            data_dims_columns.append(key)
-            data_dims_.append(data_dims[key]["values"])
+    if np.all([data_dims[k]['lims_nsample'][2] >= 1 for k in data_dims]):
+        data_dims_columns = []
+        data_dims_ = []
+        lims_nsample = []
+        for key in data_dims.keys():
+            values = data_dims[key]["values"]
+            lim_min = data_dims[key]["lims_nsample"][0]
+            lim_max = data_dims[key]["lims_nsample"][1]
 
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(random_grid_interpolation)(params=p, data_dims=data_dims_, data=data_i, lims_nsample=lims_nsample)
-        for p, data_i in tqdm(zip(params, targets), total=len(params), desc="Interpolating", disable=not verbose)
-    )
+            # Validate that lims_nsample is within the data dimension bounds
+            if lim_min >= values.min() or np.isnan(lim_min):
+                print(f"lims_nsample lower bound ({lim_min}) for '{key}' is below "
+                f"data minimum ({values.min()}) or it is nan. Using data minimum instead.")
+                lim_min = values.min()
+            if lim_max <= values.max() or np.isnan(lim_max):
+                print(f"lims_nsample upper bound ({lim_max}) for '{key}' is above "
+                f"data maximum ({values.max()}) or it is nan. Using data maximum instead.")
+                lim_max = values.max()
 
-    params, targets = zip(*results)
-    params = np.vstack(params)
-    targets = np.hstack(targets)
+            if data_dims[key]["log"]:
+                # Use the prior limits from lims_nsample, applying log transform
+                lims_nsample.append([
+                    np.log10(lim_min),
+                    np.log10(lim_max),
+                    data_dims[key]["lims_nsample"][2]
+                ])
+                data_dims_columns.append(f"log10{key}")
+                data_dims_.append(np.log10(values))
+            else:
+                # Use the prior limits from lims_nsample directly
+                lims_nsample.append(data_dims[key]["lims_nsample"])
+                data_dims_columns.append(key)
+                data_dims_.append(values)
 
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(random_grid_interpolation)(params=p, data_dims=data_dims_, data=data_i, lims_nsample=lims_nsample)
+            for p, data_i in tqdm(zip(params, targets), total=len(params), desc="Interpolating", disable=not verbose)
+        )
+        params, targets = zip(*results)
+        params = np.vstack(params)
+        targets = np.hstack(targets)
+        
+        # section to disable parallel for easier debugging
+        #for i,(p, data_i) in enumerate(tqdm(zip(params, targets), total=len(params), desc="Interpolating", disable=not verbose)):
+        #    params_i, targets_i = random_grid_interpolation(params=p, data_dims=data_dims_, data=data_i, lims_nsample=lims_nsample)
+        #    if i==0:
+        #        params = params_i
+        #        targets = targets_i
+        #    else:
+        #        params = np.vstack((params, params_i))
+        #        targets = np.hstack((targets, targets_i))
+    else:
+        # No interpolation - stack raw data within lims_nsample bounds
+        data_dims_columns = []
+        data_dims_ = []
+        masks = []
+        for key in data_dims.keys():
+            values = data_dims[key]["values"]
+            lim_min = data_dims[key]["lims_nsample"][0]
+            lim_max = data_dims[key]["lims_nsample"][1]
+            if np.isnan(lim_min):
+                lim_min = values.min()
+            if np.isnan(lim_max):
+                lim_max = values.max()
+
+            # Create mask for values within bounds
+            mask = (values >= lim_min) & (values <= lim_max)
+            masks.append(mask)
+
+            if data_dims[key]["log"]:
+                data_dims_columns.append(f"log10{key}")
+                data_dims_.append(np.log10(values[mask]))
+            else:
+                data_dims_columns.append(key)
+                data_dims_.append(values[mask])
+
+        # Apply masks to targets along each data dimension axis
+        for i, mask in enumerate(masks):
+            targets = np.compress(mask, targets, axis=i + 1)
+
+        # Create meshgrid of filtered data dimension values
+        grids = np.meshgrid(*data_dims_, indexing='ij')
+        combinations = np.vstack([grid.ravel() for grid in grids]).T
+
+        num_params = len(params)
+        num_combinations = len(combinations)
+
+        # Repeat params for each combination and tile combinations for each param
+        params = np.repeat(params, num_combinations, axis=0)
+        combinations = np.tile(combinations, (num_params, 1))
+        params = np.hstack((combinations, params))
+
+        # Flatten targets
+        targets = targets.ravel()
+    
+    #print("Final params shape:", params.shape, "Final targets shape:", targets.shape)
     params = pd.DataFrame(params, columns=data_dims_columns + params_columns)
 
     return params, targets

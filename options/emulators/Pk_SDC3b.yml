@@ -16,9 +16,9 @@ train:
   total_iter: !!int 20000
   ema_decay: !!float 0.999
   optimizer_opt:
-    type: AdamW
+    type: Adam
     lr: !!float 0.001
-    weight_decay: !!float 0.001 #0.0001
+    weight_decay: !!float 0.0001 #0.0001
   scheduler:
     type: MultiStepLR
     milestones: [5000, 7500]
@@ -44,15 +44,15 @@ dataset:
     z:
       file: data/SDC3b/z_power_spectra.npy
       log: !!bool false
-      lims_nsample: [6.535, 7.962, 20]
+      lims_nsample: [!!float nan, !!float nan, !!float nan] # [6.535, 7.962, !!float nan]
     kperp:
       file: data/SDC3b/bins_kper.txt
       log: !!bool false
-      lims_nsample: [!!float 5e-2, !!float 5e-1, 20]
+      lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
     kpar:
       file: data/SDC3b/bins_kpar.txt
       log: !!bool false
-      lims_nsample: [!!float 5e-2, !!float 5e-1, 20]
+      lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
 
 path:
   pretrain_network_g: ~
