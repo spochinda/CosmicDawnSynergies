@@ -284,6 +284,10 @@ def train_pipeline(root_path):
         model.net_g.fit(params, targets)
         current_iter = total_iters
 
+        # Log feature importances if available
+        if hasattr(model, 'get_feature_importance'):
+            model.get_feature_importance()
+
     consumed_time = str(datetime.timedelta(seconds=int(time.time() - start_time)))
     logger.info(f'End of training. Time consumed: {consumed_time}')
     logger.info('Save the latest model.')

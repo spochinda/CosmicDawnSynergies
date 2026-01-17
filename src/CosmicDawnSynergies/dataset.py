@@ -196,11 +196,11 @@ def gen_training_data(params, targets, data_dims, n_jobs=-1, verbose=False, **kw
             lim_max = data_dims[key]["lims_nsample"][1]
 
             # Validate that lims_nsample is within the data dimension bounds
-            if lim_min >= values.min() or np.isnan(lim_min):
+            if lim_min < values.min() or np.isnan(lim_min):
                 print(f"lims_nsample lower bound ({lim_min}) for '{key}' is below "
                 f"data minimum ({values.min()}) or it is nan. Using data minimum instead.")
                 lim_min = values.min()
-            if lim_max <= values.max() or np.isnan(lim_max):
+            if lim_max > values.max() or np.isnan(lim_max):
                 print(f"lims_nsample upper bound ({lim_max}) for '{key}' is above "
                 f"data maximum ({values.max()}) or it is nan. Using data maximum instead.")
                 lim_max = values.max()

@@ -807,6 +807,35 @@ class RandomForestModel(BaseModelSklearn):
         super().__init__(opt)
         self.net_g = RandomForestRegressor(**self.network_opt)
 
+    def get_feature_importance(self, feature_names=None):
+        """Get feature importances from the trained Random Forest model.
+
+        Args:
+            feature_names (list, optional): List of feature names. If None, uses feature_0, feature_1, etc.
+
+        Returns:
+            dict: Dictionary mapping feature names to importance scores, sorted by importance.
+        """
+        importances = self.net_g.feature_importances_
+
+        if feature_names is None:
+            feature_names = [f'feature_{i}' for i in range(len(importances))]
+
+        # Create dict sorted by importance (descending)
+        importance_dict = dict(sorted(
+            zip(feature_names, importances),
+            key=lambda x: x[1],
+            reverse=True
+        ))
+
+        # Log feature importances
+        logger = get_root_logger()
+        logger.info('Feature Importances:')
+        for name, importance in importance_dict.items():
+            logger.info(f'  {name}: {importance:.4f}')
+
+        return importance_dict
+
 
 class GradientBoostingModel(BaseModelSklearn):
     """Gradient Boosting Model using scikit-learn for emulator training."""
@@ -814,3 +843,32 @@ class GradientBoostingModel(BaseModelSklearn):
     def __init__(self, opt):
         super().__init__(opt)
         self.net_g = GradientBoostingRegressor(**self.network_opt)
+
+    def get_feature_importance(self, feature_names=None):
+        """Get feature importances from the trained Gradient Boosting model.
+
+        Args:
+            feature_names (list, optional): List of feature names. If None, uses feature_0, feature_1, etc.
+
+        Returns:
+            dict: Dictionary mapping feature names to importance scores, sorted by importance.
+        """
+        importances = self.net_g.feature_importances_
+
+        if feature_names is None:
+            feature_names = [f'feature_{i}' for i in range(len(importances))]
+
+        # Create dict sorted by importance (descending)
+        importance_dict = dict(sorted(
+            zip(feature_names, importances),
+            key=lambda x: x[1],
+            reverse=True
+        ))
+
+        # Log feature importances
+        logger = get_root_logger()
+        logger.info('Feature Importances:')
+        for name, importance in importance_dict.items():
+            logger.info(f'  {name}: {importance:.4f}')
+
+        return importance_dict
