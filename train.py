@@ -2,6 +2,7 @@ import datetime
 import logging
 import math
 import time
+import sklearn
 import torch
 from os import path as osp
 import torch.distributed as dist
@@ -197,8 +198,9 @@ def train_pipeline(root_path):
     train_loader, train_sampler, val_loader, total_epochs, total_iters, param_stats = result
 
     # create model
-    opt['network_opt']['in_dim'] = train_loader.dataset.params.shape[1]
-    model = getattr(models, opt['model_type'])(opt)
+    if opt['model_type'] == 'MLPModel':
+        opt['network_opt']['in_dim'] = train_loader.dataset.params.shape[1]
+    model = getattr(models, opt.get('model_type', 'MLPModel'))(opt)
 
     # Store normalization stats in model if available (before resume, in case resume overwrites)
     if param_stats is not None:
@@ -220,61 +222,67 @@ def train_pipeline(root_path):
     logger.info(f'Start training from epoch: {start_epoch}, iter: {current_iter}')
     data_timer, iter_timer = AvgTimer(), AvgTimer()
     start_time = time.time()
+    if isinstance(model.net_g, sklearn.base.BaseEstimator) is False:
+        for epoch in range(start_epoch, total_epochs + 1):
+            # Set epoch for distributed sampler
+            if train_sampler is not None and hasattr(train_sampler, 'set_epoch'):
+                train_sampler.set_epoch(epoch)
+                
+            # Standard PyTorch training loop
+            for train_data in train_loader:
+                data_timer.record()
 
-    for epoch in range(start_epoch, total_epochs + 1):
-        # Set epoch for distributed sampler
-        if train_sampler is not None and hasattr(train_sampler, 'set_epoch'):
-            train_sampler.set_epoch(epoch)
-            
-        # Standard PyTorch training loop
-        for train_data in train_loader:
-            data_timer.record()
+                current_iter += 1
+                if current_iter > total_iters:
+                    break
+                    
+                # update learning rate
+                model.update_learning_rate(current_iter, warmup_iter=opt['train'].get('warmup_iter', -1))
+                
+                # training
+                model.optimize_parameters(train_data, current_iter)
+                iter_timer.record()
+                
+                if current_iter == 1:
+                    # reset start time in msg_logger for more accurate eta_time
+                    # not work in resume mode
+                    msg_logger.reset_start_time()
+                    
+                # log
+                if current_iter % opt['logger']['print_freq'] == 0:
+                    log_vars = {'epoch': epoch, 'iter': current_iter}
+                    log_vars.update({'lrs': model.get_current_learning_rate()})
+                    log_vars.update({'time': iter_timer.get_avg_time(), 'data_time': data_timer.get_avg_time()})
+                    log_vars.update(model.get_current_log())
+                    msg_logger(log_vars)
 
-            current_iter += 1
-            if current_iter > total_iters:
+                #main_dataset.params_train.columns
+                # save models and training states
+                if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
+                    logger.info('Saving models and training states.')
+                    model.save(epoch, current_iter)
+
+                # validation
+                if opt.get('val') is not None and (current_iter % opt['val']['val_freq'] == 0):
+                    logger.info('Running validation...')
+                    model.validation(val_loader, current_iter, tb_logger)
+
+                data_timer.start()
+                iter_timer.start()
+                
+            # Check if we've reached the total iterations
+            if current_iter >= total_iters:
                 break
+            if current_iter == 10:
+                assert False, 'Just for debug: run only 10 iters'
                 
-            # update learning rate
-            model.update_learning_rate(current_iter, warmup_iter=opt['train'].get('warmup_iter', -1))
-            
-            # training
-            model.optimize_parameters(train_data, current_iter)
-            iter_timer.record()
-            
-            if current_iter == 1:
-                # reset start time in msg_logger for more accurate eta_time
-                # not work in resume mode
-                msg_logger.reset_start_time()
-                
-            # log
-            if current_iter % opt['logger']['print_freq'] == 0:
-                log_vars = {'epoch': epoch, 'iter': current_iter}
-                log_vars.update({'lrs': model.get_current_learning_rate()})
-                log_vars.update({'time': iter_timer.get_avg_time(), 'data_time': data_timer.get_avg_time()})
-                log_vars.update(model.get_current_log())
-                msg_logger(log_vars)
-
-            #main_dataset.params_train.columns
-            # save models and training states
-            if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
-                logger.info('Saving models and training states.')
-                model.save(epoch, current_iter)
-
-            # validation
-            if opt.get('val') is not None and (current_iter % opt['val']['val_freq'] == 0):
-                logger.info('Running validation...')
-                model.validation(val_loader, current_iter, tb_logger)
-
-            data_timer.start()
-            iter_timer.start()
-            
-        # Check if we've reached the total iterations
-        if current_iter >= total_iters:
-            break
-        if current_iter == 10:
-            assert False, 'Just for debug: run only 10 iters'
-            
-    # end of epoch
+        # end of epoch
+    else:
+        # sklearn model training
+        params = train_loader.dataset.params
+        targets = train_loader.dataset.targets
+        model.net_g.fit(params, targets)
+        current_iter = total_iters
 
     consumed_time = str(datetime.timedelta(seconds=int(time.time() - start_time)))
     logger.info(f'End of training. Time consumed: {consumed_time}')

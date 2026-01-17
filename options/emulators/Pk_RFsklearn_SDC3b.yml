@@ -1,16 +1,16 @@
 # general settings
-name: demo_Pk_SDC3b_minmax_emulator
+name: Pk_SDC3b_RF
 num_gpu: auto  # automatic GPU detection
 manual_seed: !!int 10
 
-model_type: MLPModel
+model_type: RandomForestModel
 # network architecture
 network_opt:
-  hidden_dim: !!int 100
-  n_hidden: !!int 6
-  out_dim: !!int 1
-  activation: ReLU
-
+  n_estimators: !!int 500
+  max_depth: !!int 30
+  min_samples_split: !!int 2
+  min_samples_leaf: !!int 1
+  n_jobs: !!int -1  # use all CPU cores
 
 # training settings
 train:

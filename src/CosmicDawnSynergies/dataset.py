@@ -337,16 +337,24 @@ def prepare_validation_data(params, targets, data_dims, **kwargs):
     data_dims_ = []
     lims = []
     for key in data_dims.keys():
+        values = data_dims[key]["values"]
+        lim_min = data_dims[key]["lims_nsample"][0]
+        lim_max = data_dims[key]["lims_nsample"][1]
+
+        # Handle nan values by using data min/max
+        if np.isnan(lim_min):
+            lim_min = values.min()
+        if np.isnan(lim_max):
+            lim_max = values.max()
+
         if data_dims[key]["log"]:
-            data_dims[key]["lims_nsample"][0] = np.log10(data_dims[key]["lims_nsample"][0])
-            data_dims[key]["lims_nsample"][1] = np.log10(data_dims[key]["lims_nsample"][1])
-            lims.append(data_dims[key]["lims_nsample"][:2])
+            lims.append([np.log10(lim_min), np.log10(lim_max)])
             data_dims_columns.append(f"log10{key}")
-            data_dims_.append(np.log10(data_dims[key]["values"]))
+            data_dims_.append(np.log10(values))
         else:
-            lims.append(data_dims[key]["lims_nsample"][:2])
+            lims.append([lim_min, lim_max])
             data_dims_columns.append(key)
-            data_dims_.append(data_dims[key]["values"])
+            data_dims_.append(values)
 
     #log lims
     masks = [np.logical_and(data_dim >= lim[0], data_dim <= lim[1]) for data_dim, lim in zip(data_dims_, lims)]

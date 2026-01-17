@@ -1,8 +1,10 @@
 import os
 import time
+from unittest.mock import Base
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import joblib
 from collections import OrderedDict
 from copy import deepcopy
 from torch.nn.parallel import DataParallel, DistributedDataParallel
@@ -12,6 +14,9 @@ from basicsr.models import lr_scheduler as lr_scheduler
 from basicsr.utils import get_root_logger
 from basicsr.utils.dist_util import master_only
 from tqdm import tqdm
+
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 
 class BaseModel():
     """Base model."""
@@ -638,8 +643,8 @@ class MLPModel(BaseModel):
         net.load_state_dict(load_net, strict=strict)
 
     def nondist_validation(self, dataloader, current_iter, tb_logger):
-        """Validation function for regression models using RMSE metric."""
-        
+        """Validation function for regression models using RMSE, NRMSE, and R² metrics."""
+
         # Get the entire validation dataset directly from the dataset tensors
         val_dataset = dataloader.dataset
         all_inputs = val_dataset.params.to(self.device)
@@ -649,21 +654,29 @@ class MLPModel(BaseModel):
         with torch.no_grad():
             # Single forward pass through entire validation set
             all_outputs = self.net_g(all_inputs)
-                        
-            # Compute RMSE
+
+            # Compute MSE and RMSE
             mse = F.mse_loss(all_outputs, all_targets, reduction='mean')
             rmse = torch.sqrt(mse)
-            
+
+            # Normalized RMSE (RMSE / std of targets)
+            nrmse = rmse / torch.std(all_targets)
+
+            # R² score: 1 - (MSE / variance of targets)
+            r2 = 1 - (mse / torch.var(all_targets))
+
             # Get rmse on original scale if log transform was applied (not exact due averaging with offset in logspace)
-            rmse = 10**rmse if self.opt['dataset']['targets_opt'].get('log', False) else rmse
-            rmse = rmse - self.opt['dataset']['targets_opt'].get('offset', 0)
+            rmse_scaled = 10**rmse if self.opt['dataset']['targets_opt'].get('log', False) else rmse
+            rmse_scaled = rmse_scaled - self.opt['dataset']['targets_opt'].get('offset', 0)
 
             logger = get_root_logger()
-            logger.info(f'Validation RMSE: {rmse:.6f}')
-            
+            logger.info(f'Validation RMSE: {rmse_scaled:.6f} | NRMSE: {nrmse:.6f} | R²: {r2:.6f}')
+
             if tb_logger:
-                tb_logger.add_scalar('validation/rmse', rmse, current_iter)
-        
+                tb_logger.add_scalar('validation/rmse', rmse_scaled, current_iter)
+                tb_logger.add_scalar('validation/nrmse', nrmse, current_iter)
+                tb_logger.add_scalar('validation/r2', r2, current_iter)
+
         self.net_g.train()
 
     def nondist_validation_old(self, dataloader, current_iter, tb_logger):
@@ -725,7 +738,6 @@ class MLPModel(BaseModel):
             out_dict['target'] = self.target.detach().cpu()
         return out_dict
 
-    
     def dist_validation(self, dataloader, current_iter, tb_logger):
         """Distributed validation."""
         # For now, use the same logic as non-distributed
@@ -733,3 +745,72 @@ class MLPModel(BaseModel):
         self.nondist_validation(dataloader, current_iter, tb_logger)
 
 
+class BaseModelSklearn:
+    """Base model for sklearn models."""
+
+    def __init__(self, opt):
+        self.opt = opt
+        self.network_opt = opt.get('network_opt', {}) or {}
+        self.net_g = None  # To be set by subclass
+
+    def save(self, epoch, current_iter):
+        """Save the sklearn model using joblib."""
+        if current_iter == -1:
+            save_filename = "net_g_latest.joblib"
+        else:
+            save_filename = f"net_g_{current_iter}.joblib"
+        save_path = osp.join(self.opt['path']['models'], save_filename)
+        joblib.dump(self.net_g, save_path)
+        logger = get_root_logger()
+        logger.info(f'Saved sklearn model to {save_path}')
+
+    def validation(self, dataloader, current_iter, tb_logger):
+        """Validation function for sklearn regression models using RMSE metric."""
+        import numpy as np
+
+        # Get the entire validation dataset directly from the dataset tensors
+        val_dataset = dataloader.dataset
+        params = val_dataset.params.numpy() if hasattr(val_dataset.params, 'numpy') else val_dataset.params
+        targets = val_dataset.targets.numpy() if hasattr(val_dataset.targets, 'numpy') else val_dataset.targets
+
+        # Predict using sklearn model
+        predictions = self.net_g.predict(params)
+
+        # Compute metrics
+        mse = np.mean((predictions - targets) ** 2)
+        rmse = np.sqrt(mse)
+
+        # Normalized RMSE (RMSE / std of targets)
+        nrmse = rmse / np.std(targets)
+
+        # R² score: 1 - (MSE / variance of targets)
+        r2 = 1 - (mse / np.var(targets))
+
+        # Get rmse on original scale if log transform was applied
+        if self.opt['dataset']['targets_opt'].get('log', False):
+            rmse = 10 ** rmse
+        rmse = rmse - self.opt['dataset']['targets_opt'].get('offset', 0)
+
+        logger = get_root_logger()
+        logger.info(f'Validation RMSE: {rmse:.6f} | NRMSE: {nrmse:.6f} | R²: {r2:.6f}')
+
+        if tb_logger:
+            tb_logger.add_scalar('validation/rmse', rmse, current_iter)
+            tb_logger.add_scalar('validation/nrmse', nrmse, current_iter)
+            tb_logger.add_scalar('validation/r2', r2, current_iter)
+
+
+class RandomForestModel(BaseModelSklearn):
+    """Random Forest Model using scikit-learn for emulator training."""
+
+    def __init__(self, opt):
+        super().__init__(opt)
+        self.net_g = RandomForestRegressor(**self.network_opt)
+
+
+class GradientBoostingModel(BaseModelSklearn):
+    """Gradient Boosting Model using scikit-learn for emulator training."""
+
+    def __init__(self, opt):
+        super().__init__(opt)
+        self.net_g = GradientBoostingRegressor(**self.network_opt)

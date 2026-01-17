@@ -1,16 +1,17 @@
 # general settings
-name: demo_Pk_SDC3b_minmax_emulator
+name: Pk_SDC3b_GB
 num_gpu: auto  # automatic GPU detection
 manual_seed: !!int 10
 
-model_type: MLPModel
+model_type: GradientBoostingModel
 # network architecture
 network_opt:
-  hidden_dim: !!int 100
-  n_hidden: !!int 6
-  out_dim: !!int 1
-  activation: ReLU
-
+  n_estimators: !!int 1000
+  max_depth: !!int 10
+  learning_rate: !!float 0.05
+  subsample: !!float 0.8
+  min_samples_split: !!int 2
+  min_samples_leaf: !!int 1
 
 # training settings
 train:
