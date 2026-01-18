@@ -1,5 +1,5 @@
 # general settings
-name: demo_Pk_SDC3b_minmax_emulator
+name: Pk_SDC3b_MLP
 num_gpu: auto  # automatic GPU detection
 manual_seed: !!int 10
 
@@ -14,7 +14,7 @@ network_opt:
 
 # training settings
 train:
-  total_iter: !!int 20000
+  total_iter: !!int 120000
   ema_decay: !!float 0.999
   optimizer_opt:
     type: Adam
@@ -22,7 +22,7 @@ train:
     weight_decay: !!float 0.0001 #0.0001
   scheduler:
     type: MultiStepLR
-    milestones: [5000, 7500]
+    milestones: [60000, 90000]
     gamma: !!float 0.5
 
 # dataset options
@@ -65,7 +65,7 @@ val:
   val_freq: !!float 1000
 
 logger:
-  print_freq: !!int 200
+  print_freq: !!int 500
   save_checkpoint_freq: !!float 1000
   use_tb_logger: !!bool true
   wandb:
