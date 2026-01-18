@@ -11,10 +11,15 @@ Usage:
 import argparse
 import os
 import shutil
+import sys
 import time
 from pathlib import Path
 
 import optuna
+
+# Disable output buffering for SLURM compatibility
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 from optuna.trial import TrialState
 import torch
 import torch.nn as nn
