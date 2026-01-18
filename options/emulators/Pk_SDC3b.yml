@@ -10,6 +10,7 @@ network_opt:
   n_hidden: !!int 2
   out_dim: !!int 1
   activation: ReLU
+  out_activation: ReLU
 
 
 # training settings
