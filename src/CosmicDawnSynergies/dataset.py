@@ -215,8 +215,12 @@ def gen_training_data(params, targets, data_dims, n_jobs=-1, verbose=False, **kw
                 data_dims_columns.append(f"log10{key}")
                 data_dims_.append(np.log10(values))
             else:
-                # Use the prior limits from lims_nsample directly
-                lims_nsample.append(data_dims[key]["lims_nsample"])
+                # Use the updated limits with the number of samples
+                lims_nsample.append([
+                    lim_min,
+                    lim_max,
+                    data_dims[key]["lims_nsample"][2]
+                ])
                 data_dims_columns.append(key)
                 data_dims_.append(values)
 
