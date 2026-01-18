@@ -1,0 +1,71 @@
+# Optuna hyperparameter tuning configuration for Pk_SDC3b emulator
+
+# Tuning settings
+tune:
+  n_trials: !!int 100
+  timeout: !!int 3600  # seconds
+  epochs: !!int 50
+  log_freq: !!int 5
+  study_name: Pk_SDC3b_tuning
+
+# Fixed model settings
+model:
+  activation: ReLU
+  out_dim: !!int 1
+
+# Fixed optimizer settings
+optimizer:
+  type: AdamW
+
+# Parameters to tune with their ranges and scales
+search_space:
+  batch_size:
+    type: int
+    low: !!int 1000
+    high: !!int 40000
+  n_hidden:
+    type: int
+    low: !!int 1
+    high: !!int 6
+  hidden_dim:
+    type: int
+    low: !!int 32
+    high: !!int 256
+  lr:
+    type: float
+    low: !!float 1e-5
+    high: !!float 1e-2
+    log: !!bool true
+  weight_decay:
+    type: float
+    low: !!float 1e-6
+    high: !!float 1e-2
+    log: !!bool true
+
+# Dataset options (same as training config)
+dataset:
+  type: BaseDataset
+  params_opt:
+    file: data/SDC3b/parameters_old.npy
+    key: parameters
+    names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
+    log: []
+    discard: []
+    normalization: norm_minmax
+  targets_opt:
+    file: data/SDC3b/power_spectra_old.npy
+    offset: !!float 0.0
+    log: !!bool false
+  data_dims:
+    z:
+      file: data/SDC3b/z_power_spectra.npy
+      log: !!bool false
+      lims_nsample: [!!float nan, !!float nan, !!float nan]
+    kperp:
+      file: data/SDC3b/bins_kper.txt
+      log: !!bool false
+      lims_nsample: [!!float nan, !!float nan, !!float nan]
+    kpar:
+      file: data/SDC3b/bins_kpar.txt
+      log: !!bool false
+      lims_nsample: [!!float nan, !!float nan, !!float nan]
