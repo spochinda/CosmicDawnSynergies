@@ -7,7 +7,7 @@ model_type: MLPModel
 # network architecture
 network_opt:
   hidden_dim: !!int 100
-  n_hidden: !!int 6
+  n_hidden: !!int 2
   out_dim: !!int 1
   activation: ReLU
 
@@ -18,8 +18,8 @@ train:
   ema_decay: !!float 0.999
   optimizer_opt:
     type: Adam
-    lr: !!float 0.001
-    weight_decay: !!float 0.0001 #0.0001
+    lr: !!float 1e-3
+    weight_decay: !!float 1e-4 #0.0001
   scheduler:
     type: MultiStepLR
     milestones: [60000, 90000]
