@@ -10,7 +10,9 @@ Usage:
 
 import argparse
 import os
+import shutil
 import time
+from pathlib import Path
 
 import optuna
 from optuna.trial import TrialState
@@ -266,12 +268,24 @@ def main():
     timeout = tune_config.get('timeout', 3600)
     study_name = tune_config.get('study_name', 'emulator_tuning')
 
+    # Create output directory
+    output_dir = Path('param_search') / study_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy config file to output directory
+    shutil.copy(args.opt, output_dir / 'tune_config.yml')
+
+    # SQLite storage for persistence
+    storage_path = output_dir / 'study.db'
+    storage = f"sqlite:///{storage_path}"
+
     print(f"\nTuning settings:")
     print(f"  n_trials: {n_trials}")
     print(f"  timeout: {timeout}s")
     print(f"  epochs per trial: {tune_config.get('epochs', 50)}")
     print(f"  log_freq: {tune_config.get('log_freq', 10)}")
     print(f"  study_name: {study_name}")
+    print(f"  output_dir: {output_dir}")
 
     # Print search space
     print(f"\nSearch space:")
@@ -284,12 +298,19 @@ def main():
             log_str = " (log)" if param_config.get('log', False) else ""
             print(f"  {param_name}: [{param_config['low']}, {param_config['high']}]{log_str}")
 
-    # Create Optuna study (maximize R²)
+    # Create or load Optuna study (maximize R²)
     study = optuna.create_study(
         direction="maximize",
         study_name=study_name,
+        storage=storage,
+        load_if_exists=True,
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=10)
     )
+
+    # Check if resuming
+    if len(study.trials) > 0:
+        print(f"\nResuming study with {len(study.trials)} existing trials")
+        print(f"  Best so far: R² = {study.best_value:.4f}")
 
     # Callback to print best trial after each trial
     def print_best_callback(study, trial):
@@ -339,6 +360,37 @@ def main():
     print(f"    type: {optimizer_config.get('type', 'AdamW')}")
     print(f"    lr: !!float {trial.params['lr']:.6e}")
     print(f"    weight_decay: !!float {trial.params['weight_decay']:.6e}")
+
+    # Save best config to YAML file
+    best_config = {
+        'network_opt': {
+            'hidden_dim': int(trial.params['hidden_dim']),
+            'n_hidden': int(trial.params['n_hidden']),
+            'out_dim': int(model_config.get('out_dim', 1)),
+            'activation': model_config.get('activation', 'ReLU'),
+        },
+        'dataset': {
+            'batch_size_per_gpu': int(trial.params['batch_size']),
+        },
+        'train': {
+            'optimizer_opt': {
+                'type': optimizer_config.get('type', 'AdamW'),
+                'lr': float(trial.params['lr']),
+                'weight_decay': float(trial.params['weight_decay']),
+            }
+        },
+        'best_trial': {
+            'number': trial.number,
+            'r2': float(trial.value),
+        }
+    }
+
+    best_config_path = output_dir / 'best_config.yml'
+    with open(best_config_path, 'w') as f:
+        yaml.dump(best_config, f, default_flow_style=False, sort_keys=False)
+
+    print(f"\nBest config saved to: {best_config_path}")
+    print(f"Study database saved to: {storage_path}")
 
 
 if __name__ == "__main__":
