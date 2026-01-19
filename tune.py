@@ -237,7 +237,7 @@ def objective(trial):
 
     # Print trial info
     print(f"\n{'='*60}")
-    print(f"Trial {trial.number}")
+    print(f"Trial {trial.number} ({DEVICE})")
     print(f"{'='*60}")
     print(f"  batch_size:   {batch_size}")
     print(f"  n_hidden:     {trial.params['n_hidden']}")
@@ -311,6 +311,7 @@ def objective(trial):
         rmse = compute_rmse(all_preds, all_targets).item()
 
         epoch_time = time.time() - epoch_start
+        avg_iter_time = (time.time() - trial_start) / total_iter * 1000  # ms per iteration
 
         # Log progress
         if (epoch + 1) % log_freq == 0 or epoch == 0 or epoch == epochs - 1:
@@ -320,7 +321,8 @@ def objective(trial):
                   f"Val MSE: {val_mse:.6f} | "
                   f"R²: {r2:.4f} | "
                   f"RMSE: {rmse:.6f} | "
-                  f"Time: {epoch_time:.2f}s")
+                  f"Time: {epoch_time:.2f}s | "
+                  f"Avg: {avg_iter_time:.1f}ms/it")
 
         # Report intermediate value and handle pruning (single-objective only)
         # Get primary objective value for pruning
