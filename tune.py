@@ -29,6 +29,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 import yaml
 
+from basicsr.data.prefetch_dataloader import CPUPrefetcher, CUDAPrefetcher
 from src.CosmicDawnSynergies.dataset import BaseDataset
 from src.CosmicDawnSynergies.model import MLP
 
@@ -268,15 +269,29 @@ def objective(trial):
     iters_per_epoch = len(train_loader)
     total_iters = epochs * iters_per_epoch
 
+    # Create prefetchers for overlapping data transfer with computation
+    use_cuda = DEVICE.type == 'cuda'
+    if use_cuda:
+        opt_for_prefetcher = {'num_gpu': 1}  # CUDAPrefetcher expects this
+        train_prefetcher = CUDAPrefetcher(train_loader, opt_for_prefetcher)
+        val_prefetcher = CUDAPrefetcher(val_loader, opt_for_prefetcher)
+    else:
+        train_prefetcher = CPUPrefetcher(train_loader)
+        val_prefetcher = CPUPrefetcher(val_loader)
+
     for epoch in range(epochs):
         epoch_start = time.time()
         model.train()
         train_loss = 0.0
         n_batches = 0
 
-        for batch in train_loader:
-            params = batch['params'].to(DEVICE)
-            targets = batch['target'].to(DEVICE)
+        # Use prefetcher pattern
+        train_prefetcher.reset()
+        batch = train_prefetcher.next()
+
+        while batch is not None:
+            params = batch['params']
+            targets = batch['target']
 
             optimizer.zero_grad()
             output = model(params)
@@ -288,6 +303,8 @@ def objective(trial):
             n_batches += 1
             total_iter += 1
 
+            batch = train_prefetcher.next()
+
         train_loss /= n_batches
 
         # Validation
@@ -295,14 +312,19 @@ def objective(trial):
         all_preds = []
         all_targets = []
 
+        val_prefetcher.reset()
+        batch = val_prefetcher.next()
+
         with torch.no_grad():
-            for batch in val_loader:
-                params = batch['params'].to(DEVICE)
-                targets = batch['target'].to(DEVICE)
+            while batch is not None:
+                params = batch['params']
+                targets = batch['target']
 
                 output = model(params)
                 all_preds.append(output)
                 all_targets.append(targets)
+
+                batch = val_prefetcher.next()
 
         all_preds = torch.cat(all_preds)
         all_targets = torch.cat(all_targets)
