@@ -70,23 +70,27 @@ def load_config(opt_path):
 def create_dataloaders(batch_size):
     """Create dataloaders with specified batch size."""
     use_cuda = DEVICE.type == 'cuda'
+    dataset_config = OPT.get('dataset', {})
+    num_workers = dataset_config.get('num_worker_per_gpu', 4)
 
     train_loader = DataLoader(
         TRAIN_SET,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=num_workers,
         drop_last=True,
         pin_memory=use_cuda,
+        persistent_workers=num_workers > 0,
     )
 
     val_loader = DataLoader(
         VAL_SET,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=0,
+        num_workers=num_workers,
         drop_last=False,
         pin_memory=use_cuda,
+        persistent_workers=num_workers > 0,
     )
 
     return train_loader, val_loader
