@@ -36,6 +36,7 @@ src/*egg-info/
 tb_logger
 trained_emulators
 inferences
+param_search
 
 # SLURM and log files
 *err
