@@ -9,6 +9,8 @@ Usage:
 """
 
 import argparse
+import datetime
+import logging
 import math
 import os
 import shutil
@@ -41,6 +43,40 @@ OPT = None
 TRAIN_SET = None
 VAL_SET = None
 IN_DIM = None
+LOGGER = None
+
+
+def setup_logger(output_dir, study_name):
+    """Setup logger that outputs to both console and file."""
+    global LOGGER
+
+    # Create logger
+    LOGGER = logging.getLogger('tune')
+    LOGGER.setLevel(logging.INFO)
+    LOGGER.handlers = []  # Clear existing handlers
+
+    # Create formatters
+    formatter = logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    LOGGER.addHandler(console_handler)
+
+    # File handler with immediate flush
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = output_dir / f'tune_{study_name}_{timestamp}.log'
+    file_handler = logging.FileHandler(log_file, mode='w')
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
+    # Force immediate flush after each log message (important for SLURM/interrupted runs)
+    file_handler.stream.reconfigure(line_buffering=True)
+    LOGGER.addHandler(file_handler)
+
+    LOGGER.info(f"Log file: {log_file}")
+
+    return LOGGER
 
 
 def load_config(opt_path):
@@ -52,6 +88,7 @@ def load_config(opt_path):
 
     dataset_config = OPT.get('dataset', {})
 
+    # Use print here since logger isn't set up yet
     print(f"Loading dataset from {opt_path}")
     base_dataset = BaseDataset(dataset_config)
 
@@ -240,17 +277,18 @@ def objective(trial):
     # Get activation for logging
     activation = trial.params.get('activation', OPT.get('model', {}).get('activation', 'ReLU'))
 
-    # Print trial info
-    print(f"\n{'='*60}")
-    print(f"Trial {trial.number} ({DEVICE})")
-    print(f"{'='*60}")
-    print(f"  batch_size:   {batch_size}")
-    print(f"  n_hidden:     {trial.params['n_hidden']}")
-    print(f"  hidden_dim:   {trial.params['hidden_dim']}")
-    print(f"  activation:   {activation}")
-    print(f"  lr:           {lr:.2e}")
-    print(f"  weight_decay: {weight_decay:.2e}")
-    print(f"  n_params:     {n_params:,}")
+    # Log trial info
+    LOGGER.info("")
+    LOGGER.info("=" * 60)
+    LOGGER.info(f"Trial {trial.number} ({DEVICE})")
+    LOGGER.info(f"{'='*60}")
+    LOGGER.info(f"  batch_size:   {batch_size}")
+    LOGGER.info(f"  n_hidden:     {trial.params['n_hidden']}")
+    LOGGER.info(f"  hidden_dim:   {trial.params['hidden_dim']}")
+    LOGGER.info(f"  activation:   {activation}")
+    LOGGER.info(f"  lr:           {lr:.2e}")
+    LOGGER.info(f"  weight_decay: {weight_decay:.2e}")
+    LOGGER.info(f"  n_params:     {n_params:,}")
 
     # Create optimizer (fixed type from config)
     optimizer_type = optimizer_config.get('type', 'AdamW')
@@ -341,14 +379,14 @@ def objective(trial):
 
         # Log progress
         if (epoch + 1) % log_freq == 0 or epoch == 0 or epoch == epochs - 1:
-            print(f"  Epoch {epoch+1:3d}/{epochs} | "
-                  f"Iter {total_iter:6d}/{total_iters} | "
-                  f"Train Loss: {train_loss:.6f} | "
-                  f"Val MSE: {val_mse:.6f} | "
-                  f"R²: {r2:.4f} | "
-                  f"RMSE: {rmse:.6f} | "
-                  f"Time: {epoch_time:.2f}s | "
-                  f"Avg: {avg_iter_time:.1f}ms/it")
+            LOGGER.info(f"  Epoch {epoch+1:3d}/{epochs} | "
+                        f"Iter {total_iter:6d}/{total_iters} | "
+                        f"Train Loss: {train_loss:.6f} | "
+                        f"Val MSE: {val_mse:.6f} | "
+                        f"R²: {r2:.4f} | "
+                        f"RMSE: {rmse:.6f} | "
+                        f"Time: {epoch_time:.2f}s | "
+                        f"Avg: {avg_iter_time:.1f}ms/it")
 
         # Report intermediate value and handle pruning (single-objective only)
         # Get primary objective value for pruning
@@ -359,14 +397,14 @@ def objective(trial):
             trial.report(obj1_transformed, epoch)
             if trial.should_prune():
                 trial_time = time.time() - trial_start
-                print(f"  >>> Trial pruned at epoch {epoch+1} ({objective1}: {obj1_value:{METRIC_CONFIG[objective1]['format']}}) | Total time: {trial_time:.1f}s")
+                LOGGER.info(f"  >>> Trial pruned at epoch {epoch+1} ({objective1}: {obj1_value:{METRIC_CONFIG[objective1]['format']}}) | Total time: {trial_time:.1f}s")
                 raise optuna.exceptions.TrialPruned()
 
     trial_time = time.time() - trial_start
 
     # Get final objective values
     obj1_value = get_objective_value(objective1, r2, rmse, n_params)
-    print(f"  >>> Trial completed | {objective1}: {obj1_value:{METRIC_CONFIG[objective1]['format']}} | n_params: {n_params:,} | Total time: {trial_time:.1f}s")
+    LOGGER.info(f"  >>> Trial completed | {objective1}: {obj1_value:{METRIC_CONFIG[objective1]['format']}} | n_params: {n_params:,} | Total time: {trial_time:.1f}s")
 
     # Store metrics as user attributes for later analysis
     trial.set_user_attr('n_params', n_params)
@@ -415,6 +453,9 @@ def main():
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Setup logger (after creating output directory)
+    setup_logger(output_dir, study_name)
+
     # Copy config file to output directory
     shutil.copy(args.opt, output_dir / 'tune_config.yml')
 
@@ -422,28 +463,30 @@ def main():
     storage_path = output_dir / 'study.db'
     storage = f"sqlite:///{storage_path}"
 
-    print(f"\nTuning settings:")
-    print(f"  n_trials: {n_trials}")
-    print(f"  timeout: {timeout}s")
-    print(f"  epochs per trial: {tune_config.get('epochs', 50)}")
-    print(f"  log_freq: {tune_config.get('log_freq', 10)}")
-    print(f"  study_name: {study_name}")
-    print(f"  output_dir: {output_dir}")
-    print(f"  objective1: {objective1} ({METRIC_CONFIG[objective1]['direction']})")
+    LOGGER.info("")
+    LOGGER.info("Tuning settings:")
+    LOGGER.info(f"  n_trials: {n_trials}")
+    LOGGER.info(f"  timeout: {timeout}s")
+    LOGGER.info(f"  epochs per trial: {tune_config.get('epochs', 50)}")
+    LOGGER.info(f"  log_freq: {tune_config.get('log_freq', 10)}")
+    LOGGER.info(f"  study_name: {study_name}")
+    LOGGER.info(f"  output_dir: {output_dir}")
+    LOGGER.info(f"  objective1: {objective1} ({METRIC_CONFIG[objective1]['direction']})")
     if multi_objective:
-        print(f"  objective2: {objective2} ({METRIC_CONFIG[objective2]['direction']})")
-    print(f"  multi_objective: {multi_objective}")
+        LOGGER.info(f"  objective2: {objective2} ({METRIC_CONFIG[objective2]['direction']})")
+    LOGGER.info(f"  multi_objective: {multi_objective}")
 
-    # Print search space
-    print(f"\nSearch space:")
+    # Log search space
+    LOGGER.info("")
+    LOGGER.info("Search space:")
     search_space = opt.get('search_space', {})
     for param_name, param_config in search_space.items():
         ptype = param_config['type']
         if ptype == 'categorical':
-            print(f"  {param_name}: {param_config['choices']}")
+            LOGGER.info(f"  {param_name}: {param_config['choices']}")
         else:
             log_str = " (log)" if param_config.get('log', False) else ""
-            print(f"  {param_name}: [{param_config['low']}, {param_config['high']}]{log_str}")
+            LOGGER.info(f"  {param_name}: [{param_config['low']}, {param_config['high']}]{log_str}")
 
     # Create or load Optuna study
     if multi_objective:
@@ -467,50 +510,55 @@ def main():
 
     # Check if resuming
     if len(study.trials) > 0:
-        print(f"\nResuming study with {len(study.trials)} existing trials")
+        LOGGER.info("")
+        LOGGER.info(f"Resuming study with {len(study.trials)} existing trials")
         if not multi_objective:
             best_raw = study.best_trial.user_attrs.get(objective1, study.best_value)
-            print(f"  Best so far: {objective1} = {best_raw:{METRIC_CONFIG[objective1]['format']}}")
+            LOGGER.info(f"  Best so far: {objective1} = {best_raw:{METRIC_CONFIG[objective1]['format']}}")
         else:
-            print(f"  Pareto front size: {len(study.best_trials)}")
+            LOGGER.info(f"  Pareto front size: {len(study.best_trials)}")
 
-    # Callback to print best trial after each trial
-    def print_best_callback(study, trial):
+    # Callback to log best trial after each trial
+    def log_best_callback(study, trial):
         if multi_objective:
             # For multi-objective, check if trial is on Pareto front
             if trial in study.best_trials:
                 obj1_val = trial.user_attrs.get(objective1, 'N/A')
                 obj2_val = trial.user_attrs.get(objective2, 'N/A')
-                print(f"\n  *** Trial on Pareto front! {objective1}: {obj1_val}, {objective2}: {obj2_val} ***")
-            print(f"  Pareto front size: {len(study.best_trials)}")
+                LOGGER.info("")
+                LOGGER.info(f"  *** Trial on Pareto front! {objective1}: {obj1_val}, {objective2}: {obj2_val} ***")
+            LOGGER.info(f"  Pareto front size: {len(study.best_trials)}")
         else:
             if study.best_trial.number == trial.number:
                 obj1_val = trial.user_attrs.get(objective1, trial.value)
-                print(f"\n  *** New best trial! {objective1}: {obj1_val:{METRIC_CONFIG[objective1]['format']}} ***")
+                LOGGER.info("")
+                LOGGER.info(f"  *** New best trial! {objective1}: {obj1_val:{METRIC_CONFIG[objective1]['format']}} ***")
             else:
                 best_val = study.best_trial.user_attrs.get(objective1, study.best_value)
-                print(f"  Current best: Trial {study.best_trial.number} with {objective1}: {best_val:{METRIC_CONFIG[objective1]['format']}}")
+                LOGGER.info(f"  Current best: Trial {study.best_trial.number} with {objective1}: {best_val:{METRIC_CONFIG[objective1]['format']}}")
 
-    study.optimize(objective, n_trials=n_trials, timeout=timeout, callbacks=[print_best_callback])
+    study.optimize(objective, n_trials=n_trials, timeout=timeout, callbacks=[log_best_callback])
 
-    # Print results
+    # Log results
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
-    print("\n" + "=" * 60)
-    print("Study statistics:")
-    print("=" * 60)
-    print(f"  Number of finished trials: {len(study.trials)}")
-    print(f"  Number of pruned trials: {len(pruned_trials)}")
-    print(f"  Number of complete trials: {len(complete_trials)}")
+    LOGGER.info("")
+    LOGGER.info("=" * 60)
+    LOGGER.info("Study statistics:")
+    LOGGER.info("=" * 60)
+    LOGGER.info(f"  Number of finished trials: {len(study.trials)}")
+    LOGGER.info(f"  Number of pruned trials: {len(pruned_trials)}")
+    LOGGER.info(f"  Number of complete trials: {len(complete_trials)}")
 
     model_config = opt.get('model', {})
     optimizer_config = opt.get('optimizer', {})
 
     if multi_objective:
-        # Print Pareto front
-        print(f"\nPareto front ({len(study.best_trials)} solutions):")
-        print("-" * 60)
+        # Log Pareto front
+        LOGGER.info("")
+        LOGGER.info(f"Pareto front ({len(study.best_trials)} solutions):")
+        LOGGER.info("-" * 60)
 
         # Sort by first objective (transformed value, higher is better)
         pareto_trials = sorted(study.best_trials, key=lambda t: t.values[0], reverse=True)
@@ -527,11 +575,12 @@ def main():
                 obj2_str = f"{obj2_val:,}" if isinstance(obj2_val, (int, float)) else str(obj2_val)
             else:
                 obj2_str = f"{obj2_val:{METRIC_CONFIG[objective2]['format']}}" if isinstance(obj2_val, (int, float)) else str(obj2_val)
-            print(f"  {i+1}. Trial {t.number}: {objective1} = {obj1_str}, {objective2} = {obj2_str}")
+            LOGGER.info(f"  {i+1}. Trial {t.number}: {objective1} = {obj1_str}, {objective2} = {obj2_str}")
 
         # Select best: highest transformed objective1 (first in sorted list)
         trial = pareto_trials[0]
-        print(f"\nSelected best (best {objective1}): Trial {trial.number}")
+        LOGGER.info("")
+        LOGGER.info(f"Selected best (best {objective1}): Trial {trial.number}")
 
         # Save all Pareto solutions
         pareto_configs = []
@@ -549,21 +598,24 @@ def main():
         pareto_path = output_dir / 'pareto_front.yml'
         with open(pareto_path, 'w') as f:
             yaml.dump(pareto_configs, f, default_flow_style=False, sort_keys=False)
-        print(f"Pareto front saved to: {pareto_path}")
+        LOGGER.info(f"Pareto front saved to: {pareto_path}")
 
     else:
-        print("\nBest trial:")
+        LOGGER.info("")
+        LOGGER.info("Best trial:")
         trial = study.best_trial
 
-    # Print all metrics for the best trial
-    print(f"\nBest trial metrics:")
-    print(f"  R²:      {trial.user_attrs.get('r2', 'N/A'):.4f}" if isinstance(trial.user_attrs.get('r2'), float) else f"  R²:      {trial.user_attrs.get('r2', 'N/A')}")
-    print(f"  RMSE:    {trial.user_attrs.get('rmse', 'N/A'):.6f}" if isinstance(trial.user_attrs.get('rmse'), float) else f"  RMSE:    {trial.user_attrs.get('rmse', 'N/A')}")
-    print(f"  n_params: {trial.user_attrs.get('n_params', 'N/A'):,}" if isinstance(trial.user_attrs.get('n_params'), int) else f"  n_params: {trial.user_attrs.get('n_params', 'N/A')}")
+    # Log all metrics for the best trial
+    LOGGER.info("")
+    LOGGER.info("Best trial metrics:")
+    LOGGER.info(f"  R²:      {trial.user_attrs.get('r2', 'N/A'):.4f}" if isinstance(trial.user_attrs.get('r2'), float) else f"  R²:      {trial.user_attrs.get('r2', 'N/A')}")
+    LOGGER.info(f"  RMSE:    {trial.user_attrs.get('rmse', 'N/A'):.6f}" if isinstance(trial.user_attrs.get('rmse'), float) else f"  RMSE:    {trial.user_attrs.get('rmse', 'N/A')}")
+    LOGGER.info(f"  n_params: {trial.user_attrs.get('n_params', 'N/A'):,}" if isinstance(trial.user_attrs.get('n_params'), int) else f"  n_params: {trial.user_attrs.get('n_params', 'N/A')}")
 
-    print("\n  Params:")
+    LOGGER.info("")
+    LOGGER.info("  Params:")
     for key, value in trial.params.items():
-        print(f"    {key}: {value}")
+        LOGGER.info(f"    {key}: {value}")
 
     # Get activation - from tuned params or fixed config
     activation = trial.params.get('activation', model_config.get('activation', 'ReLU'))
@@ -573,23 +625,26 @@ def main():
     lr = trial.params.get('lr', optimizer_config.get('lr', 1e-3))
     weight_decay = trial.params.get('weight_decay', optimizer_config.get('weight_decay', 1e-4))
 
-    # Print suggested config for training options file
-    print("\n" + "=" * 60)
-    print("Suggested config for training YAML file:")
-    print("=" * 60)
-    print(f"network_opt:")
-    print(f"  hidden_dim: !!int {trial.params['hidden_dim']}")
-    print(f"  n_hidden: !!int {trial.params['n_hidden']}")
-    print(f"  out_dim: !!int {model_config.get('out_dim', 1)}")
-    print(f"  activation: {activation}")
-    print(f"  out_activation: {out_activation}")
-    print(f"\ndataset:")
-    print(f"  batch_size_per_gpu: !!int {trial.params['batch_size']}")
-    print(f"\ntrain:")
-    print(f"  optimizer_opt:")
-    print(f"    type: {optimizer_config.get('type', 'AdamW')}")
-    print(f"    lr: !!float {lr:.6e}")
-    print(f"    weight_decay: !!float {weight_decay:.6e}")
+    # Log suggested config for training options file
+    LOGGER.info("")
+    LOGGER.info("=" * 60)
+    LOGGER.info("Suggested config for training YAML file:")
+    LOGGER.info("=" * 60)
+    LOGGER.info(f"network_opt:")
+    LOGGER.info(f"  hidden_dim: !!int {trial.params['hidden_dim']}")
+    LOGGER.info(f"  n_hidden: !!int {trial.params['n_hidden']}")
+    LOGGER.info(f"  out_dim: !!int {model_config.get('out_dim', 1)}")
+    LOGGER.info(f"  activation: {activation}")
+    LOGGER.info(f"  out_activation: {out_activation}")
+    LOGGER.info("")
+    LOGGER.info("dataset:")
+    LOGGER.info(f"  batch_size_per_gpu: !!int {trial.params['batch_size']}")
+    LOGGER.info("")
+    LOGGER.info("train:")
+    LOGGER.info(f"  optimizer_opt:")
+    LOGGER.info(f"    type: {optimizer_config.get('type', 'AdamW')}")
+    LOGGER.info(f"    lr: !!float {lr:.6e}")
+    LOGGER.info(f"    weight_decay: !!float {weight_decay:.6e}")
 
     # Save best config to YAML file
     best_config = {
@@ -626,8 +681,9 @@ def main():
     with open(best_config_path, 'w') as f:
         yaml.dump(best_config, f, default_flow_style=False, sort_keys=False)
 
-    print(f"\nBest config saved to: {best_config_path}")
-    print(f"Study database saved to: {storage_path}")
+    LOGGER.info("")
+    LOGGER.info(f"Best config saved to: {best_config_path}")
+    LOGGER.info(f"Study database saved to: {storage_path}")
 
 
 if __name__ == "__main__":

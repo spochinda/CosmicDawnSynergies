@@ -379,15 +379,18 @@ class BaseModel():
 class MLP(nn.Module):
     """
     Multi-Layer Perceptron (MLP) for emulator training.
-    
+
     Args:
         in_dim (int): Input dimension
         hidden_dim (int): Hidden layer dimension
         n_hidden (int): Number of hidden layers
         out_dim (int): Output dimension
-        activation (str): Activation function ('ReLU', 'GELU', 'Swish', 'Tanh')
+        activation (str): Activation function ('ReLU', 'LeakyReLU', 'GELU', 'Tanh', etc.)
+        out_activation (str): Output activation function ('ReLU', 'Softplus', etc.)
+            Use 'Softplus' for non-negative outputs (e.g., power spectra) as it
+            avoids the "dying ReLU" problem while guaranteeing positive outputs.
     """
-    
+
     def __init__(
         self,
         in_dim: int,
@@ -398,35 +401,39 @@ class MLP(nn.Module):
         out_activation: str = None,
     ):
         super(MLP, self).__init__()
-        
+
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
         self.n_hidden = n_hidden
         self.out_dim = out_dim
-        out_activation = out_activation
-        
+        self.activation_name = activation
+        self.out_activation_name = out_activation
+
         # Define activation function
         self.activation_fn = self._get_activation_fn(activation)
         self.out_activation_fn = self._get_activation_fn(out_activation) if out_activation else None
 
         # Build layers
         layers = []
-        
+
         # Input layer
         layers.append(nn.Linear(in_dim, hidden_dim))
-        layers.append(self.activation_fn)
-        
+        layers.append(self._get_activation_fn(activation))
+
         # Hidden layers
         for _ in range(n_hidden):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(self.activation_fn)
-        
+            layers.append(self._get_activation_fn(activation))
+
         # Output layer
         layers.append(nn.Linear(hidden_dim, out_dim))
         if self.out_activation_fn is not None:
-            layers.append(self.out_activation_fn)
+            layers.append(self._get_activation_fn(out_activation))
         self.network = nn.Sequential(*layers)
-    
+
+        # Initialize weights
+        self._init_weights()
+
     def _get_activation_fn(self, activation: str) -> nn.Module:
         """Get activation function by name."""
         try:
@@ -435,6 +442,26 @@ class MLP(nn.Module):
         except AttributeError:
             raise ValueError(f"Activation '{activation}' not found in torch.nn. "
                            f"Make sure it's a valid PyTorch activation function.")
+
+    def _init_weights(self):
+        """Initialize weights using He/Kaiming initialization for better training stability."""
+        for module in self.network.modules():
+            if isinstance(module, nn.Linear):
+                # Use Kaiming (He) initialization
+                # For ReLU-like activations, use 'relu' nonlinearity
+                # For other activations, use 'leaky_relu' with a=0.01 as a reasonable default
+                if self.activation_name in ['ReLU', 'LeakyReLU', 'PReLU', 'RReLU']:
+                    nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+                elif self.activation_name in ['Tanh', 'Sigmoid']:
+                    # Xavier/Glorot initialization is better for tanh/sigmoid
+                    nn.init.xavier_normal_(module.weight)
+                else:
+                    # Default to Kaiming for other activations (GELU, SiLU, etc.)
+                    nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='leaky_relu')
+
+                # Initialize biases to small positive values to help avoid dead neurons
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0.01)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
