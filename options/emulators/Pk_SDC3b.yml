@@ -1,16 +1,16 @@
 # general settings
-name: Pk_SDC3b_MLP
+name: Pk_SDC3b_MLP_pareto
 num_gpu: auto  # automatic GPU detection
 manual_seed: !!int 10
 
 model_type: MLPModel
 # network architecture
 network_opt:
-  hidden_dim: !!int 100
-  n_hidden: !!int 2
+  hidden_dim: !!int 35
+  n_hidden: !!int 3
   out_dim: !!int 1
   activation: ReLU
-  out_activation: ReLU
+  out_activation: Softplus
 
 
 # training settings
@@ -18,9 +18,9 @@ train:
   total_iter: !!int 120000
   ema_decay: !!float 0.999
   optimizer_opt:
-    type: Adam
+    type: AdamW
     lr: !!float 1e-3
-    weight_decay: !!float 1e-4 #0.0001
+    weight_decay: !!float 1e-5 #0.0001
   scheduler:
     type: MultiStepLR
     milestones: [60000, 90000]
@@ -29,7 +29,7 @@ train:
 # dataset options
 dataset:
   type: BaseDataset
-  batch_size_per_gpu: !!int 20000
+  batch_size_per_gpu: !!int 1449
   num_worker_per_gpu: !!int 4
   params_opt:
     file: data/SDC3b/parameters_old.npy
@@ -49,11 +49,11 @@ dataset:
       lims_nsample: [!!float nan, !!float nan, !!float nan] # [6.535, 7.962, !!float nan]
     kperp:
       file: data/SDC3b/bins_kper.txt
-      log: !!bool false
+      log: !!bool true
       lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
     kpar:
       file: data/SDC3b/bins_kpar.txt
-      log: !!bool false
+      log: !!bool true
       lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
 
 path:

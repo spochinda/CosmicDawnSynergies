@@ -2,24 +2,25 @@
 
 # Tuning settings
 tune:
-  n_trials: !!int 500
-  timeout: !!int 3600  # seconds
-  epochs: !!int 40
+  n_trials: !!int 2100
+  timeout: !!int 50000  # seconds
+  epochs: !!int 50
   log_freq: !!int 10
-  study_name: Pk_SDC3b_tuning
-  overwrite: !!bool true  # Set to true to delete existing study and start fresh
-  objective1: rmse      # Primary objective: minimize RMSE
+  study_name: Pk_SDC3b_tuning_4
+  overwrite: !!bool false  # Set to true to delete existing study and start fresh
+  objective1: r2      # Primary objective: maximize R2
   objective2: n_params  # Secondary objective: minimize number of parameters (Pareto)
 
 # Fixed model settings
 model:
   out_dim: !!int 1
-  out_activation: ReLU  # Output activation is fixed
+  activation: ReLU  # Activation function to be tuned
+  out_activation: Softplus  # Output activation is fixed
 
 # Fixed optimizer settings
 optimizer:
   type: AdamW
-#  lr: !!float 1e-3
+  lr: !!float 1e-3
   weight_decay: !!float 1e-5
 
 # Parameters to tune with their ranges and scales
@@ -37,14 +38,14 @@ search_space:
     type: int
     low: !!int 32
     high: !!int 256
-  activation:
-    type: categorical
-    choices: ['ReLU', 'LeakyReLU', 'Sigmoid']
-  lr:
-    type: float
-    low: !!float 1e-5
-    high: !!float 1e-2
-    log: !!bool true
+#  activation:
+#    type: categorical
+#    choices: ['ReLU', 'LeakyReLU', 'Sigmoid']
+#  lr:
+#    type: float
+#    low: !!float 1e-5
+#    high: !!float 1e-2
+#    log: !!bool true
 #  weight_decay:
 #    type: float
 #    low: !!float 1e-6
