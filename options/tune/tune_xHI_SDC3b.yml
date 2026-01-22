@@ -1,0 +1,73 @@
+# Optuna hyperparameter tuning configuration for xHI_SDC3b emulator
+
+# Tuning settings
+tune:
+  n_trials: !!int 2100
+  timeout: !!int 50000  # seconds
+  epochs: !!int 50
+  log_freq: !!int 10
+  study_name: xHI_SDC3b_tuning
+  overwrite: !!bool false  # Set to true to delete existing study and start fresh
+  objective1: r2      # Primary objective: maximize R2
+  objective2: n_params  # Secondary objective: minimize number of parameters (Pareto)
+
+# Fixed model settings
+model:
+  out_dim: !!int 1
+  activation: ReLU  # Activation function to be tuned
+  out_activation: Softplus  # Output activation is fixed
+
+# Fixed optimizer settings
+optimizer:
+  type: AdamW
+  lr: !!float 1e-3
+  weight_decay: !!float 1e-5
+
+# Parameters to tune with their ranges and scales
+# Note: lr and weight_decay can be added here to make them tunable instead of fixed
+search_space:
+  batch_size:
+    type: int
+    low: !!int 1000
+    high: !!int 40000
+  n_hidden:
+    type: int
+    low: !!int 1
+    high: !!int 6
+  hidden_dim:
+    type: int
+    low: !!int 32
+    high: !!int 256
+#  activation:
+#    type: categorical
+#    choices: ['ReLU', 'LeakyReLU', 'Sigmoid']
+#  lr:
+#    type: float
+#    low: !!float 1e-5
+#    high: !!float 1e-2
+#    log: !!bool true
+#  weight_decay:
+#    type: float
+#    low: !!float 1e-6
+#    high: !!float 1e-2
+#    log: !!bool true
+
+# Dataset options (same as training config)
+dataset:
+  type: BaseDataset
+  params_opt:
+    file: data/SDC3b/parameters_old.npy
+    key: parameters
+    names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
+    log: []
+    discard: []
+    normalization: norm_minmax
+  targets_opt:
+    file: data/SDC3b/averaged_xHI_old.npy
+    offset: !!float 0.0
+    log: !!bool false
+  data_dims:
+    z:
+      file: data/SDC3b/z_xHI.npy
+      log: !!bool false
+      lims_nsample: [!!float nan, !!float nan, !!float nan]
