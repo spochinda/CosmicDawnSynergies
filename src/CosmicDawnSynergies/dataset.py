@@ -115,6 +115,9 @@ class BaseDataset(Dataset):
     
     def norm_standard(self, x):
         return (x - self.params_means) / self.params_stds
+
+    def norm_minmax_extended(self, x):
+        return (x - self.params_mins) / (self.params_maxs - self.params_mins) * 2 - 1
     
     def build_param_stats(self):
         self.param_stats = OrderedDict()

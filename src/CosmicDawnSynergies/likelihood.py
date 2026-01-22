@@ -67,6 +67,14 @@ class LikelihoodBase:
             return param * std + mean
         else:
             return (param - mean) / std
+    
+    def norm_minmax_extended(self, params, invert=False, **kwargs):
+        minimum = kwargs.get("min", None)
+        maximum = kwargs.get("max", None)
+        if invert:
+            return (params + 1) / 2 * (maximum - minimum) + minimum
+        else:
+            return (params - minimum) / (maximum - minimum) * 2 - 1
         
     def get_prior_indices(self, prior_dict):
         prior_keys = list(prior_dict.keys())
