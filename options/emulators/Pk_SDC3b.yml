@@ -1,5 +1,5 @@
 # general settings
-name: Pk_SDC3b_MLP_pareto
+name: Pk_SDC3b_test
 num_gpu: auto  # automatic GPU detection
 manual_seed: !!int 10
 
@@ -63,7 +63,9 @@ path:
 
 # validation settings
 val:
-  val_freq: !!float 1000
+  val_freq: !!float 500
+  save_best: !!bool false
+  val_start: !!int 0
 
 logger:
   print_freq: !!int 500

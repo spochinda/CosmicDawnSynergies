@@ -515,6 +515,17 @@ class MLPModel(BaseModel):
         self.log_dict = OrderedDict()
     
     def init_training_settings(self):
+        self.best_metric_results = dict()
+        self.best_metric_results['rmse'] = dict()
+        self.best_metric_results['rmse']['val'] = float('inf')
+        self.best_metric_results['rmse']['iter'] = -1
+        self.best_metric_results['nrmse'] = dict()
+        self.best_metric_results['nrmse']['val'] = float('inf')
+        self.best_metric_results['nrmse']['iter'] = -1
+        self.best_metric_results['r2'] = dict()
+        self.best_metric_results['r2']['val'] = -float('inf')
+        self.best_metric_results['r2']['iter'] = -1
+
         self.net_g.train()
         train_opt = self.opt['train']
 
@@ -696,8 +707,18 @@ class MLPModel(BaseModel):
             rmse_scaled = 10**rmse if self.opt['dataset']['targets_opt'].get('log', False) else rmse
             rmse_scaled = rmse_scaled - self.opt['dataset']['targets_opt'].get('offset', 0)
 
+            if self.best_metric_results['rmse']['val'] > rmse_scaled.item():
+                self.best_metric_results['rmse']['val'] = rmse_scaled.item()
+                self.best_metric_results['rmse']['iter'] = current_iter
+            if self.best_metric_results['nrmse']['val'] > nrmse.item():
+                self.best_metric_results['nrmse']['val'] = nrmse.item()
+                self.best_metric_results['nrmse']['iter'] = current_iter
+            if self.best_metric_results['r2']['val'] < r2.item():
+                self.best_metric_results['r2']['val'] = r2.item()
+                self.best_metric_results['r2']['iter'] = current_iter
+
             logger = get_root_logger()
-            logger.info(f'Validation RMSE: {rmse_scaled:.6f} | NRMSE: {nrmse:.6f} | R²: {r2:.6f}')
+            logger.info(f'Validation: RMSE={rmse_scaled:.4f} (Best: {self.best_metric_results["rmse"]["val"]:.4f}, iter {self.best_metric_results["rmse"]["iter"]})| NRMSE={nrmse:.4f} (Best: {self.best_metric_results["nrmse"]["val"]:.4f}, iter {self.best_metric_results["nrmse"]["iter"]})| R²={r2:.4f} (Best: {self.best_metric_results["r2"]["val"]:.4f}, iter {self.best_metric_results["r2"]["iter"]})')
 
             if tb_logger:
                 tb_logger.add_scalar('validation/rmse', rmse_scaled, current_iter)

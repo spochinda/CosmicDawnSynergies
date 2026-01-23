@@ -1,5 +1,6 @@
 import datetime
 import logging
+from copy import deepcopy
 import math
 import time
 import sklearn
@@ -256,25 +257,30 @@ def train_pipeline(root_path):
                     log_vars.update(model.get_current_log())
                     msg_logger(log_vars)
 
-                #main_dataset.params_train.columns
-                # save models and training states
-                if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
-                    logger.info('Saving models and training states.')
-                    model.save(epoch, current_iter)
-
                 # validation
+                save_best = opt['val'].get('save_best', False) and (current_iter > opt['val'].get('val_start', 0))
                 if opt.get('val') is not None and (current_iter % opt['val']['val_freq'] == 0):
                     logger.info('Running validation...')
+                    previous_best = deepcopy(model.best_metric_results)
                     model.validation(val_loader, current_iter, tb_logger)
-
+                    current_best = deepcopy(model.best_metric_results)
+                    if save_best:
+                        if previous_best != current_best:
+                            logger.info('Saving models and training states.')
+                            model.save(epoch, current_iter)
+                        else:
+                            logger.info('No improvement in validation metrics, skipping model save.')
+                    
+                if (current_iter % opt['logger']['save_checkpoint_freq'] == 0) and not save_best:
+                    logger.info('Saving models and training states.')
+                    model.save(epoch, current_iter)
+                    
                 data_timer.start()
                 iter_timer.start()
                 
             # Check if we've reached the total iterations
             if current_iter >= total_iters:
                 break
-            if current_iter == 10:
-                assert False, 'Just for debug: run only 10 iters'
                 
         # end of epoch
     else:
