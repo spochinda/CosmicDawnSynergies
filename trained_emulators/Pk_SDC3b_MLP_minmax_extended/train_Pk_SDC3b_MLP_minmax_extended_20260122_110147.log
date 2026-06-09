@@ -1,0 +1,397 @@
+2026-01-22 11:01:47,032 INFO: Version Information: PyTorch: 2.2.1+cu121
+2026-01-22 11:01:47,033 INFO: 
+  name: Pk_SDC3b_MLP_minmax_extended
+  num_gpu: 1
+  manual_seed: 10
+  model_type: MLPModel
+  network_opt:[
+    hidden_dim: 35
+    n_hidden: 3
+    out_dim: 1
+    activation: ReLU
+    out_activation: Softplus
+  ]
+  train:[
+    total_iter: 120000
+    ema_decay: 0.999
+    optimizer_opt:[
+      type: AdamW
+      lr: 0.001
+      weight_decay: 1e-05
+    ]
+    scheduler:[
+      type: MultiStepLR
+      milestones: [60000, 90000]
+      gamma: 0.5
+    ]
+  ]
+  dataset:[
+    type: BaseDataset
+    batch_size_per_gpu: 1449
+    num_worker_per_gpu: 4
+    params_opt:[
+      file: data/SDC3b/parameters_old.npy
+      key: parameters
+      names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
+      log: []
+      discard: []
+      normalization: norm_minmax_extended
+    ]
+    targets_opt:[
+      file: data/SDC3b/power_spectra_old.npy
+      offset: 0.0
+      log: False
+    ]
+    data_dims:[
+      z:[
+        file: data/SDC3b/z_power_spectra.npy
+        log: False
+        lims_nsample: [nan, nan, nan]
+      ]
+      kperp:[
+        file: data/SDC3b/bins_kper.txt
+        log: True
+        lims_nsample: [nan, nan, nan]
+      ]
+      kpar:[
+        file: data/SDC3b/bins_kpar.txt
+        log: True
+        lims_nsample: [nan, nan, nan]
+      ]
+    ]
+  ]
+  path:[
+    pretrain_network_g: None
+    strict_load_g: True
+    resume_state: None
+    emulators_root: /home/sp2053/rds/hpc-work/updated_CosmicDawnSynergies/CosmicDawnSynergies/trained_emulators/Pk_SDC3b_MLP_minmax_extended
+    models: /home/sp2053/rds/hpc-work/updated_CosmicDawnSynergies/CosmicDawnSynergies/trained_emulators/Pk_SDC3b_MLP_minmax_extended/models
+    training_states: /home/sp2053/rds/hpc-work/updated_CosmicDawnSynergies/CosmicDawnSynergies/trained_emulators/Pk_SDC3b_MLP_minmax_extended/training_states
+    log: /home/sp2053/rds/hpc-work/updated_CosmicDawnSynergies/CosmicDawnSynergies/trained_emulators/Pk_SDC3b_MLP_minmax_extended
+    visualization: /home/sp2053/rds/hpc-work/updated_CosmicDawnSynergies/CosmicDawnSynergies/trained_emulators/Pk_SDC3b_MLP_minmax_extended/visualization
+  ]
+  val:[
+    val_freq: 10000.0
+  ]
+  logger:[
+    print_freq: 500
+    save_checkpoint_freq: 10000.0
+    use_tb_logger: True
+    wandb:[
+      project: None
+      resume_id: None
+    ]
+  ]
+  dist_params:[
+    backend: nccl
+    port: 29500
+  ]
+  dist: False
+  rank: 0
+  world_size: 1
+  auto_resume: False
+  is_train: True
+  root_path: /home/sp2053/rds/hpc-work/updated_CosmicDawnSynergies/CosmicDawnSynergies
+
+2026-01-22 11:02:30,349 INFO: Building BaseDataset
+2026-01-22 11:02:30,603 INFO: Training statistics:
+	Number of train samples: 240000
+	Number of val samples: 60000
+	Batch size per gpu: 1449
+	World size (gpu number): 1
+	Total batch size: 1449
+	Iterations per epoch: 166
+	Total epochs: 723; iters: 120000.
+2026-01-22 11:02:30,910 INFO: Network: MLP, with parameters: 4,096
+2026-01-22 11:02:30,910 INFO: MLP(
+  (activation_fn): ReLU()
+  (out_activation_fn): Softplus(beta=1, threshold=20)
+  (network): Sequential(
+    (0): Linear(in_features=7, out_features=35, bias=True)
+    (1): ReLU()
+    (2): Linear(in_features=35, out_features=35, bias=True)
+    (3): ReLU()
+    (4): Linear(in_features=35, out_features=35, bias=True)
+    (5): ReLU()
+    (6): Linear(in_features=35, out_features=35, bias=True)
+    (7): ReLU()
+    (8): Linear(in_features=35, out_features=1, bias=True)
+    (9): Softplus(beta=1, threshold=20)
+  )
+)
+2026-01-22 11:02:30,911 INFO: Use Exponential Moving Average with decay: 0.999
+2026-01-22 11:02:31,144 INFO: Start training from epoch: 0, iter: 0
+2026-01-22 11:02:33,132 INFO: [Pk_SD..][epoch:  3, iter:     500, lr:(1.000e-03,)] [eta: 0:06:30, time (data): 0.003 (0.001)] loss: 4.5040e-02 
+2026-01-22 11:02:34,779 INFO: [Pk_SD..][epoch:  6, iter:   1,000, lr:(1.000e-03,)] [eta: 0:06:30, time (data): 0.003 (0.001)] loss: 2.8744e-02 
+2026-01-22 11:02:36,034 INFO: [Pk_SD..][epoch:  9, iter:   1,500, lr:(1.000e-03,)] [eta: 0:05:58, time (data): 0.002 (0.001)] loss: 2.3007e-02 
+2026-01-22 11:02:37,130 INFO: [Pk_SD..][epoch: 12, iter:   2,000, lr:(1.000e-03,)] [eta: 0:05:32, time (data): 0.002 (0.001)] loss: 1.7268e-02 
+2026-01-22 11:02:38,271 INFO: [Pk_SD..][epoch: 15, iter:   2,500, lr:(1.000e-03,)] [eta: 0:05:18, time (data): 0.002 (0.001)] loss: 1.8562e-02 
+2026-01-22 11:02:39,751 INFO: [Pk_SD..][epoch: 18, iter:   3,000, lr:(1.000e-03,)] [eta: 0:05:21, time (data): 0.002 (0.000)] loss: 1.2262e-02 
+2026-01-22 11:02:41,248 INFO: [Pk_SD..][epoch: 21, iter:   3,500, lr:(1.000e-03,)] [eta: 0:05:24, time (data): 0.005 (0.003)] loss: 1.1320e-02 
+2026-01-22 11:02:42,554 INFO: [Pk_SD..][epoch: 24, iter:   4,000, lr:(1.000e-03,)] [eta: 0:05:20, time (data): 0.003 (0.001)] loss: 1.0028e-02 
+2026-01-22 11:02:44,236 INFO: [Pk_SD..][epoch: 27, iter:   4,500, lr:(1.000e-03,)] [eta: 0:05:26, time (data): 0.005 (0.003)] loss: 1.5574e-02 
+2026-01-22 11:02:45,751 INFO: [Pk_SD..][epoch: 30, iter:   5,000, lr:(1.000e-03,)] [eta: 0:05:27, time (data): 0.003 (0.001)] loss: 1.0589e-02 
+2026-01-22 11:02:47,206 INFO: [Pk_SD..][epoch: 33, iter:   5,500, lr:(1.000e-03,)] [eta: 0:05:26, time (data): 0.002 (0.001)] loss: 7.8888e-03 
+2026-01-22 11:02:48,334 INFO: [Pk_SD..][epoch: 36, iter:   6,000, lr:(1.000e-03,)] [eta: 0:05:19, time (data): 0.002 (0.000)] loss: 6.8010e-03 
+2026-01-22 11:02:49,466 INFO: [Pk_SD..][epoch: 39, iter:   6,500, lr:(1.000e-03,)] [eta: 0:05:13, time (data): 0.002 (0.001)] loss: 9.8106e-03 
+2026-01-22 11:02:50,961 INFO: [Pk_SD..][epoch: 42, iter:   7,000, lr:(1.000e-03,)] [eta: 0:05:14, time (data): 0.002 (0.000)] loss: 8.8184e-03 
+2026-01-22 11:02:52,287 INFO: [Pk_SD..][epoch: 45, iter:   7,500, lr:(1.000e-03,)] [eta: 0:05:11, time (data): 0.002 (0.000)] loss: 7.5102e-03 
+2026-01-22 11:02:53,822 INFO: [Pk_SD..][epoch: 48, iter:   8,000, lr:(1.000e-03,)] [eta: 0:05:12, time (data): 0.003 (0.002)] loss: 7.8868e-03 
+2026-01-22 11:02:55,350 INFO: [Pk_SD..][epoch: 51, iter:   8,500, lr:(1.000e-03,)] [eta: 0:05:12, time (data): 0.002 (0.000)] loss: 6.4887e-03 
+2026-01-22 11:02:57,019 INFO: [Pk_SD..][epoch: 54, iter:   9,000, lr:(1.000e-03,)] [eta: 0:05:14, time (data): 0.003 (0.002)] loss: 8.1463e-03 
+2026-01-22 11:02:58,479 INFO: [Pk_SD..][epoch: 57, iter:   9,500, lr:(1.000e-03,)] [eta: 0:05:13, time (data): 0.002 (0.000)] loss: 7.0442e-03 
+2026-01-22 11:02:59,557 INFO: [Pk_SD..][epoch: 60, iter:  10,000, lr:(1.000e-03,)] [eta: 0:05:08, time (data): 0.002 (0.000)] loss: 5.7134e-03 
+2026-01-22 11:02:59,557 INFO: Saving models and training states.
+2026-01-22 11:02:59,592 INFO: Running validation...
+2026-01-22 11:02:59,601 INFO: Validation RMSE: 0.010312 | NRMSE: 0.201694 | R²: 0.959319
+2026-01-22 11:03:00,673 INFO: [Pk_SD..][epoch: 63, iter:  10,500, lr:(1.000e-03,)] [eta: 0:05:04, time (data): 0.002 (0.000)] loss: 5.4052e-03 
+2026-01-22 11:03:02,137 INFO: [Pk_SD..][epoch: 66, iter:  11,000, lr:(1.000e-03,)] [eta: 0:05:03, time (data): 0.003 (0.002)] loss: 6.2691e-03 
+2026-01-22 11:03:03,376 INFO: [Pk_SD..][epoch: 69, iter:  11,500, lr:(1.000e-03,)] [eta: 0:05:00, time (data): 0.006 (0.004)] loss: 5.8950e-03 
+2026-01-22 11:03:04,647 INFO: [Pk_SD..][epoch: 72, iter:  12,000, lr:(1.000e-03,)] [eta: 0:04:58, time (data): 0.002 (0.000)] loss: 8.1653e-03 
+2026-01-22 11:03:06,286 INFO: [Pk_SD..][epoch: 75, iter:  12,500, lr:(1.000e-03,)] [eta: 0:04:59, time (data): 0.007 (0.005)] loss: 6.0644e-03 
+2026-01-22 11:03:07,747 INFO: [Pk_SD..][epoch: 78, iter:  13,000, lr:(1.000e-03,)] [eta: 0:04:58, time (data): 0.002 (0.000)] loss: 5.6647e-03 
+2026-01-22 11:03:09,374 INFO: [Pk_SD..][epoch: 81, iter:  13,500, lr:(1.000e-03,)] [eta: 0:04:58, time (data): 0.002 (0.000)] loss: 1.0372e-02 
+2026-01-22 11:03:10,534 INFO: [Pk_SD..][epoch: 84, iter:  14,000, lr:(1.000e-03,)] [eta: 0:04:55, time (data): 0.002 (0.000)] loss: 5.5639e-03 
+2026-01-22 11:03:11,668 INFO: [Pk_SD..][epoch: 87, iter:  14,500, lr:(1.000e-03,)] [eta: 0:04:52, time (data): 0.002 (0.000)] loss: 4.4156e-03 
+2026-01-22 11:03:12,979 INFO: [Pk_SD..][epoch: 90, iter:  15,000, lr:(1.000e-03,)] [eta: 0:04:50, time (data): 0.002 (0.000)] loss: 6.8512e-03 
+2026-01-22 11:03:14,267 INFO: [Pk_SD..][epoch: 93, iter:  15,500, lr:(1.000e-03,)] [eta: 0:04:48, time (data): 0.002 (0.000)] loss: 4.2511e-03 
+2026-01-22 11:03:15,774 INFO: [Pk_SD..][epoch: 96, iter:  16,000, lr:(1.000e-03,)] [eta: 0:04:47, time (data): 0.004 (0.002)] loss: 4.8960e-03 
+2026-01-22 11:03:17,233 INFO: [Pk_SD..][epoch: 99, iter:  16,500, lr:(1.000e-03,)] [eta: 0:04:46, time (data): 0.013 (0.011)] loss: 5.3355e-03 
+2026-01-22 11:03:18,911 INFO: [Pk_SD..][epoch:103, iter:  17,000, lr:(1.000e-03,)] [eta: 0:04:47, time (data): 0.004 (0.002)] loss: 5.1237e-03 
+2026-01-22 11:03:20,416 INFO: [Pk_SD..][epoch:106, iter:  17,500, lr:(1.000e-03,)] [eta: 0:04:46, time (data): 0.004 (0.002)] loss: 4.0634e-03 
+2026-01-22 11:03:21,699 INFO: [Pk_SD..][epoch:109, iter:  18,000, lr:(1.000e-03,)] [eta: 0:04:44, time (data): 0.002 (0.001)] loss: 5.2638e-03 
+2026-01-22 11:03:22,830 INFO: [Pk_SD..][epoch:112, iter:  18,500, lr:(1.000e-03,)] [eta: 0:04:41, time (data): 0.002 (0.000)] loss: 4.7833e-03 
+2026-01-22 11:03:24,102 INFO: [Pk_SD..][epoch:115, iter:  19,000, lr:(1.000e-03,)] [eta: 0:04:39, time (data): 0.002 (0.001)] loss: 4.1670e-03 
+2026-01-22 11:03:25,420 INFO: [Pk_SD..][epoch:118, iter:  19,500, lr:(1.000e-03,)] [eta: 0:04:37, time (data): 0.002 (0.000)] loss: 4.1312e-03 
+2026-01-22 11:03:26,695 INFO: [Pk_SD..][epoch:121, iter:  20,000, lr:(1.000e-03,)] [eta: 0:04:35, time (data): 0.002 (0.001)] loss: 4.5587e-03 
+2026-01-22 11:03:26,695 INFO: Saving models and training states.
+2026-01-22 11:03:26,749 INFO: Running validation...
+2026-01-22 11:03:26,751 INFO: Validation RMSE: 0.008660 | NRMSE: 0.169399 | R²: 0.971304
+2026-01-22 11:03:28,209 INFO: [Pk_SD..][epoch:124, iter:  20,500, lr:(1.000e-03,)] [eta: 0:04:35, time (data): 0.002 (0.000)] loss: 4.0409e-03 
+2026-01-22 11:03:29,807 INFO: [Pk_SD..][epoch:127, iter:  21,000, lr:(1.000e-03,)] [eta: 0:04:34, time (data): 0.004 (0.002)] loss: 8.5712e-03 
+2026-01-22 11:03:31,397 INFO: [Pk_SD..][epoch:130, iter:  21,500, lr:(1.000e-03,)] [eta: 0:04:34, time (data): 0.003 (0.001)] loss: 4.7500e-03 
+2026-01-22 11:03:32,684 INFO: [Pk_SD..][epoch:133, iter:  22,000, lr:(1.000e-03,)] [eta: 0:04:32, time (data): 0.002 (0.001)] loss: 5.8369e-03 
+2026-01-22 11:03:33,765 INFO: [Pk_SD..][epoch:136, iter:  22,500, lr:(1.000e-03,)] [eta: 0:04:29, time (data): 0.002 (0.000)] loss: 4.7931e-03 
+2026-01-22 11:03:35,016 INFO: [Pk_SD..][epoch:139, iter:  23,000, lr:(1.000e-03,)] [eta: 0:04:27, time (data): 0.002 (0.001)] loss: 3.4184e-03 
+2026-01-22 11:03:36,295 INFO: [Pk_SD..][epoch:142, iter:  23,500, lr:(1.000e-03,)] [eta: 0:04:26, time (data): 0.003 (0.001)] loss: 5.6639e-03 
+2026-01-22 11:03:37,545 INFO: [Pk_SD..][epoch:145, iter:  24,000, lr:(1.000e-03,)] [eta: 0:04:24, time (data): 0.002 (0.000)] loss: 4.2885e-03 
+2026-01-22 11:03:39,000 INFO: [Pk_SD..][epoch:148, iter:  24,500, lr:(1.000e-03,)] [eta: 0:04:23, time (data): 0.002 (0.000)] loss: 3.5227e-03 
+2026-01-22 11:03:40,587 INFO: [Pk_SD..][epoch:151, iter:  25,000, lr:(1.000e-03,)] [eta: 0:04:22, time (data): 0.004 (0.003)] loss: 4.0773e-03 
+2026-01-22 11:03:41,987 INFO: [Pk_SD..][epoch:154, iter:  25,500, lr:(1.000e-03,)] [eta: 0:04:21, time (data): 0.002 (0.000)] loss: 3.7865e-03 
+2026-01-22 11:03:43,423 INFO: [Pk_SD..][epoch:157, iter:  26,000, lr:(1.000e-03,)] [eta: 0:04:20, time (data): 0.002 (0.000)] loss: 4.2286e-03 
+2026-01-22 11:03:44,517 INFO: [Pk_SD..][epoch:160, iter:  26,500, lr:(1.000e-03,)] [eta: 0:04:17, time (data): 0.002 (0.000)] loss: 4.2811e-03 
+2026-01-22 11:03:45,804 INFO: [Pk_SD..][epoch:163, iter:  27,000, lr:(1.000e-03,)] [eta: 0:04:15, time (data): 0.002 (0.000)] loss: 2.9005e-03 
+2026-01-22 11:03:47,063 INFO: [Pk_SD..][epoch:166, iter:  27,500, lr:(1.000e-03,)] [eta: 0:04:14, time (data): 0.003 (0.002)] loss: 4.0333e-03 
+2026-01-22 11:03:48,301 INFO: [Pk_SD..][epoch:169, iter:  28,000, lr:(1.000e-03,)] [eta: 0:04:12, time (data): 0.002 (0.000)] loss: 5.0096e-03 
+2026-01-22 11:03:49,721 INFO: [Pk_SD..][epoch:172, iter:  28,500, lr:(1.000e-03,)] [eta: 0:04:11, time (data): 0.003 (0.002)] loss: 3.0476e-03 
+2026-01-22 11:03:51,170 INFO: [Pk_SD..][epoch:175, iter:  29,000, lr:(1.000e-03,)] [eta: 0:04:10, time (data): 0.002 (0.000)] loss: 4.3863e-03 
+2026-01-22 11:03:52,779 INFO: [Pk_SD..][epoch:178, iter:  29,500, lr:(1.000e-03,)] [eta: 0:04:09, time (data): 0.003 (0.002)] loss: 5.5405e-03 
+2026-01-22 11:03:54,063 INFO: [Pk_SD..][epoch:181, iter:  30,000, lr:(1.000e-03,)] [eta: 0:04:07, time (data): 0.002 (0.000)] loss: 3.7521e-03 
+2026-01-22 11:03:54,063 INFO: Saving models and training states.
+2026-01-22 11:03:54,108 INFO: Running validation...
+2026-01-22 11:03:54,109 INFO: Validation RMSE: 0.006562 | NRMSE: 0.128357 | R²: 0.983524
+2026-01-22 11:03:55,391 INFO: [Pk_SD..][epoch:184, iter:  30,500, lr:(1.000e-03,)] [eta: 0:04:06, time (data): 0.002 (0.000)] loss: 6.8336e-03 
+2026-01-22 11:03:56,665 INFO: [Pk_SD..][epoch:187, iter:  31,000, lr:(1.000e-03,)] [eta: 0:04:04, time (data): 0.002 (0.000)] loss: 4.5714e-03 
+2026-01-22 11:03:57,764 INFO: [Pk_SD..][epoch:190, iter:  31,500, lr:(1.000e-03,)] [eta: 0:04:02, time (data): 0.002 (0.000)] loss: 3.1835e-03 
+2026-01-22 11:03:59,227 INFO: [Pk_SD..][epoch:193, iter:  32,000, lr:(1.000e-03,)] [eta: 0:04:01, time (data): 0.002 (0.000)] loss: 4.3139e-03 
+2026-01-22 11:04:00,695 INFO: [Pk_SD..][epoch:196, iter:  32,500, lr:(1.000e-03,)] [eta: 0:04:00, time (data): 0.003 (0.002)] loss: 3.0625e-03 
+2026-01-22 11:04:01,959 INFO: [Pk_SD..][epoch:199, iter:  33,000, lr:(1.000e-03,)] [eta: 0:03:58, time (data): 0.002 (0.001)] loss: 2.7713e-03 
+2026-01-22 11:04:03,625 INFO: [Pk_SD..][epoch:203, iter:  33,500, lr:(1.000e-03,)] [eta: 0:03:57, time (data): 0.004 (0.002)] loss: 4.4967e-03 
+2026-01-22 11:04:05,138 INFO: [Pk_SD..][epoch:206, iter:  34,000, lr:(1.000e-03,)] [eta: 0:03:56, time (data): 0.003 (0.001)] loss: 2.7781e-03 
+2026-01-22 11:04:06,452 INFO: [Pk_SD..][epoch:209, iter:  34,500, lr:(1.000e-03,)] [eta: 0:03:55, time (data): 0.002 (0.000)] loss: 4.3263e-03 
+2026-01-22 11:04:07,720 INFO: [Pk_SD..][epoch:212, iter:  35,000, lr:(1.000e-03,)] [eta: 0:03:53, time (data): 0.003 (0.001)] loss: 3.8218e-03 
+2026-01-22 11:04:08,856 INFO: [Pk_SD..][epoch:215, iter:  35,500, lr:(1.000e-03,)] [eta: 0:03:51, time (data): 0.002 (0.001)] loss: 3.3539e-03 
+2026-01-22 11:04:10,342 INFO: [Pk_SD..][epoch:218, iter:  36,000, lr:(1.000e-03,)] [eta: 0:03:50, time (data): 0.002 (0.000)] loss: 4.8769e-03 
+2026-01-22 11:04:11,608 INFO: [Pk_SD..][epoch:221, iter:  36,500, lr:(1.000e-03,)] [eta: 0:03:49, time (data): 0.002 (0.001)] loss: 4.7977e-03 
+2026-01-22 11:04:13,078 INFO: [Pk_SD..][epoch:224, iter:  37,000, lr:(1.000e-03,)] [eta: 0:03:47, time (data): 0.002 (0.000)] loss: 4.5479e-03 
+2026-01-22 11:04:14,719 INFO: [Pk_SD..][epoch:227, iter:  37,500, lr:(1.000e-03,)] [eta: 0:03:47, time (data): 0.004 (0.002)] loss: 2.7549e-03 
+2026-01-22 11:04:15,975 INFO: [Pk_SD..][epoch:230, iter:  38,000, lr:(1.000e-03,)] [eta: 0:03:45, time (data): 0.002 (0.000)] loss: 3.2342e-03 
+2026-01-22 11:04:17,400 INFO: [Pk_SD..][epoch:233, iter:  38,500, lr:(1.000e-03,)] [eta: 0:03:44, time (data): 0.002 (0.001)] loss: 3.2979e-03 
+2026-01-22 11:04:18,675 INFO: [Pk_SD..][epoch:236, iter:  39,000, lr:(1.000e-03,)] [eta: 0:03:42, time (data): 0.002 (0.000)] loss: 4.1301e-03 
+2026-01-22 11:04:19,760 INFO: [Pk_SD..][epoch:239, iter:  39,500, lr:(1.000e-03,)] [eta: 0:03:40, time (data): 0.002 (0.001)] loss: 2.8144e-03 
+2026-01-22 11:04:21,195 INFO: [Pk_SD..][epoch:242, iter:  40,000, lr:(1.000e-03,)] [eta: 0:03:39, time (data): 0.002 (0.000)] loss: 4.7472e-03 
+2026-01-22 11:04:21,196 INFO: Saving models and training states.
+2026-01-22 11:04:21,397 INFO: Running validation...
+2026-01-22 11:04:21,399 INFO: Validation RMSE: 0.006578 | NRMSE: 0.128658 | R²: 0.983447
+2026-01-22 11:04:22,637 INFO: [Pk_SD..][epoch:245, iter:  40,500, lr:(1.000e-03,)] [eta: 0:03:38, time (data): 0.002 (0.001)] loss: 3.8719e-03 
+2026-01-22 11:04:24,096 INFO: [Pk_SD..][epoch:248, iter:  41,000, lr:(1.000e-03,)] [eta: 0:03:36, time (data): 0.003 (0.001)] loss: 3.3580e-03 
+2026-01-22 11:04:25,746 INFO: [Pk_SD..][epoch:251, iter:  41,500, lr:(1.000e-03,)] [eta: 0:03:36, time (data): 0.004 (0.002)] loss: 3.4045e-03 
+2026-01-22 11:04:27,059 INFO: [Pk_SD..][epoch:254, iter:  42,000, lr:(1.000e-03,)] [eta: 0:03:34, time (data): 0.003 (0.001)] loss: 3.8923e-03 
+2026-01-22 11:04:28,529 INFO: [Pk_SD..][epoch:257, iter:  42,500, lr:(1.000e-03,)] [eta: 0:03:33, time (data): 0.004 (0.002)] loss: 4.2635e-03 
+2026-01-22 11:04:29,654 INFO: [Pk_SD..][epoch:260, iter:  43,000, lr:(1.000e-03,)] [eta: 0:03:31, time (data): 0.002 (0.000)] loss: 2.7247e-03 
+2026-01-22 11:04:30,953 INFO: [Pk_SD..][epoch:263, iter:  43,500, lr:(1.000e-03,)] [eta: 0:03:30, time (data): 0.002 (0.000)] loss: 4.3036e-03 
+2026-01-22 11:04:32,266 INFO: [Pk_SD..][epoch:266, iter:  44,000, lr:(1.000e-03,)] [eta: 0:03:28, time (data): 0.003 (0.001)] loss: 4.0233e-03 
+2026-01-22 11:04:33,748 INFO: [Pk_SD..][epoch:269, iter:  44,500, lr:(1.000e-03,)] [eta: 0:03:27, time (data): 0.004 (0.002)] loss: 4.0368e-03 
+2026-01-22 11:04:35,228 INFO: [Pk_SD..][epoch:272, iter:  45,000, lr:(1.000e-03,)] [eta: 0:03:26, time (data): 0.004 (0.002)] loss: 3.8317e-03 
+2026-01-22 11:04:36,571 INFO: [Pk_SD..][epoch:275, iter:  45,500, lr:(1.000e-03,)] [eta: 0:03:24, time (data): 0.002 (0.000)] loss: 2.9190e-03 
+2026-01-22 11:04:38,211 INFO: [Pk_SD..][epoch:278, iter:  46,000, lr:(1.000e-03,)] [eta: 0:03:23, time (data): 0.003 (0.001)] loss: 2.8744e-03 
+2026-01-22 11:04:39,479 INFO: [Pk_SD..][epoch:281, iter:  46,500, lr:(1.000e-03,)] [eta: 0:03:22, time (data): 0.002 (0.000)] loss: 3.3968e-03 
+2026-01-22 11:04:40,788 INFO: [Pk_SD..][epoch:284, iter:  47,000, lr:(1.000e-03,)] [eta: 0:03:20, time (data): 0.002 (0.000)] loss: 3.7884e-03 
+2026-01-22 11:04:42,126 INFO: [Pk_SD..][epoch:287, iter:  47,500, lr:(1.000e-03,)] [eta: 0:03:19, time (data): 0.002 (0.000)] loss: 6.4375e-03 
+2026-01-22 11:04:43,468 INFO: [Pk_SD..][epoch:290, iter:  48,000, lr:(1.000e-03,)] [eta: 0:03:17, time (data): 0.003 (0.002)] loss: 2.7002e-03 
+2026-01-22 11:04:44,959 INFO: [Pk_SD..][epoch:293, iter:  48,500, lr:(1.000e-03,)] [eta: 0:03:16, time (data): 0.005 (0.003)] loss: 3.0061e-03 
+2026-01-22 11:04:46,280 INFO: [Pk_SD..][epoch:296, iter:  49,000, lr:(1.000e-03,)] [eta: 0:03:15, time (data): 0.003 (0.001)] loss: 3.2581e-03 
+2026-01-22 11:04:47,761 INFO: [Pk_SD..][epoch:299, iter:  49,500, lr:(1.000e-03,)] [eta: 0:03:14, time (data): 0.002 (0.000)] loss: 4.1046e-03 
+2026-01-22 11:04:49,295 INFO: [Pk_SD..][epoch:303, iter:  50,000, lr:(1.000e-03,)] [eta: 0:03:12, time (data): 0.002 (0.000)] loss: 3.9296e-03 
+2026-01-22 11:04:49,295 INFO: Saving models and training states.
+2026-01-22 11:04:49,320 INFO: Running validation...
+2026-01-22 11:04:49,321 INFO: Validation RMSE: 0.006131 | NRMSE: 0.119932 | R²: 0.985616
+2026-01-22 11:04:50,804 INFO: [Pk_SD..][epoch:306, iter:  50,500, lr:(1.000e-03,)] [eta: 0:03:11, time (data): 0.006 (0.005)] loss: 2.7175e-03 
+2026-01-22 11:04:52,053 INFO: [Pk_SD..][epoch:309, iter:  51,000, lr:(1.000e-03,)] [eta: 0:03:10, time (data): 0.002 (0.000)] loss: 2.8827e-03 
+2026-01-22 11:04:53,362 INFO: [Pk_SD..][epoch:312, iter:  51,500, lr:(1.000e-03,)] [eta: 0:03:08, time (data): 0.003 (0.001)] loss: 2.8141e-03 
+2026-01-22 11:04:54,669 INFO: [Pk_SD..][epoch:315, iter:  52,000, lr:(1.000e-03,)] [eta: 0:03:07, time (data): 0.004 (0.002)] loss: 4.8291e-03 
+2026-01-22 11:04:56,006 INFO: [Pk_SD..][epoch:318, iter:  52,500, lr:(1.000e-03,)] [eta: 0:03:05, time (data): 0.003 (0.001)] loss: 2.2555e-03 
+2026-01-22 11:04:57,502 INFO: [Pk_SD..][epoch:321, iter:  53,000, lr:(1.000e-03,)] [eta: 0:03:04, time (data): 0.004 (0.002)] loss: 3.6420e-03 
+2026-01-22 11:04:59,002 INFO: [Pk_SD..][epoch:324, iter:  53,500, lr:(1.000e-03,)] [eta: 0:03:03, time (data): 0.002 (0.000)] loss: 2.3375e-03 
+2026-01-22 11:05:00,516 INFO: [Pk_SD..][epoch:327, iter:  54,000, lr:(1.000e-03,)] [eta: 0:03:02, time (data): 0.002 (0.001)] loss: 2.8119e-03 
+2026-01-22 11:05:01,793 INFO: [Pk_SD..][epoch:330, iter:  54,500, lr:(1.000e-03,)] [eta: 0:03:00, time (data): 0.002 (0.000)] loss: 4.9702e-03 
+2026-01-22 11:05:03,241 INFO: [Pk_SD..][epoch:333, iter:  55,000, lr:(1.000e-03,)] [eta: 0:02:59, time (data): 0.004 (0.002)] loss: 2.8350e-03 
+2026-01-22 11:05:04,547 INFO: [Pk_SD..][epoch:336, iter:  55,500, lr:(1.000e-03,)] [eta: 0:02:57, time (data): 0.002 (0.000)] loss: 5.8992e-03 
+2026-01-22 11:05:05,733 INFO: [Pk_SD..][epoch:339, iter:  56,000, lr:(1.000e-03,)] [eta: 0:02:56, time (data): 0.002 (0.000)] loss: 2.9015e-03 
+2026-01-22 11:05:07,033 INFO: [Pk_SD..][epoch:342, iter:  56,500, lr:(1.000e-03,)] [eta: 0:02:54, time (data): 0.002 (0.000)] loss: 1.9832e-03 
+2026-01-22 11:05:08,539 INFO: [Pk_SD..][epoch:345, iter:  57,000, lr:(1.000e-03,)] [eta: 0:02:53, time (data): 0.002 (0.000)] loss: 2.5214e-03 
+2026-01-22 11:05:10,250 INFO: [Pk_SD..][epoch:348, iter:  57,500, lr:(1.000e-03,)] [eta: 0:02:52, time (data): 0.002 (0.000)] loss: 2.5366e-03 
+2026-01-22 11:05:11,751 INFO: [Pk_SD..][epoch:351, iter:  58,000, lr:(1.000e-03,)] [eta: 0:02:51, time (data): 0.004 (0.002)] loss: 2.5758e-03 
+2026-01-22 11:05:13,074 INFO: [Pk_SD..][epoch:354, iter:  58,500, lr:(1.000e-03,)] [eta: 0:02:49, time (data): 0.002 (0.000)] loss: 4.9423e-03 
+2026-01-22 11:05:14,374 INFO: [Pk_SD..][epoch:357, iter:  59,000, lr:(1.000e-03,)] [eta: 0:02:48, time (data): 0.002 (0.001)] loss: 2.3183e-03 
+2026-01-22 11:05:15,821 INFO: [Pk_SD..][epoch:360, iter:  59,500, lr:(1.000e-03,)] [eta: 0:02:47, time (data): 0.002 (0.000)] loss: 2.6830e-03 
+2026-01-22 11:05:16,966 INFO: [Pk_SD..][epoch:363, iter:  60,000, lr:(1.000e-03,)] [eta: 0:02:45, time (data): 0.002 (0.000)] loss: 3.2859e-03 
+2026-01-22 11:05:16,966 INFO: Saving models and training states.
+2026-01-22 11:05:16,999 INFO: Running validation...
+2026-01-22 11:05:17,001 INFO: Validation RMSE: 0.006281 | NRMSE: 0.122851 | R²: 0.984908
+2026-01-22 11:05:18,360 INFO: [Pk_SD..][epoch:366, iter:  60,500, lr:(5.000e-04,)] [eta: 0:02:44, time (data): 0.002 (0.000)] loss: 2.3812e-03 
+2026-01-22 11:05:19,842 INFO: [Pk_SD..][epoch:369, iter:  61,000, lr:(5.000e-04,)] [eta: 0:02:42, time (data): 0.002 (0.000)] loss: 1.8204e-03 
+2026-01-22 11:05:21,327 INFO: [Pk_SD..][epoch:372, iter:  61,500, lr:(5.000e-04,)] [eta: 0:02:41, time (data): 0.003 (0.001)] loss: 2.3372e-03 
+2026-01-22 11:05:22,841 INFO: [Pk_SD..][epoch:375, iter:  62,000, lr:(5.000e-04,)] [eta: 0:02:40, time (data): 0.002 (0.000)] loss: 2.4690e-03 
+2026-01-22 11:05:24,160 INFO: [Pk_SD..][epoch:378, iter:  62,500, lr:(5.000e-04,)] [eta: 0:02:38, time (data): 0.002 (0.000)] loss: 2.1692e-03 
+2026-01-22 11:05:25,643 INFO: [Pk_SD..][epoch:381, iter:  63,000, lr:(5.000e-04,)] [eta: 0:02:37, time (data): 0.004 (0.002)] loss: 3.0157e-03 
+2026-01-22 11:05:27,122 INFO: [Pk_SD..][epoch:384, iter:  63,500, lr:(5.000e-04,)] [eta: 0:02:36, time (data): 0.002 (0.000)] loss: 2.5032e-03 
+2026-01-22 11:05:28,254 INFO: [Pk_SD..][epoch:387, iter:  64,000, lr:(5.000e-04,)] [eta: 0:02:34, time (data): 0.002 (0.000)] loss: 2.2687e-03 
+2026-01-22 11:05:29,562 INFO: [Pk_SD..][epoch:390, iter:  64,500, lr:(5.000e-04,)] [eta: 0:02:33, time (data): 0.002 (0.000)] loss: 2.0679e-03 
+2026-01-22 11:05:31,036 INFO: [Pk_SD..][epoch:393, iter:  65,000, lr:(5.000e-04,)] [eta: 0:02:31, time (data): 0.002 (0.000)] loss: 2.5988e-03 
+2026-01-22 11:05:32,530 INFO: [Pk_SD..][epoch:396, iter:  65,500, lr:(5.000e-04,)] [eta: 0:02:30, time (data): 0.003 (0.001)] loss: 2.6493e-03 
+2026-01-22 11:05:34,036 INFO: [Pk_SD..][epoch:399, iter:  66,000, lr:(5.000e-04,)] [eta: 0:02:29, time (data): 0.002 (0.000)] loss: 2.4238e-03 
+2026-01-22 11:05:35,343 INFO: [Pk_SD..][epoch:403, iter:  66,500, lr:(5.000e-04,)] [eta: 0:02:27, time (data): 0.002 (0.001)] loss: 2.3355e-03 
+2026-01-22 11:05:36,651 INFO: [Pk_SD..][epoch:406, iter:  67,000, lr:(5.000e-04,)] [eta: 0:02:26, time (data): 0.003 (0.001)] loss: 2.0376e-03 
+2026-01-22 11:05:38,298 INFO: [Pk_SD..][epoch:409, iter:  67,500, lr:(5.000e-04,)] [eta: 0:02:25, time (data): 0.003 (0.001)] loss: 3.5909e-03 
+2026-01-22 11:05:39,410 INFO: [Pk_SD..][epoch:412, iter:  68,000, lr:(5.000e-04,)] [eta: 0:02:23, time (data): 0.002 (0.001)] loss: 3.2652e-03 
+2026-01-22 11:05:40,716 INFO: [Pk_SD..][epoch:415, iter:  68,500, lr:(5.000e-04,)] [eta: 0:02:22, time (data): 0.002 (0.000)] loss: 2.8316e-03 
+2026-01-22 11:05:42,215 INFO: [Pk_SD..][epoch:418, iter:  69,000, lr:(5.000e-04,)] [eta: 0:02:20, time (data): 0.006 (0.004)] loss: 2.7239e-03 
+2026-01-22 11:05:43,582 INFO: [Pk_SD..][epoch:421, iter:  69,500, lr:(5.000e-04,)] [eta: 0:02:19, time (data): 0.002 (0.000)] loss: 2.2466e-03 
+2026-01-22 11:05:45,276 INFO: [Pk_SD..][epoch:424, iter:  70,000, lr:(5.000e-04,)] [eta: 0:02:18, time (data): 0.003 (0.001)] loss: 2.0303e-03 
+2026-01-22 11:05:45,277 INFO: Saving models and training states.
+2026-01-22 11:05:45,309 INFO: Running validation...
+2026-01-22 11:05:45,310 INFO: Validation RMSE: 0.005861 | NRMSE: 0.114641 | R²: 0.986857
+2026-01-22 11:05:46,613 INFO: [Pk_SD..][epoch:427, iter:  70,500, lr:(5.000e-04,)] [eta: 0:02:16, time (data): 0.003 (0.002)] loss: 2.2121e-03 
+2026-01-22 11:05:47,930 INFO: [Pk_SD..][epoch:430, iter:  71,000, lr:(5.000e-04,)] [eta: 0:02:15, time (data): 0.002 (0.000)] loss: 2.5920e-03 
+2026-01-22 11:05:49,404 INFO: [Pk_SD..][epoch:433, iter:  71,500, lr:(5.000e-04,)] [eta: 0:02:14, time (data): 0.004 (0.002)] loss: 2.5464e-03 
+2026-01-22 11:05:50,678 INFO: [Pk_SD..][epoch:436, iter:  72,000, lr:(5.000e-04,)] [eta: 0:02:12, time (data): 0.002 (0.000)] loss: 2.2047e-03 
+2026-01-22 11:05:52,018 INFO: [Pk_SD..][epoch:439, iter:  72,500, lr:(5.000e-04,)] [eta: 0:02:11, time (data): 0.002 (0.000)] loss: 2.0896e-03 
+2026-01-22 11:05:53,335 INFO: [Pk_SD..][epoch:442, iter:  73,000, lr:(5.000e-04,)] [eta: 0:02:09, time (data): 0.002 (0.000)] loss: 2.2941e-03 
+2026-01-22 11:05:54,856 INFO: [Pk_SD..][epoch:445, iter:  73,500, lr:(5.000e-04,)] [eta: 0:02:08, time (data): 0.002 (0.000)] loss: 2.0382e-03 
+2026-01-22 11:05:56,549 INFO: [Pk_SD..][epoch:448, iter:  74,000, lr:(5.000e-04,)] [eta: 0:02:07, time (data): 0.008 (0.006)] loss: 2.0835e-03 
+2026-01-22 11:05:57,672 INFO: [Pk_SD..][epoch:451, iter:  74,500, lr:(5.000e-04,)] [eta: 0:02:05, time (data): 0.002 (0.000)] loss: 2.3376e-03 
+2026-01-22 11:05:59,018 INFO: [Pk_SD..][epoch:454, iter:  75,000, lr:(5.000e-04,)] [eta: 0:02:04, time (data): 0.002 (0.000)] loss: 2.1854e-03 
+2026-01-22 11:06:00,652 INFO: [Pk_SD..][epoch:457, iter:  75,500, lr:(5.000e-04,)] [eta: 0:02:03, time (data): 0.004 (0.002)] loss: 2.5654e-03 
+2026-01-22 11:06:01,919 INFO: [Pk_SD..][epoch:460, iter:  76,000, lr:(5.000e-04,)] [eta: 0:02:01, time (data): 0.002 (0.000)] loss: 2.5518e-03 
+2026-01-22 11:06:03,281 INFO: [Pk_SD..][epoch:463, iter:  76,500, lr:(5.000e-04,)] [eta: 0:02:00, time (data): 0.002 (0.000)] loss: 2.2233e-03 
+2026-01-22 11:06:04,608 INFO: [Pk_SD..][epoch:466, iter:  77,000, lr:(5.000e-04,)] [eta: 0:01:59, time (data): 0.002 (0.000)] loss: 2.5762e-03 
+2026-01-22 11:06:06,044 INFO: [Pk_SD..][epoch:469, iter:  77,500, lr:(5.000e-04,)] [eta: 0:01:57, time (data): 0.002 (0.000)] loss: 2.3812e-03 
+2026-01-22 11:06:07,471 INFO: [Pk_SD..][epoch:472, iter:  78,000, lr:(5.000e-04,)] [eta: 0:01:56, time (data): 0.002 (0.000)] loss: 2.5043e-03 
+2026-01-22 11:06:08,740 INFO: [Pk_SD..][epoch:475, iter:  78,500, lr:(5.000e-04,)] [eta: 0:01:54, time (data): 0.002 (0.000)] loss: 2.0515e-03 
+2026-01-22 11:06:10,023 INFO: [Pk_SD..][epoch:478, iter:  79,000, lr:(5.000e-04,)] [eta: 0:01:53, time (data): 0.002 (0.000)] loss: 2.6620e-03 
+2026-01-22 11:06:11,481 INFO: [Pk_SD..][epoch:481, iter:  79,500, lr:(5.000e-04,)] [eta: 0:01:52, time (data): 0.004 (0.002)] loss: 2.0537e-03 
+2026-01-22 11:06:12,898 INFO: [Pk_SD..][epoch:484, iter:  80,000, lr:(5.000e-04,)] [eta: 0:01:50, time (data): 0.002 (0.000)] loss: 2.0228e-03 
+2026-01-22 11:06:12,898 INFO: Saving models and training states.
+2026-01-22 11:06:12,947 INFO: Running validation...
+2026-01-22 11:06:12,948 INFO: Validation RMSE: 0.006099 | NRMSE: 0.119289 | R²: 0.985770
+2026-01-22 11:06:14,217 INFO: [Pk_SD..][epoch:487, iter:  80,500, lr:(5.000e-04,)] [eta: 0:01:49, time (data): 0.002 (0.000)] loss: 2.2709e-03 
+2026-01-22 11:06:15,497 INFO: [Pk_SD..][epoch:490, iter:  81,000, lr:(5.000e-04,)] [eta: 0:01:47, time (data): 0.003 (0.001)] loss: 2.6289e-03 
+2026-01-22 11:06:16,957 INFO: [Pk_SD..][epoch:493, iter:  81,500, lr:(5.000e-04,)] [eta: 0:01:46, time (data): 0.004 (0.002)] loss: 2.2919e-03 
+2026-01-22 11:06:18,411 INFO: [Pk_SD..][epoch:496, iter:  82,000, lr:(5.000e-04,)] [eta: 0:01:45, time (data): 0.003 (0.001)] loss: 1.7987e-03 
+2026-01-22 11:06:19,669 INFO: [Pk_SD..][epoch:499, iter:  82,500, lr:(5.000e-04,)] [eta: 0:01:43, time (data): 0.002 (0.000)] loss: 2.3320e-03 
+2026-01-22 11:06:20,950 INFO: [Pk_SD..][epoch:503, iter:  83,000, lr:(5.000e-04,)] [eta: 0:01:42, time (data): 0.003 (0.002)] loss: 2.3135e-03 
+2026-01-22 11:06:22,203 INFO: [Pk_SD..][epoch:506, iter:  83,500, lr:(5.000e-04,)] [eta: 0:01:40, time (data): 0.002 (0.001)] loss: 2.1331e-03 
+2026-01-22 11:06:23,831 INFO: [Pk_SD..][epoch:509, iter:  84,000, lr:(5.000e-04,)] [eta: 0:01:39, time (data): 0.003 (0.001)] loss: 1.9018e-03 
+2026-01-22 11:06:25,099 INFO: [Pk_SD..][epoch:512, iter:  84,500, lr:(5.000e-04,)] [eta: 0:01:38, time (data): 0.002 (0.001)] loss: 2.6486e-03 
+2026-01-22 11:06:26,409 INFO: [Pk_SD..][epoch:515, iter:  85,000, lr:(5.000e-04,)] [eta: 0:01:36, time (data): 0.003 (0.001)] loss: 2.2804e-03 
+2026-01-22 11:06:27,690 INFO: [Pk_SD..][epoch:518, iter:  85,500, lr:(5.000e-04,)] [eta: 0:01:35, time (data): 0.002 (0.001)] loss: 2.5898e-03 
+2026-01-22 11:06:29,297 INFO: [Pk_SD..][epoch:521, iter:  86,000, lr:(5.000e-04,)] [eta: 0:01:34, time (data): 0.003 (0.001)] loss: 2.2993e-03 
+2026-01-22 11:06:30,576 INFO: [Pk_SD..][epoch:524, iter:  86,500, lr:(5.000e-04,)] [eta: 0:01:32, time (data): 0.002 (0.001)] loss: 1.6727e-03 
+2026-01-22 11:06:31,641 INFO: [Pk_SD..][epoch:527, iter:  87,000, lr:(5.000e-04,)] [eta: 0:01:31, time (data): 0.002 (0.000)] loss: 1.9520e-03 
+2026-01-22 11:06:33,100 INFO: [Pk_SD..][epoch:530, iter:  87,500, lr:(5.000e-04,)] [eta: 0:01:29, time (data): 0.005 (0.003)] loss: 1.7937e-03 
+2026-01-22 11:06:34,532 INFO: [Pk_SD..][epoch:533, iter:  88,000, lr:(5.000e-04,)] [eta: 0:01:28, time (data): 0.002 (0.000)] loss: 2.4884e-03 
+2026-01-22 11:06:35,977 INFO: [Pk_SD..][epoch:536, iter:  88,500, lr:(5.000e-04,)] [eta: 0:01:27, time (data): 0.003 (0.001)] loss: 2.4607e-03 
+2026-01-22 11:06:37,231 INFO: [Pk_SD..][epoch:539, iter:  89,000, lr:(5.000e-04,)] [eta: 0:01:25, time (data): 0.003 (0.002)] loss: 2.4141e-03 
+2026-01-22 11:06:38,476 INFO: [Pk_SD..][epoch:542, iter:  89,500, lr:(5.000e-04,)] [eta: 0:01:24, time (data): 0.002 (0.000)] loss: 2.5803e-03 
+2026-01-22 11:06:39,939 INFO: [Pk_SD..][epoch:545, iter:  90,000, lr:(5.000e-04,)] [eta: 0:01:22, time (data): 0.002 (0.000)] loss: 2.2802e-03 
+2026-01-22 11:06:39,939 INFO: Saving models and training states.
+2026-01-22 11:06:39,989 INFO: Running validation...
+2026-01-22 11:06:39,991 INFO: Validation RMSE: 0.005924 | NRMSE: 0.115866 | R²: 0.986575
+2026-01-22 11:06:41,225 INFO: [Pk_SD..][epoch:548, iter:  90,500, lr:(2.500e-04,)] [eta: 0:01:21, time (data): 0.002 (0.000)] loss: 1.8773e-03 
+2026-01-22 11:06:42,476 INFO: [Pk_SD..][epoch:551, iter:  91,000, lr:(2.500e-04,)] [eta: 0:01:19, time (data): 0.002 (0.000)] loss: 1.9387e-03 
+2026-01-22 11:06:43,750 INFO: [Pk_SD..][epoch:554, iter:  91,500, lr:(2.500e-04,)] [eta: 0:01:18, time (data): 0.002 (0.000)] loss: 2.4180e-03 
+2026-01-22 11:06:45,391 INFO: [Pk_SD..][epoch:557, iter:  92,000, lr:(2.500e-04,)] [eta: 0:01:17, time (data): 0.003 (0.002)] loss: 1.7326e-03 
+2026-01-22 11:06:46,819 INFO: [Pk_SD..][epoch:560, iter:  92,500, lr:(2.500e-04,)] [eta: 0:01:15, time (data): 0.002 (0.000)] loss: 2.2512e-03 
+2026-01-22 11:06:47,902 INFO: [Pk_SD..][epoch:563, iter:  93,000, lr:(2.500e-04,)] [eta: 0:01:14, time (data): 0.002 (0.000)] loss: 2.0680e-03 
+2026-01-22 11:06:49,350 INFO: [Pk_SD..][epoch:566, iter:  93,500, lr:(2.500e-04,)] [eta: 0:01:13, time (data): 0.002 (0.000)] loss: 2.1659e-03 
+2026-01-22 11:06:50,836 INFO: [Pk_SD..][epoch:569, iter:  94,000, lr:(2.500e-04,)] [eta: 0:01:11, time (data): 0.004 (0.002)] loss: 1.8069e-03 
+2026-01-22 11:06:52,171 INFO: [Pk_SD..][epoch:572, iter:  94,500, lr:(2.500e-04,)] [eta: 0:01:10, time (data): 0.002 (0.000)] loss: 1.9427e-03 
+2026-01-22 11:06:53,436 INFO: [Pk_SD..][epoch:575, iter:  95,000, lr:(2.500e-04,)] [eta: 0:01:08, time (data): 0.002 (0.000)] loss: 2.2239e-03 
+2026-01-22 11:06:54,774 INFO: [Pk_SD..][epoch:578, iter:  95,500, lr:(2.500e-04,)] [eta: 0:01:07, time (data): 0.002 (0.000)] loss: 1.8543e-03 
+2026-01-22 11:06:56,234 INFO: [Pk_SD..][epoch:581, iter:  96,000, lr:(2.500e-04,)] [eta: 0:01:06, time (data): 0.002 (0.000)] loss: 2.3787e-03 
+2026-01-22 11:06:57,873 INFO: [Pk_SD..][epoch:584, iter:  96,500, lr:(2.500e-04,)] [eta: 0:01:04, time (data): 0.011 (0.009)] loss: 2.5501e-03 
+2026-01-22 11:06:59,029 INFO: [Pk_SD..][epoch:587, iter:  97,000, lr:(2.500e-04,)] [eta: 0:01:03, time (data): 0.002 (0.000)] loss: 1.8039e-03 
+2026-01-22 11:07:00,481 INFO: [Pk_SD..][epoch:590, iter:  97,500, lr:(2.500e-04,)] [eta: 0:01:02, time (data): 0.014 (0.012)] loss: 2.1405e-03 
+2026-01-22 11:07:01,795 INFO: [Pk_SD..][epoch:593, iter:  98,000, lr:(2.500e-04,)] [eta: 0:01:00, time (data): 0.002 (0.000)] loss: 2.4136e-03 
+2026-01-22 11:07:03,270 INFO: [Pk_SD..][epoch:596, iter:  98,500, lr:(2.500e-04,)] [eta: 0:00:59, time (data): 0.003 (0.001)] loss: 2.5630e-03 
+2026-01-22 11:07:04,550 INFO: [Pk_SD..][epoch:599, iter:  99,000, lr:(2.500e-04,)] [eta: 0:00:57, time (data): 0.002 (0.000)] loss: 2.3424e-03 
+2026-01-22 11:07:05,869 INFO: [Pk_SD..][epoch:603, iter:  99,500, lr:(2.500e-04,)] [eta: 0:00:56, time (data): 0.007 (0.005)] loss: 2.1398e-03 
+2026-01-22 11:07:07,324 INFO: [Pk_SD..][epoch:606, iter: 100,000, lr:(2.500e-04,)] [eta: 0:00:55, time (data): 0.004 (0.002)] loss: 2.0421e-03 
+2026-01-22 11:07:07,324 INFO: Saving models and training states.
+2026-01-22 11:07:07,406 INFO: Running validation...
+2026-01-22 11:07:07,407 INFO: Validation RMSE: 0.005808 | NRMSE: 0.113609 | R²: 0.987093
+2026-01-22 11:07:08,691 INFO: [Pk_SD..][epoch:609, iter: 100,500, lr:(2.500e-04,)] [eta: 0:00:53, time (data): 0.002 (0.001)] loss: 2.1544e-03 
+2026-01-22 11:07:10,138 INFO: [Pk_SD..][epoch:612, iter: 101,000, lr:(2.500e-04,)] [eta: 0:00:52, time (data): 0.002 (0.001)] loss: 1.7493e-03 
+2026-01-22 11:07:11,405 INFO: [Pk_SD..][epoch:615, iter: 101,500, lr:(2.500e-04,)] [eta: 0:00:51, time (data): 0.002 (0.000)] loss: 2.5486e-03 
+2026-01-22 11:07:12,845 INFO: [Pk_SD..][epoch:618, iter: 102,000, lr:(2.500e-04,)] [eta: 0:00:49, time (data): 0.002 (0.001)] loss: 2.1543e-03 
+2026-01-22 11:07:14,344 INFO: [Pk_SD..][epoch:621, iter: 102,500, lr:(2.500e-04,)] [eta: 0:00:48, time (data): 0.002 (0.000)] loss: 1.9146e-03 
+2026-01-22 11:07:15,435 INFO: [Pk_SD..][epoch:624, iter: 103,000, lr:(2.500e-04,)] [eta: 0:00:46, time (data): 0.002 (0.001)] loss: 1.7226e-03 
+2026-01-22 11:07:16,709 INFO: [Pk_SD..][epoch:627, iter: 103,500, lr:(2.500e-04,)] [eta: 0:00:45, time (data): 0.002 (0.000)] loss: 1.8819e-03 
+2026-01-22 11:07:18,155 INFO: [Pk_SD..][epoch:630, iter: 104,000, lr:(2.500e-04,)] [eta: 0:00:44, time (data): 0.002 (0.001)] loss: 2.7334e-03 
+2026-01-22 11:07:19,632 INFO: [Pk_SD..][epoch:633, iter: 104,500, lr:(2.500e-04,)] [eta: 0:00:42, time (data): 0.003 (0.001)] loss: 2.2582e-03 
+2026-01-22 11:07:21,139 INFO: [Pk_SD..][epoch:636, iter: 105,000, lr:(2.500e-04,)] [eta: 0:00:41, time (data): 0.003 (0.001)] loss: 2.0036e-03 
+2026-01-22 11:07:22,467 INFO: [Pk_SD..][epoch:639, iter: 105,500, lr:(2.500e-04,)] [eta: 0:00:39, time (data): 0.002 (0.000)] loss: 2.2226e-03 
+2026-01-22 11:07:23,921 INFO: [Pk_SD..][epoch:642, iter: 106,000, lr:(2.500e-04,)] [eta: 0:00:38, time (data): 0.005 (0.003)] loss: 1.6315e-03 
+2026-01-22 11:07:25,373 INFO: [Pk_SD..][epoch:645, iter: 106,500, lr:(2.500e-04,)] [eta: 0:00:37, time (data): 0.002 (0.000)] loss: 1.7356e-03 
+2026-01-22 11:07:26,466 INFO: [Pk_SD..][epoch:648, iter: 107,000, lr:(2.500e-04,)] [eta: 0:00:35, time (data): 0.002 (0.000)] loss: 2.1611e-03 
+2026-01-22 11:07:27,741 INFO: [Pk_SD..][epoch:651, iter: 107,500, lr:(2.500e-04,)] [eta: 0:00:34, time (data): 0.002 (0.000)] loss: 2.0676e-03 
+2026-01-22 11:07:29,179 INFO: [Pk_SD..][epoch:654, iter: 108,000, lr:(2.500e-04,)] [eta: 0:00:33, time (data): 0.002 (0.000)] loss: 2.2681e-03 
+2026-01-22 11:07:30,459 INFO: [Pk_SD..][epoch:657, iter: 108,500, lr:(2.500e-04,)] [eta: 0:00:31, time (data): 0.002 (0.000)] loss: 1.9853e-03 
+2026-01-22 11:07:32,084 INFO: [Pk_SD..][epoch:660, iter: 109,000, lr:(2.500e-04,)] [eta: 0:00:30, time (data): 0.002 (0.000)] loss: 1.8635e-03 
+2026-01-22 11:07:33,343 INFO: [Pk_SD..][epoch:663, iter: 109,500, lr:(2.500e-04,)] [eta: 0:00:28, time (data): 0.002 (0.000)] loss: 1.9356e-03 
+2026-01-22 11:07:34,754 INFO: [Pk_SD..][epoch:666, iter: 110,000, lr:(2.500e-04,)] [eta: 0:00:27, time (data): 0.005 (0.003)] loss: 1.9043e-03 
+2026-01-22 11:07:34,754 INFO: Saving models and training states.
+2026-01-22 11:07:34,791 INFO: Running validation...
+2026-01-22 11:07:34,792 INFO: Validation RMSE: 0.005753 | NRMSE: 0.112529 | R²: 0.987337
+2026-01-22 11:07:36,241 INFO: [Pk_SD..][epoch:669, iter: 110,500, lr:(2.500e-04,)] [eta: 0:00:26, time (data): 0.003 (0.002)] loss: 2.1918e-03 
+2026-01-22 11:07:37,359 INFO: [Pk_SD..][epoch:672, iter: 111,000, lr:(2.500e-04,)] [eta: 0:00:24, time (data): 0.002 (0.000)] loss: 2.1566e-03 
+2026-01-22 11:07:38,694 INFO: [Pk_SD..][epoch:675, iter: 111,500, lr:(2.500e-04,)] [eta: 0:00:23, time (data): 0.002 (0.000)] loss: 1.7819e-03 
+2026-01-22 11:07:40,163 INFO: [Pk_SD..][epoch:678, iter: 112,000, lr:(2.500e-04,)] [eta: 0:00:22, time (data): 0.002 (0.000)] loss: 1.9963e-03 
+2026-01-22 11:07:41,451 INFO: [Pk_SD..][epoch:681, iter: 112,500, lr:(2.500e-04,)] [eta: 0:00:20, time (data): 0.002 (0.000)] loss: 1.8816e-03 
+2026-01-22 11:07:42,928 INFO: [Pk_SD..][epoch:684, iter: 113,000, lr:(2.500e-04,)] [eta: 0:00:19, time (data): 0.002 (0.000)] loss: 2.2439e-03 
+2026-01-22 11:07:44,403 INFO: [Pk_SD..][epoch:687, iter: 113,500, lr:(2.500e-04,)] [eta: 0:00:17, time (data): 0.002 (0.000)] loss: 1.6418e-03 
+2026-01-22 11:07:45,736 INFO: [Pk_SD..][epoch:690, iter: 114,000, lr:(2.500e-04,)] [eta: 0:00:16, time (data): 0.002 (0.000)] loss: 2.8072e-03 
+2026-01-22 11:07:47,172 INFO: [Pk_SD..][epoch:693, iter: 114,500, lr:(2.500e-04,)] [eta: 0:00:15, time (data): 0.002 (0.000)] loss: 1.8412e-03 
+2026-01-22 11:07:48,455 INFO: [Pk_SD..][epoch:696, iter: 115,000, lr:(2.500e-04,)] [eta: 0:00:13, time (data): 0.002 (0.001)] loss: 2.3257e-03 
+2026-01-22 11:07:49,723 INFO: [Pk_SD..][epoch:699, iter: 115,500, lr:(2.500e-04,)] [eta: 0:00:12, time (data): 0.004 (0.002)] loss: 2.0856e-03 
+2026-01-22 11:07:51,051 INFO: [Pk_SD..][epoch:703, iter: 116,000, lr:(2.500e-04,)] [eta: 0:00:11, time (data): 0.003 (0.002)] loss: 1.8183e-03 
+2026-01-22 11:07:52,584 INFO: [Pk_SD..][epoch:706, iter: 116,500, lr:(2.500e-04,)] [eta: 0:00:09, time (data): 0.004 (0.002)] loss: 2.1445e-03 
+2026-01-22 11:07:54,028 INFO: [Pk_SD..][epoch:709, iter: 117,000, lr:(2.500e-04,)] [eta: 0:00:08, time (data): 0.003 (0.001)] loss: 1.7425e-03 
+2026-01-22 11:07:55,490 INFO: [Pk_SD..][epoch:712, iter: 117,500, lr:(2.500e-04,)] [eta: 0:00:06, time (data): 0.002 (0.001)] loss: 2.2564e-03 
+2026-01-22 11:07:56,847 INFO: [Pk_SD..][epoch:715, iter: 118,000, lr:(2.500e-04,)] [eta: 0:00:05, time (data): 0.002 (0.000)] loss: 2.1366e-03 
+2026-01-22 11:07:58,396 INFO: [Pk_SD..][epoch:718, iter: 118,500, lr:(2.500e-04,)] [eta: 0:00:04, time (data): 0.003 (0.000)] loss: 2.0569e-03 
+2026-01-22 11:07:59,766 INFO: [Pk_SD..][epoch:721, iter: 119,000, lr:(2.500e-04,)] [eta: 0:00:02, time (data): 0.002 (0.000)] loss: 1.6992e-03 
+2026-01-22 11:08:00,823 INFO: End of training. Time consumed: 0:05:29
+2026-01-22 11:08:00,824 INFO: Save the latest model.
+2026-01-22 11:08:00,837 INFO: Validation RMSE: 0.005863 | NRMSE: 0.114684 | R²: 0.986848

@@ -1,0 +1,82 @@
+# GENERATE TIME: Thu Jan 22 11:01:47 2026
+# CMD:
+# /home/sp2053/rds/hpc-work/updated_CosmicDawnSynergies/CosmicDawnSynergies/train.py -opt options/emulators/Pk_SDC3b.yml
+
+# general settings
+name: Pk_SDC3b_MLP_minmax_extended
+num_gpu: auto  # automatic GPU detection
+manual_seed: !!int 10
+
+model_type: MLPModel
+# network architecture
+network_opt:
+  hidden_dim: !!int 35
+  n_hidden: !!int 3
+  out_dim: !!int 1
+  activation: ReLU
+  out_activation: Softplus
+
+
+# training settings
+train:
+  total_iter: !!int 120000
+  ema_decay: !!float 0.999
+  optimizer_opt:
+    type: AdamW
+    lr: !!float 1e-3
+    weight_decay: !!float 1e-5 #0.0001
+  scheduler:
+    type: MultiStepLR
+    milestones: [60000, 90000]
+    gamma: !!float 0.5
+
+# dataset options
+dataset:
+  type: BaseDataset
+  batch_size_per_gpu: !!int 1449
+  num_worker_per_gpu: !!int 4
+  params_opt:
+    file: data/SDC3b/parameters_old.npy
+    key: parameters
+    names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
+    log: []
+    discard: []
+    normalization: norm_minmax_extended
+  targets_opt:
+    file: data/SDC3b/power_spectra_old.npy
+    offset: !!float 0.0
+    log: !!bool false
+  data_dims:
+    z:
+      file: data/SDC3b/z_power_spectra.npy
+      log: !!bool false
+      lims_nsample: [!!float nan, !!float nan, !!float nan] # [6.535, 7.962, !!float nan]
+    kperp:
+      file: data/SDC3b/bins_kper.txt
+      log: !!bool true
+      lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
+    kpar:
+      file: data/SDC3b/bins_kpar.txt
+      log: !!bool true
+      lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
+
+path:
+  pretrain_network_g: ~
+  strict_load_g: true
+  resume_state: ~
+
+# validation settings
+val:
+  val_freq: !!float 10000
+
+logger:
+  print_freq: !!int 500
+  save_checkpoint_freq: !!float 10000
+  use_tb_logger: !!bool true
+  wandb:
+    project: ~
+    resume_id: ~
+
+dist_params:
+  backend: nccl
+  port: !!int 29500

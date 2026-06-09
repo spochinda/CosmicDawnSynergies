@@ -34,9 +34,15 @@ src/*egg-info/
 
 # Output directories
 tb_logger
-trained_emulators
+trained_emulators/*
 inferences
 param_search
+
+# Specific models
+!trained_emulators/Pk_SDC3b_MLP_minmax_extended
+trained_emulators/Pk_SDC3b_MLP_minmax_extended/training_states/*
+trained_emulators/Pk_SDC3b_MLP_minmax_extended/models/*
+!trained_emulators/Pk_SDC3b_MLP_minmax_extended/models/net_g_latest*
 
 # SLURM and log files
 *err
