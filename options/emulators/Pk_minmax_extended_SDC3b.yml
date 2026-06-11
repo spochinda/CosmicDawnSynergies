@@ -15,7 +15,7 @@ network_opt:
 
 # training settings
 train:
-  total_iter: !!int 120000
+  total_iter: !!int 3000
   ema_decay: !!float 0.999
   optimizer_opt:
     type: Adam
@@ -24,12 +24,12 @@ train:
   scheduler:
     type: MultiStepLR
     milestones: [60000, 90000]
-    gamma: !!float 0.5
+    gamma: !!float 1.0
 
 # dataset options
 dataset:
   type: BaseDataset
-  batch_size_per_gpu: !!int 1449
+  batch_size_per_gpu: !!int 20000
   num_worker_per_gpu: !!int 4
   params_opt:
     file: data/SDC3b/parameters_old.npy
@@ -46,15 +46,15 @@ dataset:
     z:
       file: data/SDC3b/z_power_spectra.npy
       log: !!bool false
-      lims_nsample: [!!float nan, !!float nan, !!float nan] # [6.535, 7.962, !!float nan]
+      lims_nsample: [!!float nan, !!float nan, !!int 20]
     kperp:
       file: data/SDC3b/bins_kper.txt
       log: !!bool true
-      lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
+      lims_nsample: [!!float 5e-2, !!float 5e-1, !!int 20]
     kpar:
       file: data/SDC3b/bins_kpar.txt
       log: !!bool true
-      lims_nsample: [!!float nan, !!float nan, !!float nan] # [!!float 5e-2, !!float 5e-1, !!float nan]
+      lims_nsample: [!!float 5e-2, !!float 5e-1, !!int 20]
 
 path:
   pretrain_network_g: ~
@@ -63,11 +63,11 @@ path:
 
 # validation settings
 val:
-  val_freq: !!float 10000
+  val_freq: !!float 256
 
 logger:
-  print_freq: !!int 500
-  save_checkpoint_freq: !!float 10000
+  print_freq: !!int 256
+  save_checkpoint_freq: !!float 2560
   use_tb_logger: !!bool true
   wandb:
     project: ~

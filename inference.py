@@ -150,13 +150,8 @@ def inference_pipeline(root_path):
     # Create denormalized dead-birth and phys_live-birth files for denormalized chains
     original_file_root = osp.join(settings.base_dir,settings.file_root)
     param_stats = LikelihoodModules[0].model.param_stats
-    emuNames = list(param_stats.keys())
-    astroNames = []
-    paramNames_indices = []
-    for i,key in enumerate(paramNames):
-        if key in emuNames:
-            astroNames.append(key)
-            paramNames_indices.append(i)
+    plot_noise = opt.get('plot_noise', True)
+    astroNames = paramNames if plot_noise else [n for n in paramNames if n != 'lognoise']
     files = [original_file_root]
     plot_path = osp.join(path, f"triangle_orig_nlive_{settings.nlive}.png")
     triangle_plot(files, astroNames, plot_path=plot_path)    

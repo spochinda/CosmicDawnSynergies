@@ -580,7 +580,10 @@ class MLPModel(BaseModel):
         loss = self.criterion(outputs, targets)
         loss.backward()
         self.optimizer_g.step()
-        
+
+        if hasattr(self, 'net_g_ema'):
+            self.model_ema(self.ema_decay)
+
         # Update log
         self.log_dict['loss'] = torch.pow(10, torch.sqrt(loss)).item() if self.opt['dataset']['targets_opt'].get('log', False) else torch.sqrt(loss).item()
         

@@ -1,7 +1,8 @@
-inference_id: demo_SDC3b_PS1_minmax
+inference_id: SDC3b_PS1_minmax
 num_gpu: 0
+plot_noise: !!bool true  # include lognoise row in triangle plot
 polychord_settings:
-  nlive: 250
+  nlive: 500
   read_resume: !!bool false
   precision_criterion: !!float 1
 
@@ -23,8 +24,8 @@ LikelihoodModules:
           - !!float 165.9
       kperp_file: data/SDC3b/bins_kper.txt
       kpar_file: data/SDC3b/bins_kpar.txt
-      emulator: trained_emulators/demo_Pk_SDC3b_minmax_emulator/models/net_g_10000.pth
-      emulator_xHI: trained_emulators/demo_xHI_SDC3b_minmax/models/net_g_9000.pth
+      emulator: trained_emulators/Pk_SDC3b_MLP_minmax_extended/models/net_g_latest.pth
+      emulator_xHI: trained_emulators/xHI_SDC3b_minmax/models/net_g_latest.pth
       in_dim: 7 #kper, kpar, z, zeta_eff, zeta_exp, rmfp, Vc
       lognoise: 
         -  !!float -6

@@ -85,10 +85,10 @@ class BaseDataset(Dataset):
         dim_shapes = self.targets.shape[1:]
         for i,(key,shape) in enumerate(zip(self.data_dims.keys(), dim_shapes)):
             if self.data_dims[key].get("file") is not None:
-                self.data_dims[key]["values"] = load_fn(self.data_dims[key]["file"], self.data_dims[key].get("key", None)).flatten().astype(np.float32)
+                self.data_dims[key]["values"] = load_fn(self.data_dims[key]["file"], self.data_dims[key].get("key", None)).flatten().astype(np.float64)
             else:
                 print(f"File for {key} not provided. Generating {shape} geomspace values from between {self.data_dims[key]['lims_nsample'][0]} and {self.data_dims[key]['lims_nsample'][1]}.")
-                self.data_dims[key]["values"] = np.geomspace(*self.data_dims[key]["lims_nsample"][:2], shape).astype(np.float32)
+                self.data_dims[key]["values"] = np.geomspace(*self.data_dims[key]["lims_nsample"][:2], shape).astype(np.float64)
             if self.data_dims[key].get("transform") is not None:
                 transform_fn = globals().get(self.data_dims[key]["transform"])
                 self.data_dims[key]["values"] = transform_fn(self.data_dims[key]["values"], **self.data_dims[key].get("transform_kwargs", {}))
