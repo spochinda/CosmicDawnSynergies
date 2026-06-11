@@ -738,13 +738,15 @@ class LikelihoodNeutralFraction:
 
 
 class LikelihoodSDC3b:
-    def __init__(self, 
+    def __init__(self,
                  prior_dict,
                  emulator,
                  files,
                  averaged_noise_files,
                  noise,
-                 xHI_file = None,  
+                 kperp_file,
+                 kpar_file,
+                 xHI_file = None,
                  data_dims = ["z", "kperp", "kpar"],
                  output_names = [r"\log L_\mathrm{dsq}",],
                  **kwargs
@@ -754,6 +756,8 @@ class LikelihoodSDC3b:
         self.prior_dict = prior_dict
         self.files = files
         self.averaged_noise_files = averaged_noise_files
+        self.kperp_file = kperp_file
+        self.kpar_file = kpar_file
         self.xHI_file = xHI_file
         self.output_names = output_names
         self.nDerived = len(self.output_names)
@@ -876,8 +880,8 @@ class LikelihoodSDC3b:
                 self.data[f"PS{i+1}"][f"Pk{j}"] = np.loadtxt(file)
                 self.data[f"PS{i+1}"][f"Pk{j}"] -= averaged_noise
                 self.data[f"PS{i+1}"][f"Pk{j}"] = self.data[f"PS{i+1}"][f"Pk{j}"].reshape(-1)
-        self.data["kperp"] = np.loadtxt("/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/PS1_PS2_Data/bins_kper.txt")
-        self.data["kpar"] = np.loadtxt("/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/PS1_PS2_Data/bins_kpar.txt")
+        self.data["kperp"] = np.loadtxt(self.kperp_file)
+        self.data["kpar"] = np.loadtxt(self.kpar_file)
         self.data["kcoord"] = np.array(np.meshgrid(self.data["kperp"], self.data["kpar"]))
         self.data["kcoord"] = self.data["kcoord"].reshape(2, -1).T
 

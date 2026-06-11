@@ -15,11 +15,11 @@ from pypolychord.output import PolyChordOutput
 if __name__ == "__main__":
     #get file absolute path
     path = os.path.dirname(os.path.abspath(__file__)).split("/scripts")[0]
-    data_path = "/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/PS1_PS2_Data/"
+    data_path = "/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b"
     inference_dict = {
-        "inference_id": "_SDC3b_2",
+        "inference_id": "_SDC3b_PS2_2026",
         "polychord_settings": {
-            "nlive": 1000,
+            "nlive": 500,
             "read_resume": False,
             "precision_criterion": 1.,
         },
@@ -33,11 +33,14 @@ if __name__ == "__main__":
             #        },
             "LikelihoodSDC3b": {
                 "likelihood_kwargs": {
-                    "files": [[os.path.join(data_path, "Pk_PS1_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS1_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS1_151.0_165.9.txt")],
-                              [os.path.join(data_path, "Pk_PS2_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS2_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS2_151.0_165.9.txt")]],
+                    "files": [#[os.path.join(data_path, "Pk_PS1_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS1_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS1_151.0_165.9.txt")],
+                              [os.path.join(data_path, "Pk_PS2_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS2_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS2_151.0_165.9.txt")]
+                              ],
                     "averaged_noise_files": [os.path.join(data_path, "Pk_PS_averaged_noise_181.0_195.9.txt"), os.path.join(data_path, "Pk_PS_averaged_noise_166.0_180.9.txt"), os.path.join(data_path, "Pk_PS_averaged_noise_151.0_165.9.txt")],
-                    "emulator": "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/trained_emulators_poweremu/powerspec3.pth",
-                    "xHI_file": "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/data/trained_emulators_poweremu/SDC3b_xHI_emu.pth", 
+                    "emulator": path+"/data/trained_emulators_poweremu/SDC3b_Pk_emu.pth",
+                    "xHI_file": path+"/data/trained_emulators_poweremu/SDC3b_xHI_emu.pth",
+                    "kperp_file": os.path.join(data_path, "bins_kper.txt"),
+                    "kpar_file": os.path.join(data_path, "bins_kpar.txt"),
                     "data_dims": ["z", "kperp", "kpar"],
                     "noise": {"noise": [-6., -0.5]},
                     }
@@ -127,7 +130,7 @@ if __name__ == "__main__":
         ]
     #paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "log10Arad"]
     #paramNames = ["log10fstar", "log10Vc", "log10fX", "tau", "log10fradio"]    
-    paramNames =["zeta_eff", "zeta_exp", "rmfp", "Vc"]
+    paramNames = ["zeta_eff", "zeta_exp", "rmfp", "Vc", "noise"]
     basename = os.path.basename(settings.base_dir)
     image_dir = path+"/images/"
     plot_path = os.path.join(image_dir, basename) + f"_nlive_{settings.nlive}.png"

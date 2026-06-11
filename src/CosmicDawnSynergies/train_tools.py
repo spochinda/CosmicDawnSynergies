@@ -132,12 +132,14 @@ def ddp_setup(rank: int, world_size: int):
 class Dataloader(torch.utils.data.Dataset):
     def __init__(self, parameters, target, device="cpu", **kwargs):
         self.device = device
-        self.target = torch.from_numpy(target).to(torch.float32).to(self.device)
+        # Keep on CPU — moving to device per-batch in the training loop avoids
+        # the MPS/CUDA collation bottleneck (torch.stack on device tensors is slow).
+        self.target = torch.from_numpy(target).to(torch.float32)
 
         if isinstance(parameters, np.ndarray):
-            self.parameters = torch.from_numpy(parameters).to(torch.float32).to(self.device)
+            self.parameters = torch.from_numpy(parameters).to(torch.float32)
         elif isinstance(parameters, pd.DataFrame):
-            self.parameters = torch.from_numpy(parameters.to_numpy()).to(torch.float32).to(self.device)
+            self.parameters = torch.from_numpy(parameters.to_numpy()).to(torch.float32)
         else:
             raise ValueError("parameters must be a numpy array or pandas DataFrame")
 
@@ -200,17 +202,21 @@ class poweremu_torch(nn.Module):
         terminate_time = self.train_opt.get("terminate_time", False)
         model_id = self.train_opt.get("model_id", "")
         
-        parameters_validation = validation_dataloader.dataset.parameters
-        target_validation = validation_dataloader.dataset.target
+        parameters_validation = validation_dataloader.dataset.parameters.to(self.device)
+        target_validation = validation_dataloader.dataset.target.to(self.device)
 
         loss_fn = getattr(torch.nn, loss_fn)()
         
-        if self.device.index == 0 or self.device.type=="cpu":
+        if self.device.type in ("cpu", "mps") or self.device.index == 0:
             print(self.model, flush=True)
         training_stime = time.time()
+        _print_every = None  # auto-calibrated after first batch
         for e in range(self.epoch, self.epoch+epochs):
             stime = time.time()
             for i,(parameters_train,target_train) in enumerate(train_dataloader):
+                _batch_t = time.time()
+                parameters_train = parameters_train.to(self.device)
+                target_train = target_train.to(self.device)
                 if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push(f"[{self.device.index}] predict-loss-backward-step-validation")
                 self.model.train()
                 self.opt.zero_grad()
@@ -220,7 +226,13 @@ class poweremu_torch(nn.Module):
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
                 self.opt.step()
                 if self.multi_gpu:  torch.distributed.all_reduce(loss, op=torch.distributed.ReduceOp.AVG)
-                
+
+                # calibrate print interval after first batch
+                if _print_every is None and e == self.epoch and i == 0:
+                    _batch_wall = time.time() - _batch_t
+                    _print_every = max(1, int(20.0 / _batch_wall))
+                    print(f"[diag] first batch: {_batch_wall:.3f}s/batch  →  printing every {_print_every} batches (~20s)", flush=True)
+
                 with torch.no_grad():
                     self.model.eval()
                     pred_validation = self.model(parameters_validation)
@@ -237,7 +249,7 @@ class poweremu_torch(nn.Module):
                     self.validation_loss = torch.cat((self.validation_loss, _vrmse.unsqueeze(0)))
                     if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
                     
-                    if self.device.index == 0 or self.device.type=="cpu":
+                    if self.device.type in ("cpu", "mps") or self.device.index == 0:
                         if (_vrmse == min(self.validation_loss)) and (e >= save_after_epochs):
                             print(f"Saving model with validation loss: {_vrmse:,.2f}", flush=True)
                             self.save_network(save_model_path)
@@ -263,7 +275,8 @@ class poweremu_torch(nn.Module):
                                 plt.savefig(save_path)
                                 plt.close()
 
-                    if ((self.device.index == 0 or self.device.type=="cpu") and (i % (train_dataloader.__len__() // print_freq) == 0)) or ((_vrmse == min(self.validation_loss)) and (e >= save_after_epochs)):
+                    _should_print = (_print_every is not None and i % _print_every == 0) or ((_vrmse == min(self.validation_loss)) and (e >= save_after_epochs))
+                    if (self.device.type in ("cpu", "mps") or self.device.index == 0) and _should_print:
                         if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push(f"[{self.device.index}] optional stats")
                         _resid = (pred_train - target_train).detach()
                         _rmse = torch.sqrt(torch.mean(torch.square(_resid)))#.item()
@@ -337,6 +350,7 @@ class poweremu_torch(nn.Module):
 
 
     def save_network(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         if not self.multi_gpu:
             torch.save(
                 obj = dict(
@@ -441,23 +455,32 @@ def train_model(rank, multi_gpu, parameters_train, target_train, parameters_vali
         ddp_setup(rank, world_size=world_size)
     elif not multi_gpu and torch.cuda.is_available():
         device = torch.device("cuda:0")
-
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
     else:
         device = torch.device("cpu")
     
+    print(f"[diag] device={device}  train_size={len(parameters_train)}  val_size={len(parameters_validation)}", flush=True)
+
+    t0 = time.time()
     train_data_module = Dataloader(parameters=parameters_train, target=target_train, device=device)
+    print(f"[diag] train Dataloader: {time.time()-t0:.2f}s  target shape={train_data_module.target.shape}", flush=True)
     train_sampler = torch.utils.data.distributed.DistributedSampler(dataset=train_data_module, shuffle=True, seed=0) if multi_gpu else None
     train_dataloader = torch.utils.data.DataLoader(train_data_module, batch_size=batch_size, shuffle=(train_sampler is None), sampler = train_sampler,)
+    print(f"[diag] train DataLoader: {len(train_dataloader)} batches of {batch_size}", flush=True)
 
+    t0 = time.time()
     validation_data_module = Dataloader(parameters=parameters_validation, target=target_validation, device=device)
+    print(f"[diag] val Dataloader: {time.time()-t0:.2f}s  target shape={validation_data_module.target.shape}", flush=True)
     validation_sampler = torch.utils.data.distributed.DistributedSampler(dataset=validation_data_module, shuffle=True, seed=0) if multi_gpu else None
     validation_dataloader = torch.utils.data.DataLoader(validation_data_module, batch_size=batch_size, shuffle=(validation_sampler is None), sampler = validation_sampler,)
 
-
+    t0 = time.time()
     emu = poweremu_torch(network_opt=network_opt,
                          optimizer_opt=optimizer_opt,
                          train_opt=train_opt, scale_opt=scale_opt, data_opt=data_opt,
                          device=device)
+    print(f"[diag] poweremu_torch init: {time.time()-t0:.2f}s", flush=True)
 
 
     #train

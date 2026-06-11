@@ -209,7 +209,7 @@ if __name__ == "__main__":
     import numpy as np
     from tools import gen_training
 
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    device = "cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     print(device)
 
     z_array = loadmat("/home/dp331/dp331/dc-poch1/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat")["z21cm"][0]

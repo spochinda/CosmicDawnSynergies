@@ -8,10 +8,11 @@ import torch
 from copy import deepcopy
 from collections import OrderedDict
 import argparse
+import pathlib
 
 
 if __name__ == '__main__':
-    path = "/home/sp2053/rds/hpc-work/CosmicDawnSynergies/" # "/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/"
+    path = str(pathlib.Path(__file__).resolve().parents[1]) + "/"
     parser = argparse.ArgumentParser(description="Train different emulators.")
     parser.add_argument('--emulator', type=str, choices=['Delta21', 'XRB', 'T_today', 'T21', 'Ts', 'TK', 'Trad', 'SDC3b_Pk', 'SDC3b_xHI'], default='SDC3b_xHI', help="Choose which emulator to train.")
     args = parser.parse_args()
@@ -83,11 +84,11 @@ if __name__ == '__main__':
         network_opt = {"MLP": {"in_dim": 4+3, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
-                            save_after_epochs=10, 
-                            save_model_path=path+"data/trained_emulators_poweremu/powerspec3.pth",
+                            save_after_epochs=8, 
+                            save_model_path=path+"data/trained_emulators_poweremu/SDC3b_Pk_emu.pth",
                             save_progress_plots_path=path+"images/",
                             terminate_time=3600*3,
-                            model_id=f"_{emulator_choice}_3",
+                            model_id=f"_{emulator_choice}_4",
                             )
         data_opt = {"data_log": False,
                     "data_dims":[ 
@@ -101,23 +102,23 @@ if __name__ == '__main__':
                     }
 
         #load data
-        z_array = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/z_power_spectra.npy')
-        kperp_array = np.loadtxt('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/TestDataset/bins_kper.txt')
-        kpar_array = np.loadtxt('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/yl871/SKA_SDC3b/TestDataset/bins_kpar.txt')
-        
+        z_array = np.load('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/z_power_spectra.npy')
+        kperp_array = np.loadtxt('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/bins_kper.txt')
+        kpar_array = np.loadtxt('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/bins_kpar.txt')
+
         data_opt["data_dims"][0]["z"]["values"] = z_array
         data_opt["data_dims"][1]["kperp"]["values"] = kperp_array
         data_opt["data_dims"][2]["kpar"]["values"] = kpar_array
 
         
-        target = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/power_spectra.npy')
+        target = np.load('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/power_spectra_old.npy')
         #find simulations with nans and remove them
         nan_indices = np.argwhere(np.isnan(target))
         nan_indices = np.unique(nan_indices[:,0])
         print(f"Removing {len(nan_indices)} simulations from shape {target.shape}")
         target = np.delete(target, nan_indices, axis=0)
         
-        parameters = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/parameters.npy')
+        parameters = np.load('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/parameters_old.npy')
         parameters = np.delete(parameters, nan_indices, axis=0)
 
         parameters = pd.DataFrame(parameters, columns=["zeta_eff", "zeta_exp", "rmfp", "Vc"])
@@ -131,7 +132,7 @@ if __name__ == '__main__':
         network_opt = {"MLP": {"in_dim": 4+1, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
         train_opt = dict(epochs=10000, batch_size=10000, profiling=False, loss_fn="MSELoss", 
-                            save_after_epochs=40, 
+                            save_after_epochs=8, 
                             save_model_path=path+"data/trained_emulators_poweremu/SDC3b_xHI_emu.pth",
                             save_progress_plots_path=path+"images/",
                             terminate_time=3600*2,
@@ -147,11 +148,11 @@ if __name__ == '__main__':
                     }
 
         #load data
-        z_array = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/z_xHI.npy')
+        z_array = np.load('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/z_xHI.npy')
         
         data_opt["data_dims"][0]["z"]["values"] = z_array
 
-        target = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/averaged_xHI.npy')
+        target = np.load('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/averaged_xHI_old.npy')
         
         #find simulations with nans and remove them
         nan_indices = np.argwhere(np.isnan(target))
@@ -159,7 +160,7 @@ if __name__ == '__main__':
         print(f"Removing {len(nan_indices)} simulations from shape {target.shape}")
         target = np.delete(target, nan_indices, axis=0)
         
-        parameters = np.load('/home/sp2053/rds/rds-uksrc-eElmlMT25pY/sp2053/parameters.npy')
+        parameters = np.load('/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/SDC3b/parameters_old.npy')
         parameters = np.delete(parameters, nan_indices, axis=0)
 
         parameters = pd.DataFrame(parameters, columns=["zeta_eff", "zeta_exp", "rmfp", "Vc"])
