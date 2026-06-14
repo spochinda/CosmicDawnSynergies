@@ -1,4 +1,5 @@
 import os
+import datetime
 import sys
 from scipy.interpolate import RegularGridInterpolator
 from joblib import Parallel, delayed
@@ -287,13 +288,14 @@ class poweremu_torch(nn.Module):
                     
                         if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_push(f"[{self.device.index}] print")
                         device_str = f"[{str(self.device)}] "
+                        current_time_str = f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
                         epoch_str = f"Epoch {e} | "
                         batch_str = f"Batch {i+1} out of {train_dataloader.__len__()} | "
                         time_str = f"Time: {time.time()-stime:.2f} | "
                         train_str = f"Train: RMSE={_rmse:.4f} "
                         q95_str = f"q95<={_q95:,.4f} | "
                         validation_str = f"Validation: {_vrmse:,.4f} "
-                        print(device_str + epoch_str + batch_str + time_str + train_str + q95_str + validation_str, flush=True)
+                        print(device_str + current_time_str + epoch_str + batch_str + time_str + train_str + q95_str + validation_str, flush=True)
                         if profiling and torch.cuda.is_available():   torch.cuda.nvtx.range_pop()
                     
                     if i == 20 and profiling: break

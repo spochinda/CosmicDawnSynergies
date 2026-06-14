@@ -1,3 +1,4 @@
+import os
 from scipy.io import loadmat
 import pandas as pd
 from CosmicDawnSynergies.train_tools import prepare_parameters, gen_training_data, prepare_validation_data, prepare_scale_opt, Scaler, shuffle_data, train_model
@@ -15,10 +16,11 @@ if __name__ == '__main__':
     path = str(pathlib.Path(__file__).resolve().parents[1]) + "/"
     parser = argparse.ArgumentParser(description="Train different emulators.")
     parser.add_argument('--emulator', type=str, choices=['Delta21', 'XRB', 'T_today', 'T21', 'Ts', 'TK', 'Trad', 'SDC3b_Pk', 'SDC3b_xHI'], default='SDC3b_xHI', help="Choose which emulator to train.")
+    parser.add_argument('--seed', type=int, default=51, help="Global seed for train/val split, data generation, and torch weight init. None = non-deterministic.")
     args = parser.parse_args()
+    print(f"Training {args.emulator} emulator with seed {args.seed}")
 
     emulator_choice = args.emulator
-    print(f"Training {emulator_choice} emulator")
 
     ############################################################## Delta21^2 emu ##############################################################
     if emulator_choice == 'Delta21':
@@ -83,9 +85,9 @@ if __name__ == '__main__':
         #define network, optimizer, training, and data options
         network_opt = {"MLP": {"in_dim": 4+3, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
-        train_opt = dict(epochs=10000, batch_size=20000, profiling=False, loss_fn="MSELoss", 
-                            save_after_epochs=8, 
-                            save_model_path=path+"data/trained_emulators_poweremu/SDC3b_Pk_emu.pth",
+        train_opt = dict(epochs=10, batch_size=20000, profiling=False, loss_fn="MSELoss",
+                            save_after_epochs=5, 
+                            save_model_path=path+"data/trained_emulators_poweremu/SDC3b_Pk_emu_seed51all.pth",
                             save_progress_plots_path=path+"images/",
                             terminate_time=3600*3,
                             model_id=f"_{emulator_choice}_4",
@@ -131,7 +133,7 @@ if __name__ == '__main__':
         #define network, optimizer, training, and data options
         network_opt = {"MLP": {"in_dim": 4+1, "hidden_dim": 100, "n_hidden": 6, "out_dim": 1}}
         optimizer_opt = {"Adam": {"lr": 1e-3, "weight_decay": 1e-4}}
-        train_opt = dict(epochs=10000, batch_size=10000, profiling=False, loss_fn="MSELoss", 
+        train_opt = dict(epochs=10, batch_size=10000, profiling=False, loss_fn="MSELoss", 
                             save_after_epochs=8, 
                             save_model_path=path+"data/trained_emulators_poweremu/SDC3b_xHI_emu.pth",
                             save_progress_plots_path=path+"images/",
@@ -418,12 +420,30 @@ if __name__ == '__main__':
             target[target==0] = minimum * 10**np.random.uniform(-3, 0, target[target==0].shape)
 
     #Split data and parameters into training set and test set
+    gen_data_seed = args.seed  # None = non-deterministic (faster, uses all CPU cores)
+    if gen_data_seed is not None:
+        data_opt["train_test_split_opt"]["random_state"] = gen_data_seed
+        
     parameters_train, parameters_validation, target_train, target_validation = train_test_split(parameters, target, **data_opt["train_test_split_opt"])
     #generate training data and prepare validation data
     assert (len(target.shape)-1) == len(data_opt["data_dims"]), "Number of data dimensions does not match number of limits and transformation options in data options"
-    parameters_train, target_train = gen_training_data(parameters=parameters_train, data=target_train, data_opt=data_opt, verbose=True)
+    gen_data_n_jobs = 1 if gen_data_seed is not None else -1
+    if gen_data_seed is not None:
+        np.random.seed(gen_data_seed)
+        torch.manual_seed(gen_data_seed)
+    parameters_train, target_train = gen_training_data(parameters=parameters_train, data=target_train, data_opt=data_opt, n_jobs=gen_data_n_jobs, verbose=True)
     assert len(parameters_train.columns) == network_opt["MLP"]["in_dim"], f"Number of input parameters ({len(parameters_train.columns)}) does not match network input dimension ({network_opt['MLP']['in_dim']})"
     parameters_validation, target_validation = prepare_validation_data(parameters=parameters_validation, data=target_validation, data_opt=data_opt)
+    # save generated data for cross-branch comparison (data/SDC3b/ is gitignored)
+    #_debug_dir = path + "data/SDC3b/debug_data/"
+    #os.makedirs(_debug_dir, exist_ok=True)
+    #np.save(_debug_dir + "params_train.npy", parameters_train.values)
+    #np.save(_debug_dir + "target_train.npy", target_train)
+    #np.save(_debug_dir + "params_val.npy", parameters_validation.values)
+    #np.save(_debug_dir + "target_val.npy", target_validation)
+    #np.save(_debug_dir + "params_train_columns.npy", np.array(parameters_train.columns))
+    #print(f"[debug] saved generated data to {_debug_dir}", flush=True)
+
     ##save
     #parameters_train.to_csv(path+"data/parameters_train.csv", index=False)
     #parameters_validation.to_csv(path+"data/parameters_validation.csv", index=False)
