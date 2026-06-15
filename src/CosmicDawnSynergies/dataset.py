@@ -63,7 +63,7 @@ class BaseDataset(Dataset):
         """
         self.val_size = 0.2
         self.train_size = 0.8
-        self.random_state = 42
+        self.random_state = opt.get("split_seed", 42)
         self.opt = opt
         self.params_opt = opt.get("params_opt", {})
         self.targets_opt = opt.get("targets_opt", {})
@@ -92,6 +92,9 @@ class BaseDataset(Dataset):
             if self.data_dims[key].get("transform") is not None:
                 transform_fn = globals().get(self.data_dims[key]["transform"])
                 self.data_dims[key]["values"] = transform_fn(self.data_dims[key]["values"], **self.data_dims[key].get("transform_kwargs", {}))
+        gen_data_seed = opt.get("gen_data_seed", None)
+        if gen_data_seed is not None:
+            np.random.seed(gen_data_seed)
         self.params_train, self.targets_train = gen_training_data(self.params_train, self.targets_train, copy.deepcopy(self.data_dims), n_jobs=-1, verbose=True)
         self.params_val, self.targets_val = prepare_validation_data(params=self.params_val, targets=self.targets_val, data_dims=copy.deepcopy(self.data_dims))
 

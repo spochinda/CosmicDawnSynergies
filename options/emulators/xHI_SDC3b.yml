@@ -1,7 +1,7 @@
 # general settings
 name: xHI_SDC3b_minmax
 num_gpu: auto  # automatic GPU detection
-manual_seed: !!int 10
+manual_seed: !!int 51
 
 model_type: MLPModel
 # network architecture
@@ -11,11 +11,13 @@ network_opt:
   out_dim: !!int 1
   activation: ReLU
   out_activation: ~
+  init_weights: pytorch_default
 
 # training settings
 train:
   total_iter: !!int 10000
-  ema_decay: !!float 0.999
+  ema_decay: ~
+  grad_clip_norm: !!float 1.0
   optimizer_opt:
     type: Adam
     lr: !!float 1e-3
@@ -29,14 +31,17 @@ train:
 dataset:
   type: BaseDataset
   batch_size_per_gpu: !!int 10000
-  num_worker_per_gpu: !!int 4
+  num_worker_per_gpu: !!int 0
+  gen_data_seed: !!int 51
+  split_seed: !!int 51
+  # preshuffle_seed: !!int 42
   params_opt:
     file: data/SDC3b/parameters_old.npy
     key: parameters
     names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
     log: []
     discard: []
-    normalization: norm_standard
+    normalization: norm_minmax_extended
   targets_opt:
     file: data/SDC3b/averaged_xHI_old.npy
     offset: !!float 0.0
@@ -57,8 +62,8 @@ val:
   val_freq: !!float 1024
 
 logger:
-  print_freq: !!int 256
-  save_checkpoint_freq: !!float 1280
+  print_freq: !!int 1024
+  save_checkpoint_freq: !!float 2560
   use_tb_logger: !!bool true
   wandb:
     project: ~

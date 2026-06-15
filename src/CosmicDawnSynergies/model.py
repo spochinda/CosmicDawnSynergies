@@ -399,6 +399,7 @@ class MLP(nn.Module):
         out_dim: int = 1,
         activation: str = 'ReLU',
         out_activation: str = None,
+        init_weights: str = 'kaiming',
     ):
         super(MLP, self).__init__()
 
@@ -431,8 +432,9 @@ class MLP(nn.Module):
             layers.append(self._get_activation_fn(out_activation))
         self.network = nn.Sequential(*layers)
 
-        # Initialize weights
-        self._init_weights()
+        # 'pytorch_default' uses nn.Linear's built-in Kaiming uniform init (matches legacy)
+        if init_weights != 'pytorch_default':
+            self._init_weights()
 
     def _get_activation_fn(self, activation: str) -> nn.Module:
         """Get activation function by name."""
@@ -529,7 +531,7 @@ class MLPModel(BaseModel):
         self.net_g.train()
         train_opt = self.opt['train']
 
-        self.ema_decay = train_opt.get('ema_decay', 0)
+        self.ema_decay = train_opt.get('ema_decay', 0) or 0
         if self.ema_decay > 0:
             logger = get_root_logger()
             logger.info(f'Use Exponential Moving Average with decay: {self.ema_decay}')
@@ -579,6 +581,9 @@ class MLPModel(BaseModel):
         # Calculate loss
         loss = self.criterion(outputs, targets)
         loss.backward()
+        grad_clip = self.opt['train'].get('grad_clip_norm', None)
+        if grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(self.net_g.parameters(), grad_clip)
         self.optimizer_g.step()
 
         if hasattr(self, 'net_g_ema'):

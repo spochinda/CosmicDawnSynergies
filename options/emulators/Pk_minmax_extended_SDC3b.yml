@@ -1,7 +1,7 @@
 # general settings
 name: Pk_SDC3b_MLP_minmax_extended
 num_gpu: auto  # automatic GPU detection
-manual_seed: !!int 10
+manual_seed: !!int 51
 
 model_type: MLPModel
 # network architecture
@@ -10,13 +10,15 @@ network_opt:
   n_hidden: !!int 6
   out_dim: !!int 1
   activation: ReLU
-  out_activation: 
+  out_activation:
+  init_weights: pytorch_default
 
 
 # training settings
 train:
-  total_iter: !!int 3000
-  ema_decay: !!float 0.999
+  total_iter: !!int 3200
+  ema_decay: ~
+  grad_clip_norm: !!float 1.0
   optimizer_opt:
     type: Adam
     lr: !!float 1e-3
@@ -30,7 +32,10 @@ train:
 dataset:
   type: BaseDataset
   batch_size_per_gpu: !!int 20000
-  num_worker_per_gpu: !!int 4
+  num_worker_per_gpu: !!int 0
+  gen_data_seed: !!int 51
+  split_seed: !!int 51
+  # preshuffle_seed: !!int 42
   params_opt:
     file: data/SDC3b/parameters_old.npy
     key: parameters
