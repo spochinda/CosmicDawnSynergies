@@ -715,7 +715,8 @@ class MLPModel(BaseModel):
             rmse_scaled = 10**rmse if self.opt['dataset']['targets_opt'].get('log', False) else rmse
             rmse_scaled = rmse_scaled - self.opt['dataset']['targets_opt'].get('offset', 0)
 
-            if self.best_metric_results['rmse']['val'] > rmse_scaled.item():
+            is_new_best = self.best_metric_results['rmse']['val'] > rmse_scaled.item()
+            if is_new_best:
                 self.best_metric_results['rmse']['val'] = rmse_scaled.item()
                 self.best_metric_results['rmse']['iter'] = current_iter
             if self.best_metric_results['nrmse']['val'] > nrmse.item():
@@ -727,6 +728,13 @@ class MLPModel(BaseModel):
 
             logger = get_root_logger()
             logger.info(f'Validation: RMSE={rmse_scaled:.4f} (Best: {self.best_metric_results["rmse"]["val"]:.4f}, iter {self.best_metric_results["rmse"]["iter"]})| NRMSE={nrmse:.4f} (Best: {self.best_metric_results["nrmse"]["val"]:.4f}, iter {self.best_metric_results["nrmse"]["iter"]})| R²={r2:.4f} (Best: {self.best_metric_results["r2"]["val"]:.4f}, iter {self.best_metric_results["r2"]["iter"]})')
+
+            # save best model to net_g_latest.pth, matching legacy behavior (best-val checkpoint)
+            if is_new_best:
+                if hasattr(self, 'net_g_ema'):
+                    self.save_network([self.net_g, self.net_g_ema], 'net_g', -1, param_key=['params', 'params_ema'])
+                else:
+                    self.save_network(self.net_g, 'net_g', -1)
 
             if tb_logger:
                 tb_logger.add_scalar('validation/rmse', rmse_scaled, current_iter)

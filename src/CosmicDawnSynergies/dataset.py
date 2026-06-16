@@ -93,9 +93,10 @@ class BaseDataset(Dataset):
                 transform_fn = globals().get(self.data_dims[key]["transform"])
                 self.data_dims[key]["values"] = transform_fn(self.data_dims[key]["values"], **self.data_dims[key].get("transform_kwargs", {}))
         gen_data_seed = opt.get("gen_data_seed", None)
+        n_jobs = 1 if gen_data_seed is not None else -1
         if gen_data_seed is not None:
             np.random.seed(gen_data_seed)
-        self.params_train, self.targets_train = gen_training_data(self.params_train, self.targets_train, copy.deepcopy(self.data_dims), n_jobs=-1, verbose=True)
+        self.params_train, self.targets_train = gen_training_data(self.params_train, self.targets_train, copy.deepcopy(self.data_dims), n_jobs=n_jobs, verbose=True)
         self.params_val, self.targets_val = prepare_validation_data(params=self.params_val, targets=self.targets_val, data_dims=copy.deepcopy(self.data_dims))
 
         #normalize parameters
