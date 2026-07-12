@@ -1,7 +1,7 @@
 # general settings
 name: xHI_SDC3b_minmax
 num_gpu: auto  # automatic GPU detection
-manual_seed: !!int 51
+manual_seed: !!int 34
 
 model_type: MLPModel
 # network architecture
@@ -15,7 +15,7 @@ network_opt:
 
 # training settings
 train:
-  total_iter: !!int 10000
+  total_iter: !!int 1600
   ema_decay: ~
   grad_clip_norm: !!float 1.0
   optimizer_opt:
@@ -32,8 +32,8 @@ dataset:
   type: BaseDataset
   batch_size_per_gpu: !!int 10000
   num_worker_per_gpu: !!int 0
-  gen_data_seed: !!int 51
-  split_seed: !!int 51
+  gen_data_seed: !!int 34
+  split_seed: !!int 34
   # preshuffle_seed: !!int 42
   params_opt:
     file: data/SDC3b/parameters_old.npy
@@ -59,11 +59,11 @@ path:
 
 # validation settings
 val:
-  val_freq: !!float 1024
+  val_freq: !!float 160
 
 logger:
-  print_freq: !!int 1024
-  save_checkpoint_freq: !!float 2560
+  print_freq: !!int 160
+  save_checkpoint_freq: !!float 800
   use_tb_logger: !!bool true
   wandb:
     project: ~
