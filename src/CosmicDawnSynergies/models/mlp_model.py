@@ -210,3 +210,31 @@ class MLPModel(BaseModel):
     def predict(self, params):
         """Forward pass on a (batch, in_dim) array; returns numpy."""
         return np.asarray(self._forward(self.net_g, jnp.asarray(params)))
+
+    @classmethod
+    def from_emulator_dir(cls, emulator_dir, which='best', use_ema=False):
+        """Load a trained emulator (converted or JAX-trained) for inference.
+
+        Expects the standard emulator layout: one options .yml, a
+        param_stats.json, and checkpoints/<which>.
+        """
+        import glob
+        from os import path as osp
+
+        from CosmicDawnSynergies.utils import yaml_load
+
+        ymls = glob.glob(osp.join(emulator_dir, '*.yml'))
+        if len(ymls) != 1:
+            raise ValueError(f'Expected exactly one options yml in {emulator_dir}, found {ymls}')
+        opt = yaml_load(ymls[0])
+        opt['is_train'] = False
+        opt.setdefault('path', {})
+        opt['path']['emulators_root'] = emulator_dir
+        opt['path']['checkpoints'] = osp.join(emulator_dir, 'checkpoints')
+
+        param_stats = cls.load_param_stats(emulator_dir)
+        # one input column per param_stats entry (data dims + astro params)
+        model = cls(opt, in_dim=opt['arch'].get('in_dim', len(param_stats)))
+        model.param_stats = param_stats
+        model.load_network(which=which, use_ema=use_ema)
+        return model
