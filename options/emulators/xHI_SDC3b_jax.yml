@@ -1,0 +1,65 @@
+# xHI SDC3b emulator (JAX/optax schema) — hand-ported from xHI_SDC3b.yml
+name: xHI_SDC3b_minmax_jax
+manual_seed: !!int 34
+
+model: MLPModel
+arch:
+  type: MLP
+  hidden_dim: !!int 100
+  n_hidden: !!int 6
+  out_dim: !!int 1
+  activation: relu
+  out_activation: ~
+  init: torch_default
+
+train:
+  total_iter: !!int 1600
+  loss: mse
+  ema_decay: ~
+  grad_clip_norm: !!float 1.0
+  warmup_iter: -1
+  optimizer:
+    name: adam
+    weight_decay: !!float 1e-4   # coupled L2 (torch-Adam semantics)
+  schedule:
+    name: piecewise_constant
+    init_value: !!float 1e-3
+    boundaries_and_scales:
+      60000: !!float 1.0
+      90000: !!float 1.0
+
+dataset:
+  type: BaseDataset
+  batch_size: !!int 10000
+  gen_data_seed: !!int 34
+  split_seed: !!int 34
+  # preshuffle_seed: !!int 42
+  params_opt:
+    file: data/SDC3b/parameters_old.npy
+    key: parameters
+    names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
+    log: []
+    discard: []
+    normalization: norm_minmax_extended
+  targets_opt:
+    file: data/SDC3b/averaged_xHI_old.npy
+    offset: !!float 0.0
+    log: !!bool false
+  data_dims:
+    z:
+      file: data/SDC3b/z_xHI.npy
+      log: !!bool false
+      lims_nsample: [!!float 6.1036, !!float 8.726, !!int 2000]
+
+path:
+  pretrain: ~
+  resume_state: ~
+
+val:
+  val_freq: !!float 160
+  save_best: !!bool true
+
+logger:
+  print_freq: !!int 160
+  save_checkpoint_freq: !!float 800
+  use_tb_logger: !!bool true
