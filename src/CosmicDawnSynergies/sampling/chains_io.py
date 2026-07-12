@@ -24,8 +24,11 @@ def to_nested_samples(dead, param_names, derived=None):
     logL_birth = np.asarray(sw.loglikelihood_birth)
     logL_birth = np.where(np.isnan(logL_birth), -np.inf, logL_birth)
 
-    return NestedSamples(data=np.stack(data, axis=1), columns=columns,
-                         logL=logL, logL_birth=logL_birth)
+    # labels match the legacy PolyChord paramnames convention (label = name),
+    # so PolyChord and BlackJAX chains overlay in one triangle_plot call
+    samples = NestedSamples(data=np.stack(data, axis=1), columns=columns,
+                            logL=logL, logL_birth=logL_birth)
+    return samples.set_labels([f'${c}$' for c in columns] + [None] * (samples.shape[1] - len(columns)))
 
 
 def save_chains(samples, csv_path):

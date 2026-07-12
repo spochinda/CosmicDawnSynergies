@@ -1,0 +1,35 @@
+# SDC3b PS1 inference (JAX/blackjax nested slice sampling)
+# Parity counterpart of sdc3b_seed51_PS1.yml (PolyChord nlive=500, seed=51)
+inference_id: SDC3b_PS2_jax
+plot_noise: !!bool true
+
+sampler:
+  seed: !!int 51
+  num_live: !!int 500
+  num_delete: !!int 250
+  num_inner_steps: !!int 25   # 5 * ndims (5 sampled params)
+  stop_dlogZ: !!float 3.0
+
+LikelihoodModules:
+  LikelihoodSDC3b:
+    likelihood_kwargs:
+      files:
+        - - data/SDC3b/Pk_PS2_181.0_195.9.txt
+          - data/SDC3b/Pk_PS_averaged_noise_181.0_195.9.txt
+          - !!float 181.0
+          - !!float 195.9
+        - - data/SDC3b/Pk_PS2_166.0_180.9.txt
+          - data/SDC3b/Pk_PS_averaged_noise_166.0_180.9.txt
+          - !!float 166.0
+          - !!float 180.9
+        - - data/SDC3b/Pk_PS2_151.0_165.9.txt
+          - data/SDC3b/Pk_PS_averaged_noise_151.0_165.9.txt
+          - !!float 151.0
+          - !!float 165.9
+      kperp_file: data/SDC3b/bins_kper.txt
+      kpar_file: data/SDC3b/bins_kpar.txt
+      emulator: trained_emulators/Pk_SDC3b_MLP_minmax_extended_jax
+      emulator_xHI: trained_emulators/xHI_SDC3b_minmax_jax
+      lognoise:
+        - !!float -6
+        - !!float -0.5
