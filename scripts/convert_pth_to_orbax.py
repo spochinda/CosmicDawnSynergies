@@ -143,15 +143,20 @@ def main():
 
     model = MLPModel.from_emulator_dir(out_dir)
 
+    # draw inputs from the emulator's own normalized range (plus mild
+    # extrapolation); far outside it, outputs blow up and fp32 noise with them
+    norm = legacy_opt['dataset']['params_opt'].get('normalization', 'norm_minmax')
+    lo, hi = (-1.25, 1.25) if norm == 'norm_minmax_extended' else (-0.25, 1.25)
     rng = np.random.default_rng(0)
-    # normalized inputs: cover [-1.5, 1.5] to also probe slight extrapolation
-    x = rng.uniform(-1.5, 1.5, size=(4096, in_dim)).astype(np.float32)
+    x = rng.uniform(lo, hi, size=(4096, in_dim)).astype(np.float32)
     with torch.no_grad():
         ref = torch_net(torch.from_numpy(x)).numpy()
     pred = model.predict(x)
     max_diff = np.max(np.abs(pred - ref))
-    print(f'Forward parity: max |jax - torch| = {max_diff:.3e} over {x.shape} inputs')
-    assert max_diff < args.atol, f'Parity FAILED (atol={args.atol})'
+    rel_diff = max_diff / np.max(np.abs(ref))
+    print(f'Forward parity: max |jax - torch| = {max_diff:.3e} '
+          f'(rel {rel_diff:.3e}, max |ref| {np.max(np.abs(ref)):.3e}) over {x.shape} inputs')
+    assert rel_diff < args.atol, f'Parity FAILED (rel atol={args.atol})'
     print('Level-1 parity PASSED')
 
 

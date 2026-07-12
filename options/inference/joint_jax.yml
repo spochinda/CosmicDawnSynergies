@@ -1,0 +1,46 @@
+# Joint HERA + Radio + XRB + SARAS3 inference (JAX/blackjax NSS)
+# Counterpart of the legacy joint.yml (PolyChord nlive=100).
+# NOTE: the original joint-run HERA weights (Delta21_emulator net_g_10000.pth)
+# no longer exist; Delta21_emulator2 (400-iter checkpoint) is a placeholder —
+# retrain a Delta21 emulator before drawing scientific conclusions.
+inference_id: joint_jax
+plot_noise: !!bool true
+
+sampler:
+  seed: !!int 0
+  num_live: !!int 500
+  num_delete: !!int 250
+  num_inner_steps: !!int 85   # 5 * ndims (9 astro + 7 fg + lognoise)
+  stop_dlogZ: !!float 3.0
+
+LikelihoodModules:
+  LikelihoodHERA:
+    likelihood_kwargs:
+      files:
+        - data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5
+        - data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5
+      emulator: trained_emulators/Delta21_emulator2_jax
+      decimate_data: !!bool false
+
+  LikelihoodRadioBackground:
+    likelihood_kwargs:
+      files: data/LWA1_ARCADE2/LWA1_with_err.npy
+      emulator: trained_emulators/T_today_emulator_jax
+
+  LikelihoodXRB:
+    likelihood_kwargs:
+      emulator: trained_emulators/Xray_emulator_jax
+
+  LikelihoodSARAS3:
+    likelihood_kwargs:
+      files: data/SARAS3/SARAS_3_averaged_spectrum.txt
+      emulator: trained_emulators/T21_emulator_jax
+      poly_coeff:
+        fg_a0: [3, 4]
+        fg_a1: [-1, 1]
+        fg_a2: [-0.1, 0.1]
+        fg_a3: [-0.1, 0.1]
+        fg_a4: [-0.1, 0.1]
+        fg_a5: [-0.1, 0.1]
+        fg_a6: [-0.1, 0.1]
+      lognoise: [-2, 0]
