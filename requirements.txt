@@ -1,20 +1,41 @@
-#git+https://github.com/HERA-Team/hera_pspec
-#Note on hera_pspec: a) you need the wf_delay branch, and b) remove hera_cal from dependencies and install manually hera-pspec-0.3.1.dev346+g5c394f9
-git+https://github.com/HERA-Team/hera_cal
-git+https://github.com/nkern/simpleQE
-git+https://github.com/williamjameshandley/anesthetic
-git+https://github.com/williamjameshandley/fgivenx
-git+https://github.com/PolyChord/PolyChordLite
-git+https://github.com/htjb/margarine
+# Core JAX stack
+jax
+flax
+optax
+orbax-checkpoint
+# Nested sampling: handley-lab fork of blackjax (pending upstream merge), pinned.
+# See docs/adr/0002-pin-handley-lab-blackjax-fork.md
+blackjax @ git+https://github.com/handley-lab/blackjax@2180e29ffb645b2c46b76c768229c7c24212446c
+
+# Scientific stack
 numpy
-matplotlib
+scipy
 pandas
 scikit-learn
-fastkde
-#torch
-#tqdm
-#astropy
-#tf-keras
-#globalemu
-#seaborn
+matplotlib
+astropy
+joblib
+tqdm
+pyyaml
 
+# Chains / posterior handling and plotting
+git+https://github.com/williamjameshandley/anesthetic
+seaborn
+
+# Logging
+tensorboardX
+
+# --- Phase-2 likelihoods (HERA) -------------------------------------------
+# Needed only for the HERA likelihood port; install manually when phase 2 lands.
+# Note on hera_pspec: a) you need the wf_delay branch, and b) remove hera_cal
+# from dependencies and install manually hera-pspec-0.3.1.dev346+g5c394f9
+#git+https://github.com/HERA-Team/hera_pspec
+#git+https://github.com/HERA-Team/hera_cal
+#git+https://github.com/nkern/simpleQE
+
+# --- Legacy-only (main branch) ---------------------------------------------
+# torch                       -> pip install -e '.[convert]' for .pth conversion
+#git+https://github.com/PolyChord/PolyChordLite
+#git+https://github.com/htjb/margarine
+#git+https://github.com/williamjameshandley/fgivenx
+#fastkde
