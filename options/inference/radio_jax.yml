@@ -1,0 +1,16 @@
+# Radio background (LWA1/ARCADE2) single-likelihood inference (JAX/blackjax)
+inference_id: radio_jax
+plot_noise: !!bool true
+
+sampler:
+  seed: !!int 0
+  num_live: !!int 500
+  num_delete: !!int 250
+  num_inner_steps: !!int 45   # 5 * ndims (9 astro params)
+  stop_dlogZ: !!float 3.0
+
+LikelihoodModules:
+  LikelihoodRadioBackground:
+    likelihood_kwargs:
+      files: data/LWA1_ARCADE2/LWA1_with_err.npy
+      emulator: trained_emulators/T_today_emulator_jax

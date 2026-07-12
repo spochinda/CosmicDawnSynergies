@@ -208,8 +208,46 @@ class MLPModel(BaseModel):
         get_root_logger().info(f"Loaded '{key}' weights from {self.ckpt_dir}/{which}")
 
     def predict(self, params):
-        """Forward pass on a (batch, in_dim) array; returns numpy."""
+        """Raw forward pass on already-normalized inputs; returns numpy."""
         return np.asarray(self._forward(self.net_g, jnp.asarray(params)))
+
+    def make_predict_fn(self, param_stats=None):
+        """Return a pure, jit/vmap-safe function raw physical inputs -> physical
+        predictions, encapsulating the emulator's full input/output contract:
+
+        1. log10 on data-dimension columns flagged ``log`` in dataset.data_dims
+        2. input normalization (params_opt.normalization) with param_stats
+        3. float32 forward pass through net_g
+        4. target unscaling (inverse of targets_opt log/offset)
+
+        Args:
+            param_stats: override the normalization stats (default: the
+                emulator's own). Only for legacy-parity quirks — e.g. the SDC3b
+                xHI emulator is normalized with the Pk emulator's stats.
+        """
+        from CosmicDawnSynergies.models.scaling import NORMALIZATIONS, stats_arrays
+
+        dataset_opt = self.opt['dataset']
+        normalize = NORMALIZATIONS[dataset_opt['params_opt'].get('normalization', 'norm_minmax')]
+        stats = stats_arrays(param_stats if param_stats is not None else self.param_stats)
+        log_flags = [bool(dim.get('log', False)) for dim in dataset_opt.get('data_dims', {}).values()]
+        target_log = dataset_opt['targets_opt'].get('log', False)
+        target_offset = float(dataset_opt['targets_opt'].get('offset', 0.0) or 0.0)
+        net = self.net_g
+
+        def predict_fn(x):
+            """x: (batch, in_dim) raw physical columns in emulator input order."""
+            cols = [jnp.log10(x[:, i]) if (i < len(log_flags) and log_flags[i]) else x[:, i]
+                    for i in range(x.shape[1])]
+            x = normalize(jnp.stack(cols, axis=1), stats)
+            pred = net(x.astype(jnp.float32))
+            if target_log:
+                pred = 10 ** pred
+            if target_offset > 0:
+                pred = pred - target_offset
+            return pred
+
+        return predict_fn
 
     @classmethod
     def from_emulator_dir(cls, emulator_dir, which='best', use_ema=False):

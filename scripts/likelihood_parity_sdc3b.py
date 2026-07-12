@@ -46,7 +46,7 @@ leg.get_prior_indices(prior_dict)
 
 # ---- JAX
 jax_kwargs = dict(legacy_kwargs)
-jax_kwargs['emulator'] = f'{REPO}/trained_emulators/Pk_SDC3b_MLP_minmax_extended_jax'
+jax_kwargs['emulator'] = f'{REPO}/trained_emulators/Pk_SDC3b_MLP_minmax_extended_pth_jax'
 jax_kwargs['emulator_xHI'] = f'{REPO}/trained_emulators/xHI_SDC3b_minmax_jax'
 mod = build_likelihood('LikelihoodSDC3b', jax_kwargs)
 loglik = jax.jit(mod.loglikelihood)

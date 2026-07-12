@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.stats import norm
 
-from CosmicDawnSynergies.likelihoods.base_likelihood import BaseLikelihood, stats_arrays
+from CosmicDawnSynergies.likelihoods.base_likelihood import BaseLikelihood
 from CosmicDawnSynergies.utils.registry import LIKELIHOOD_REGISTRY
 
 
@@ -29,14 +29,9 @@ class LikelihoodHERA(BaseLikelihood):
         import hera_pspec as hp  # heavy dependency, only needed by this module
 
         data_dims = self.model_opt['dataset']['data_dims']
-        log_z = data_dims['z'].get('log', False)
-        log_k = data_dims['k'].get('log', False)
-
         if self.mask_to_emulator_range:
             zmin, zmax = data_dims['z']['lims_nsample'][:-1]
             kmin, kmax = data_dims['k']['lims_nsample'][:-1]
-
-        dim_stats = stats_arrays(self.param_stats, list(self.param_stats.keys())[:self.n_data_dims])
 
         self.bands = []
         for file in self.files:
@@ -86,21 +81,16 @@ class LikelihoodHERA(BaseLikelihood):
                 else:
                     print(f'Not decimating data for z={z:.2f} in file {fn}')
 
-                # static [z, k] block, pre-normalized with the emulator's stats
-                z_n = np.log10(z) if log_z else z
-                k_n = self.to_normed(k_mag, log_k)
-                block = np.column_stack([np.full(len(k_n), z_n), k_n])
-                block_n = np.asarray(self.normalize(jnp.asarray(block), dim_stats))
-
+                # static raw [z, k] block; the model's predict_fn owns
+                # log-transforms and normalization
+                block = np.column_stack([np.full(len(k_mag), z), k_mag])
                 self.bands.append({
                     'z': z, 'file': fn,
-                    'block_norm': jnp.asarray(block_n),
+                    'block': jnp.asarray(block),
                     'dsq': jnp.asarray(dsq),
                     'std': jnp.asarray(std),
                     'wfn': jnp.asarray(wfn),
                 })
-
-        self.astro_stats = stats_arrays(self.param_stats, self.astro_names)
 
     def decimate(self, k_mag, dsq, std, wfn):
         idx = np.argmin(dsq + 2 * std)
@@ -109,14 +99,9 @@ class LikelihoodHERA(BaseLikelihood):
         return k_mag[mask], dsq[mask], std[mask], wfn[mask][:, mask]
 
     def loglikelihood(self, particle):
-        theta_n = self.normalize(self.astro_vector(particle), self.astro_stats)
-
         logL = 0.0
         for band in self.bands:
-            inputs = jnp.concatenate(
-                [band['block_norm'], jnp.broadcast_to(theta_n, (band['block_norm'].shape[0], theta_n.size))],
-                axis=1)
-            pred = self.unscale_target(self.model.net_g(inputs.astype(jnp.float32)))
+            pred = self.predict(self.emulator_inputs(band['block'], particle))
             pred = band['wfn'] @ pred
             t = (band['dsq'] - pred) / jnp.sqrt(band['std'] ** 2 + (0.2 * pred) ** 2)
             logL += jnp.sum(norm.logcdf(t))

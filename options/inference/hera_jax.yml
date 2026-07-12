@@ -1,0 +1,21 @@
+# HERA H1C IDR3 single-likelihood inference (JAX/blackjax)
+# NOTE: Delta21_emulator2 is a 400-iter placeholder checkpoint (the original
+# net_g_10000.pth weights are lost) — retrain before scientific use.
+inference_id: hera_jax
+plot_noise: !!bool true
+
+sampler:
+  seed: !!int 0
+  num_live: !!int 500
+  num_delete: !!int 250
+  num_inner_steps: !!int 45   # 5 * ndims (9 astro params)
+  stop_dlogZ: !!float 3.0
+
+LikelihoodModules:
+  LikelihoodHERA:
+    likelihood_kwargs:
+      files:
+        - data/observations_H1C_IDR3/Deltasq_Band_1_Field_D_idr3.h5
+        - data/observations_H1C_IDR3/Deltasq_Band_2_Field_C_idr3.h5
+      emulator: trained_emulators/Delta21_emulator2_jax
+      decimate_data: !!bool false

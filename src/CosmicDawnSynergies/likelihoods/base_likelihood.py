@@ -1,48 +1,8 @@
 from collections import OrderedDict
 
 import jax.numpy as jnp
-import numpy as np
 
 from CosmicDawnSynergies.models.mlp_model import MLPModel
-
-
-def norm_minmax(params, stats, invert=False):
-    minimum, maximum = stats['min'], stats['max']
-    if invert:
-        return params * (maximum - minimum) + minimum
-    return (params - minimum) / (maximum - minimum)
-
-
-def norm_standard(params, stats, invert=False):
-    mean, std = stats['mean'], stats['std']
-    if invert:
-        return params * std + mean
-    return (params - mean) / std
-
-
-def norm_minmax_extended(params, stats, invert=False):
-    minimum, maximum = stats['min'], stats['max']
-    if invert:
-        return (params + 1) / 2 * (maximum - minimum) + minimum
-    return (params - minimum) / (maximum - minimum) * 2 - 1
-
-
-NORMALIZATIONS = {
-    'norm_minmax': norm_minmax,
-    'norm_standard': norm_standard,
-    'norm_minmax_extended': norm_minmax_extended,
-}
-
-
-def stats_arrays(param_stats, keys=None):
-    """param_stats (per-name dicts) -> column vectors of min/max/mean/std."""
-    keys = list(param_stats.keys()) if keys is None else list(keys)
-    return {
-        'min': jnp.array([param_stats[k]['min'] for k in keys]),
-        'max': jnp.array([param_stats[k]['max'] for k in keys]),
-        'mean': jnp.array([param_stats[k]['mean'] for k in keys]),
-        'std': jnp.array([param_stats[k]['std'] for k in keys]),
-    }
 
 
 class BaseLikelihood:
@@ -53,6 +13,10 @@ class BaseLikelihood:
     can drive blackjax nested sampling. ``derived`` (optional) maps a particle
     dict to a dict of derived quantities, vmapped over the posterior after
     the run.
+
+    Likelihoods work in raw physical units: ``self.predict`` (from
+    MLPModel.make_predict_fn) owns the emulator's input log-transforms,
+    normalization and target unscaling. Likelihood code never normalizes.
     """
 
     def __init__(self, opt):
@@ -65,16 +29,11 @@ class BaseLikelihood:
         self.model = MLPModel.from_emulator_dir(self.emulator_dir, which=opt.get('which', 'best'),
                                                 use_ema=opt.get('use_ema', False))
         self.model_opt = self.model.opt
-
-        self.target_log = self.model_opt['dataset']['targets_opt'].get('log', False)
-        self.target_offset = self.model_opt['dataset']['targets_opt'].get('offset', 0.0)
-        params_norm = self.model_opt['dataset']['params_opt'].get('normalization', 'norm_minmax')
-        self.normalize = NORMALIZATIONS[params_norm]
+        self.predict = self.model.make_predict_fn()
 
         self.param_stats = self.model.param_stats
         self.n_data_dims = len(self.model_opt['dataset']['data_dims'])
         self.astro_names = list(self.param_stats.keys())[self.n_data_dims:]
-        self.stats = stats_arrays(self.param_stats)
 
         self.extract_data()
 
@@ -93,7 +52,11 @@ class BaseLikelihood:
 
     @property
     def prior_bounds(self):
-        """Uniform prior bounds for this module's sampled parameters."""
+        """Uniform prior bounds for this module's sampled parameters.
+
+        Note: param_stats of log-transformed astro params (e.g. log10fX) are
+        stats of the transformed column, so bounds are in sampled space.
+        """
         bounds = OrderedDict()
         for name in self.astro_names:
             bounds[name] = (self.param_stats[name]['min'], self.param_stats[name]['max'])
@@ -104,14 +67,9 @@ class BaseLikelihood:
         """Particle dict -> raw astro-parameter vector in emulator order."""
         return jnp.array([particle[name] for name in self.astro_names])
 
-    def unscale_target(self, pred):
-        if self.target_log:
-            pred = 10 ** pred
-        if self.target_offset > 0:
-            pred = pred - self.target_offset
-        return pred
-
-    @staticmethod
-    def to_normed(values, stat):
-        """Host-side log10 helper for data-dimension values."""
-        return np.log10(values) if stat else np.asarray(values)
+    def emulator_inputs(self, data_block, particle):
+        """Stack a static data-dimension block (n, n_data_dims) with the
+        particle's astro parameters into raw (n, in_dim) emulator inputs."""
+        theta = self.astro_vector(particle)
+        return jnp.concatenate(
+            [data_block, jnp.broadcast_to(theta, (data_block.shape[0], theta.size))], axis=1)

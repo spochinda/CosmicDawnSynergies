@@ -15,7 +15,7 @@ The bare network architecture (e.g. the MLP) — layer structure and forward pas
 _Avoid_: network, net_g
 
 **Model**:
-The training-time wrapper around an Arch: loss, optimizer, EMA, validation metrics, checkpointing. The thing the training loop drives.
+The wrapper around an Arch that owns the emulator's full contract: training (loss, optimizer, EMA, validation, checkpointing) and prediction (input transforms, normalization, output unscaling). Likelihoods consume predictions in physical units and never normalize.
 _Avoid_: trainer
 
 **Data dimension**:

@@ -1,0 +1,15 @@
+# X-ray background (Chandra/NuSTAR limits) single-likelihood inference (JAX/blackjax)
+inference_id: xrb_jax
+plot_noise: !!bool true
+
+sampler:
+  seed: !!int 0
+  num_live: !!int 500
+  num_delete: !!int 250
+  num_inner_steps: !!int 45   # 5 * ndims (9 astro params)
+  stop_dlogZ: !!float 3.0
+
+LikelihoodModules:
+  LikelihoodXRB:
+    likelihood_kwargs:
+      emulator: trained_emulators/Xray_emulator_jax

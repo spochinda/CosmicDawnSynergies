@@ -99,8 +99,8 @@ Available configs: `sdc3b_jax_PS1.yml` / `sdc3b_jax_PS2.yml` (SDC3b with xHI der
 
 Add a `*_likelihood.py` file in `src/CosmicDawnSynergies/likelihoods/` with a class registered via `@LIKELIHOOD_REGISTRY.register()` that subclasses `BaseLikelihood`:
 
-- `extract_data(self)` — host-side numpy setup; precompute static (pre-normalized) input blocks
-- `loglikelihood(self, particle)` — **pure JAX** (jit/vmap-safe) map from a `{param_name: scalar}` dict to a scalar logL
+- `extract_data(self)` — host-side numpy setup; build static input blocks in **raw physical units**
+- `loglikelihood(self, particle)` — **pure JAX** (jit/vmap-safe) map from a `{param_name: scalar}` dict to a scalar logL; get model predictions via `self.predict(self.emulator_inputs(block, particle))` — the model's predict function owns log-transforms, input normalization and output unscaling, so likelihood code never normalizes
 - `derived(self, particle)` — optional derived quantities, vmapped over the posterior after the run
 - `prior_bounds` — extend if the module adds nuisance parameters (see `LikelihoodSARAS3`)
 

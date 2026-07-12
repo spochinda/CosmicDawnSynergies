@@ -3,7 +3,7 @@ import numpy as np
 from jax.scipy.stats import norm
 from scipy.constants import parsec, physical_constants
 
-from CosmicDawnSynergies.likelihoods.base_likelihood import BaseLikelihood, stats_arrays
+from CosmicDawnSynergies.likelihoods.base_likelihood import BaseLikelihood
 from CosmicDawnSynergies.utils.registry import LIKELIHOOD_REGISTRY
 
 
@@ -34,12 +34,8 @@ class LikelihoodXRB(BaseLikelihood):
 
         minE, maxE = self.X_limits[:, 0].min(), self.X_limits[:, 1].max()
         E_kev = np.geomspace(minE, maxE, 100)
+        self.block = jnp.asarray(E_kev)[:, None]
         self.logE_grid = jnp.asarray(np.log10(E_kev))
-
-        log_E = self.model_opt['dataset']['data_dims']['E_kev'].get('log', False)
-        E_col = self.to_normed(E_kev, log_E)[:, None]
-        dim_stats = stats_arrays(self.param_stats, list(self.param_stats.keys())[:self.n_data_dims])
-        self.block_norm = jnp.asarray(np.asarray(self.normalize(jnp.asarray(E_col), dim_stats)))
 
         # per-band static integration grids
         self.bands = []
@@ -51,13 +47,9 @@ class LikelihoodXRB(BaseLikelihood):
                 'obs': obs,
                 'std': std,
             })
-        self.astro_stats = stats_arrays(self.param_stats, self.astro_names)
 
     def loglikelihood(self, particle):
-        theta_n = self.normalize(self.astro_vector(particle), self.astro_stats)
-        inputs = jnp.concatenate(
-            [self.block_norm, jnp.broadcast_to(theta_n, (self.block_norm.shape[0], theta_n.size))], axis=1)
-        pred = self.unscale_target(self.model.net_g(inputs.astype(jnp.float32)))
+        pred = self.predict(self.emulator_inputs(self.block, particle))
         logpred_grid = jnp.log10(pred)
 
         logL = 0.0
