@@ -2,12 +2,16 @@
 inference_id: saras3_jax
 plot_noise: !!bool true
 
+# Cheapened for CPU (first-look quality): fewer live points, 80% deletions per
+# vectorized step, 3*ndims inner steps, loose stopping (live evidence < e^-1).
+# For paper-grade chains use num_live: 500, num_delete: 250,
+# num_inner_steps: 85, stop_dlogZ: 3.0 on a GPU node.
 sampler:
   seed: !!int 0
-  num_live: !!int 500
-  num_delete: !!int 250
-  num_inner_steps: !!int 85   # 5 * ndims (9 astro + 7 fg + lognoise)
-  stop_dlogZ: !!float 3.0
+  num_live: !!int 250
+  num_delete: !!int 200
+  num_inner_steps: !!int 51   # 3 * ndims (9 astro + 7 fg + lognoise)
+  stop_dlogZ: !!float 1.0
 
 LikelihoodModules:
   LikelihoodSARAS3:
