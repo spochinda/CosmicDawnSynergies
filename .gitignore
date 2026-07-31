@@ -74,4 +74,5 @@ images/
 scripts/
 analysis/*
 !analysis/sdc3b_xhi_truth.py
+!analysis/score_sdc3b.py
 options/emulators/
