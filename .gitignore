@@ -14,6 +14,11 @@ data/globalemu/*
 !data/globalemu/emulator14
 data/LWA1_ARCADE2
 data/SDC3b/*npy
+!data/SDC3b/parameters_old.npy
+!data/SDC3b/power_spectra_old.npy
+!data/SDC3b/z_power_spectra.npy
+!data/SDC3b/averaged_xHI_old.npy
+!data/SDC3b/z_xHI.npy
 data/SDC3b/mock_PS*
 data/SDC3b/ska_noise_sim*
 data/SDC3b/PS0_*
