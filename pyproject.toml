@@ -29,6 +29,11 @@ dependencies = [
     "pyyaml",
     "basicsr",
     "anesthetic @ git+https://github.com/williamjameshandley/anesthetic",
+    # not imported directly anywhere, but basicsr pulls it in transitively and
+    # its own code imports torchvision.transforms.functional_tensor, which
+    # was removed in newer torchvision — pin below that removal (confirmed
+    # working at 0.21.0; failed at the latest, 0.28.0)
+    "torchvision<0.22",
 ]
 
 [project.urls]

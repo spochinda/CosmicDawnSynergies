@@ -6,7 +6,10 @@ import torch
 import copy
 
 from scipy.constants import parsec, physical_constants
-import hera_pspec as hp
+# hera_pspec needs a special/manual install (see README) and is only used by
+# LikelihoodHERA.extract_data below, so it's imported lazily there instead of
+# at module level — otherwise every likelihood in this file (including
+# LikelihoodSDC3b, which never touches HERA data) would require it too.
 
 import scipy.special as ssp
 import CosmicDawnSynergies.itamar.radio_cutoff_calc as rad
@@ -361,6 +364,8 @@ class LikelihoodHERA(LikelihoodBase):
             print(exc_type, fname, exc_tb.tb_lineno)
         
     def extract_data(self, **kwargs):
+        import hera_pspec as hp
+
         # Precompute normalization dict
         self.norm_dict = {}
         self.norm_dict['min'] = np.array([item[1]['min'] for item in self.model.param_stats.items()])
