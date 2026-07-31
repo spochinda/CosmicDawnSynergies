@@ -459,27 +459,27 @@ def transform_T_today(targets, params, z_file, z_key):
 if __name__ == "__main__":
     opt = {
         "params_opt": {
-            "file": "/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat",
+            "file": "data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_parameters_mat.mat",
             "key": "parameters",
             "names": ['fstarII', 'fstarIII', 'Vc', 'fX', 'alpha', 'nu_0', 'zeta', 'tau', 'fradio', 'pop', 'feed', 'delay'],
             "log": ['fstarII', 'fstarIII', 'Vc', 'fX', 'fradio'],
             "discard": ['zeta', 'feed', 'delay'],
         },
         "targets_opt": {
-            "file": "/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat",
+            "file": "data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_Deltak_mat.mat",
             "key": "combined_Deltaks",
             "offset": 1e-6,
             "log": True,
         },
         "data_dims": {
             "z": {
-                "file": "/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat",
+                "file": "data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_z_mat.mat",
                 "key": "z21cm",
                 "log": False,
                 "lims_nsample": [6, 27, 20]
             },
             "k": {
-                "file": "/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat",
+                "file": "data/models_21cmSim/HERA_IDR4_Emulator_Data/hera_k_mat.mat",
                 "key": "ks",
                 "log": True,
                 "lims_nsample": [0.1, 0.99, 20],

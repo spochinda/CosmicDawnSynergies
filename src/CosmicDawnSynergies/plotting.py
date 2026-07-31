@@ -196,7 +196,7 @@ def triangle_plot(files, paramNames, plot_path="", **kwargs):
 if __name__ == "__main__":
     plt.rcParams["font.size"]=22 #30
 
-    files = ["/Users/simonpochinda/venvs/cosmicdawn/lib/python3.12/site-packages/CosmicDawnSynergies/scripts/non-public/LikelihoodXRB_LikelihoodRadioBackground_LikelihoodHERA/run",]
+    files = ["scripts/non-public/LikelihoodXRB_LikelihoodRadioBackground_LikelihoodHERA/run",]
 
     paramNames = ["log10fstarII", "log10fstarIII", "log10Vc", "log10fX", "tau", "log10fradio"]
 

@@ -339,6 +339,6 @@ def get_time_str():
 
 
 if __name__ == '__main__':
-    src = '/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/trained_emulators/debug_Delta21_power_spectrum_emulator'
-    dst = '/Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/inferences/_SDC3b_2/'
+    src = 'trained_emulators/debug_Delta21_power_spectrum_emulator'
+    dst = 'inferences/_SDC3b_2/'
     copy_directory(src, dst, emulator='net_g_16.pth')
