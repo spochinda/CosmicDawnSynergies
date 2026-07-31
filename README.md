@@ -23,12 +23,24 @@ The script finds its own location, so it can be run from anywhere; it uses whate
 `PATH`.
 
 **Building the environment from scratch with `uv`**: `uv sync --extra polychord` currently fails on the
-upstream PolyChordLite bug below, so install pypolychord separately first (patched clone method under
-[Installing pypolychord](#installing-pypolychord)), then:
+upstream PolyChordLite bug described in [Installing pypolychord](#installing-pypolychord) (missing `HOME`
+in its `setup.py` build subprocess), so install pypolychord separately from a patched clone. Verified
+working end-to-end:
 ```bash
 git clone https://github.com/spochinda/CosmicDawnSynergies.git
 uv sync --project CosmicDawnSynergies
+
+git clone https://github.com/PolyChord/PolyChordLite /tmp/PolyChordLite
+python3 -c "
+content = open('/tmp/PolyChordLite/setup.py').read()
+content = content.replace(
+    'env[\"PATH\"] = os.environ[\"PATH\"]',
+    'env[\"PATH\"] = os.environ[\"PATH\"]\n        env[\"HOME\"] = os.environ.get(\"HOME\", \"\")'
+)
+open('/tmp/PolyChordLite/setup.py', 'w').write(content)
+"
 VIRTUAL_ENV=CosmicDawnSynergies/.venv uv pip install --no-build-isolation -e /tmp/PolyChordLite
+
 uv run --project CosmicDawnSynergies ./CosmicDawnSynergies/analysis/reproduce_sdc3b.sh
 ```
 The `VIRTUAL_ENV=` prefix matters: if another venv is already active in your shell, `uv pip install --project <dir>` silently installs into *that* venv instead — `--project`
@@ -57,33 +69,15 @@ To perform inference with new data, new likelihood classes can be added in the l
 Needs a Fortran/C++ compiler and MPI — how much setup that takes depends on where you're running.
 
 ### On a laptop
-Install a compiler + MPI, then a plain pip install — most of the Azimuth steps below (module system,
-`libhwloc.so.15`, `sudo dnf install`) are specific to that cluster and don't apply here:
+Install a compiler + MPI first — most of the Azimuth steps below (module system, `libhwloc.so.15`,
+`sudo dnf install`) are specific to that cluster and don't apply here:
 - **macOS**: `brew install gcc open-mpi`
 - **Linux (Debian/Ubuntu)**: `sudo apt install gfortran libopenmpi-dev openmpi-bin`
-```bash
-pip install git+https://github.com/PolyChord/PolyChordLite@master
-# or, from this repo: uv sync --extra polychord
-```
 
-**If that fails with `opal_init failed` / `Unable to get the user home directory`**: a bug in PolyChordLite's
-own `setup.py`, not this repo, `uv`, or `pip`. `PyPolyChordExtension.run()` builds a near-empty environment
-for its internal `make` call (`PATH`/`MPI`/`CURDIR`/`CC`/`CXX`/`FC` only) that omits `HOME`, which newer Open
-MPI needs during `mpicc`/`mpifort`. Confirmed on a plain, unsandboxed machine, across `pip`, `uv`, isolated
-and `--no-build-isolation` builds, and wheel and editable installs — it's specifically the missing `HOME`.
-Workaround: clone locally, patch `setup.py` to also copy `HOME`, install from the patched clone:
-```bash
-git clone https://github.com/PolyChord/PolyChordLite /tmp/PolyChordLite
-python3 -c "
-content = open('/tmp/PolyChordLite/setup.py').read()
-content = content.replace(
-    'env[\"PATH\"] = os.environ[\"PATH\"]',
-    'env[\"PATH\"] = os.environ[\"PATH\"]\n        env[\"HOME\"] = os.environ.get(\"HOME\", \"\")'
-)
-open('/tmp/PolyChordLite/setup.py', 'w').write(content)
-"
-pip install --no-build-isolation -e /tmp/PolyChordLite
-```
+Then `pip install git+https://github.com/PolyChord/PolyChordLite@master` (or `uv sync --extra polychord`)
+may just work. If it fails with `opal_init failed` / `Unable to get the user home directory`, that's a bug
+in PolyChordLite's own `setup.py` (its build subprocess omits `HOME`, which newer Open MPI needs) — see the
+patched-clone workaround in [Reproducing the SDC3b results](#reproducing-the-sdc3b-results).
 
 ### On Azimuth
 1. Load compilers: `module load gnu12/12.2.0` and `module load openmpi4/4.1.5`.
