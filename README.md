@@ -31,8 +31,7 @@ uv sync --project CosmicDawnSynergies
 VIRTUAL_ENV=CosmicDawnSynergies/.venv uv pip install --no-build-isolation -e /tmp/PolyChordLite
 uv run --project CosmicDawnSynergies ./CosmicDawnSynergies/analysis/reproduce_sdc3b.sh
 ```
-The `VIRTUAL_ENV=` prefix matters: if another venv is already active in your shell (e.g. `(cosmicdawn)` in
-your prompt), `uv pip install --project <dir>` silently installs into *that* venv instead — `--project`
+The `VIRTUAL_ENV=` prefix matters: if another venv is already active in your shell, `uv pip install --project <dir>` silently installs into *that* venv instead — `--project`
 doesn't override an already-set `VIRTUAL_ENV` for that subcommand. Skip it and `pypolychord` ends up in the
 wrong place, and the final `uv run` fails with `ModuleNotFoundError: No module named 'pypolychord'` despite
 the install appearing to succeed.
