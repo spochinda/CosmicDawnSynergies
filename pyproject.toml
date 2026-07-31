@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CosmicDawnSynergies"
+version = "0.1.0"
+description = "A package for astrophysical parameter inference with 21cmSPACE"
+authors = [{ name = "spochinda", email = "sp2053@cam.ac.uk" }]
+# upper-bounded because basicsr==1.4.2's legacy setup.py build script fails
+# on a fresh build under 3.13 and 3.14 (KeyError in its version-sniffing
+# code, confirmed with cleared caches on both); 3.12 confirmed working
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    # derived from a fresh audit of imports actually used across every
+    # tracked .py file (analysis/, src/CosmicDawnSynergies/, train.py,
+    # inference.py, tune.py) — not carried over from the old requirements.txt
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pandas",
+    "scikit-learn",
+    "torch",
+    "tqdm",
+    "astropy",
+    "seaborn",
+    "joblib",
+    "optuna",
+    "pyyaml",
+    "basicsr",
+    "anesthetic @ git+https://github.com/williamjameshandley/anesthetic",
+]
+
+[project.urls]
+Homepage = "https://github.com/CosmicDawnLab/CosmicDawnSynergies"
+
+# Not in the default dependency set — both need a manual/special install
+# rather than a plain `pip install`:
+#   - pypolychord needs a compiled Fortran/C++ extension with MPI (see
+#     README for the HPC-specific steps).
+#   - hera_pspec (imported in likelihood.py) needs a specific branch/dev
+#     version (wf_delay branch, hera-pspec-0.3.1.dev346+g5c394f9 per prior
+#     notes) rather than the default HEAD, so it isn't pinned here — install
+#     manually per those notes if you need the HERA likelihood.
+[project.optional-dependencies]
+polychord = ["pypolychord @ git+https://github.com/PolyChord/PolyChordLite"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
