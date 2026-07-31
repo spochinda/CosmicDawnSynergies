@@ -79,4 +79,6 @@ scripts/non-public/*
 analysis/*
 !analysis/sdc3b_xhi_truth.py
 !analysis/score_sdc3b.py
+!analysis/reproduce_sdc3b.sh
+!analysis/plot_triangle_sdc3b.py
 options/emulators/

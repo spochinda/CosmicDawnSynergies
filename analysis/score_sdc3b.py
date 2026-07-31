@@ -66,7 +66,11 @@ REPRO_CHAINS = {
     'PS1': 'inferences/SDC3b_PS1/LikelihoodSDC3b',
     'PS2': 'inferences/SDC3b_PS2/LikelihoodSDC3b',
 }
-BEST_XHI_EMU = 'trained_emulators/xHI_SDC3b_scan_best/models/net_g_latest.pth'
+# xHI_SDC3b_minmax is trained by reproduce_sdc3b.sh from
+# options/emulators/xHI_SDC3b.yml (seed=34) and is byte-identical to the seed
+# scan's seed-34 output (trained_emulators/xHI_SDC3b_scan_0034), so we point
+# here rather than at the untracked scan_best directory.
+BEST_XHI_EMU = 'trained_emulators/xHI_SDC3b_minmax/models/net_g_latest.pth'
 
 # the actual FITS cubes submitted to the SDC3b organisers for scoring
 SUBMITTED_FITS = {

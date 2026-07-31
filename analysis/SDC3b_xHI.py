@@ -203,6 +203,8 @@ def SDC3b_xHI_hist(path_chain, plot_name="SDC3b_xHI.png", xHI_columns=None,
 
 
 if __name__ == '__main__':
+    import argparse, re
+
     plt.rcParams.update({
         'text.usetex': True,
         'font.family': 'serif',
@@ -212,28 +214,75 @@ if __name__ == '__main__':
 
     from sdc3b_xhi_truth import xhi_true, xhi_true_min_max
 
-    # best xHI emulator from the seed scan (seed 34, avg_KL=1.21) — the
-    # inferences/SDC3b_PS{1,2} chains' own stored xHI_z* columns were computed
-    # during inference with whichever emulator_xHI was configured at the time,
-    # which does not match this best-seed emulator; recompute instead of
-    # trusting those columns (see analysis/plots/make_comparison_plots.py)
-    BEST_XHI_EMU = 'trained_emulators/xHI_SDC3b_scan_best/models/net_g_latest.pth'
+    # best xHI emulator from the seed scan (seed 34, avg_KL=1.21) — a chain's
+    # own stored xHI_z* columns were computed during inference with whichever
+    # emulator_xHI was configured at the time, which does not match this
+    # best-seed emulator; recompute instead of trusting those columns for any
+    # non-legacy chain (see analysis/plots/make_comparison_plots.py).
+    # xHI_SDC3b_minmax is trained by reproduce_sdc3b.sh from
+    # options/emulators/xHI_SDC3b.yml (seed=34) and is byte-identical to the
+    # scan's seed-34 output (trained_emulators/xHI_SDC3b_scan_0034), so we
+    # point here rather than at the untracked scan_best directory.
+    BEST_XHI_EMU = 'trained_emulators/xHI_SDC3b_minmax/models/net_g_latest.pth'
+    LEGACY_PREFIX = 'scripts/non-public/LikelihoodSDC3b_SDC3b_'
 
-    for PS in ('PS1', 'PS2'):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--PS', required=True, choices=['PS1', 'PS2'])
+    parser.add_argument('--chains', nargs='+', default=None,
+                        help='One or more chain root dirs (without "/run" suffix). '
+                             'Defaults to the single legacy chain for --PS if omitted.')
+    parser.add_argument('--labels', nargs='+', default=None,
+                        help='One label per --chains entry. Defaults to '
+                             '"chain 1", "chain 2", ... if omitted.')
+    parser.add_argument('--xhi_emu_path', nargs='+', default=None,
+                        help='One entry per --chains: an emulator path, or the '
+                             'literal "columns" to read that chain\'s own stored '
+                             'xHI_z* columns instead. Defaults to the legacy '
+                             'chain reading its own columns and every other '
+                             'chain using the best-seed emulator.')
+    args = parser.parse_args()
+
+    PS = args.PS
+
+    if args.chains is None:
+        chain_dirs = [f'{LEGACY_PREFIX}{PS}']
+        labels = ['Legacy']
+    else:
+        chain_dirs = args.chains
+        if args.labels is not None:
+            assert len(args.labels) == len(chain_dirs), \
+                "--labels must have the same number of entries as --chains"
+            labels = args.labels
+        else:
+            labels = [f'chain {i+1}' for i in range(len(chain_dirs))]
+
+    if args.xhi_emu_path is not None:
+        assert len(args.xhi_emu_path) == len(chain_dirs), \
+            "--xhi_emu_path must have the same number of entries as --chains"
+        emu_paths = [None if p.lower() == 'columns' else p for p in args.xhi_emu_path]
+    else:
+        emu_paths = [None if d.startswith(LEGACY_PREFIX) else BEST_XHI_EMU
+                    for d in chain_dirs]
+
+    # panel order is z~6.53, z~7.18, z~7.96; xhi_true's z1/z2/z3 run the
+    # opposite way (z1 = highest z), see analysis/sdc3b_xhi_truth.py
+    truths = [xhi_true['z3'][PS], xhi_true['z2'][PS], xhi_true['z1'][PS]]
+    truth_ranges = [xhi_true_min_max['z3'][PS], xhi_true_min_max['z2'][PS],
+                    xhi_true_min_max['z1'][PS]]
+
+    if args.chains is None:
         plot_name = f'analysis/xHI_legacy_{PS}.png'
-        # panel order is z~6.53, z~7.18, z~7.96; xhi_true's z1/z2/z3 run the
-        # opposite way (z1 = highest z), see analysis/sdc3b_xhi_truth.py
-        truths = [xhi_true['z3'][PS], xhi_true['z2'][PS], xhi_true['z1'][PS]]
-        truth_ranges = [xhi_true_min_max['z3'][PS], xhi_true_min_max['z2'][PS],
-                        xhi_true_min_max['z1'][PS]]
-        fig, axes = SDC3b_xHI_hist(
-            path_chain=[f'scripts/non-public/LikelihoodSDC3b_SDC3b_{PS}',
-                       f'inferences/SDC3b_{PS}/LikelihoodSDC3b'],
-            chain_labels=['Legacy', 'Reproduced'],
-            xhi_emu_path=[None, BEST_XHI_EMU],
-            plot_name=plot_name,
-            title=f'SDC3b {PS}: Neutral fraction posteriors',
-            truth_ranges=truth_ranges,
-            truths=truths,
-        )
-        print(f"Saved → {plot_name}")
+    else:
+        slug = '_'.join(re.sub(r'\W+', '_', lbl.lower()).strip('_') for lbl in labels)
+        plot_name = f'analysis/xHI_{PS}_{slug}.png'
+
+    fig, axes = SDC3b_xHI_hist(
+        path_chain=chain_dirs,
+        chain_labels=labels if len(chain_dirs) > 1 else None,
+        xhi_emu_path=emu_paths,
+        plot_name=plot_name,
+        title=f'SDC3b {PS}: Neutral fraction posteriors',
+        truth_ranges=truth_ranges,
+        truths=truths,
+    )
+    print(f"Saved → {plot_name}")
