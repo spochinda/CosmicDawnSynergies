@@ -72,5 +72,6 @@ CLAUDE.md
 # sdc3b_legacy leftovers
 images/
 scripts/
-analysis/
+analysis/*
+!analysis/sdc3b_xhi_truth.py
 options/emulators/
