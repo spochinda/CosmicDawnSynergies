@@ -71,7 +71,11 @@ CLAUDE.md
 
 # sdc3b_legacy leftovers
 images/
-scripts/
+scripts/*
+!scripts/non-public
+scripts/non-public/*
+!scripts/non-public/LikelihoodSDC3b_SDC3b_PS1
+!scripts/non-public/LikelihoodSDC3b_SDC3b_PS2
 analysis/*
 !analysis/sdc3b_xhi_truth.py
 !analysis/score_sdc3b.py
