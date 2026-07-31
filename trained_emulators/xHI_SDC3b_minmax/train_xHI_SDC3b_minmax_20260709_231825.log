@@ -1,0 +1,155 @@
+2026-07-09 23:18:25,236 INFO: Version Information: PyTorch: 2.6.0
+2026-07-09 23:18:25,236 INFO: 
+  name: xHI_SDC3b_minmax
+  num_gpu: 0
+  manual_seed: 34
+  model_type: MLPModel
+  network_opt:[
+    hidden_dim: 100
+    n_hidden: 6
+    out_dim: 1
+    activation: ReLU
+    out_activation: None
+    init_weights: pytorch_default
+  ]
+  train:[
+    total_iter: 1600
+    ema_decay: None
+    grad_clip_norm: 1.0
+    optimizer_opt:[
+      type: Adam
+      lr: 0.001
+      weight_decay: 0.0001
+    ]
+    scheduler:[
+      type: MultiStepLR
+      milestones: [60000, 90000]
+      gamma: 1.0
+    ]
+  ]
+  dataset:[
+    type: BaseDataset
+    batch_size_per_gpu: 10000
+    num_worker_per_gpu: 0
+    gen_data_seed: 34
+    split_seed: 34
+    params_opt:[
+      file: data/SDC3b/parameters_old.npy
+      key: parameters
+      names: ['zeta_eff', 'zeta_exp', 'rmfp', 'Vc']
+      log: []
+      discard: []
+      normalization: norm_minmax_extended
+    ]
+    targets_opt:[
+      file: data/SDC3b/averaged_xHI_old.npy
+      offset: 0.0
+      log: False
+    ]
+    data_dims:[
+      z:[
+        file: data/SDC3b/z_xHI.npy
+        log: False
+        lims_nsample: [6.1036, 8.726, 2000]
+      ]
+    ]
+  ]
+  path:[
+    pretrain_network_g: None
+    strict_load_g: True
+    resume_state: None
+    emulators_root: /Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/trained_emulators/xHI_SDC3b_minmax
+    models: /Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/trained_emulators/xHI_SDC3b_minmax/models
+    training_states: /Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/trained_emulators/xHI_SDC3b_minmax/training_states
+    log: /Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/trained_emulators/xHI_SDC3b_minmax
+    visualization: /Users/simonpochinda/Documents/PhD/CosmicDawnSynergies/trained_emulators/xHI_SDC3b_minmax/visualization
+  ]
+  val:[
+    val_freq: 160.0
+  ]
+  logger:[
+    print_freq: 160
+    save_checkpoint_freq: 800.0
+    use_tb_logger: True
+    wandb:[
+      project: None
+      resume_id: None
+    ]
+  ]
+  dist_params:[
+    backend: nccl
+    port: 29500
+  ]
+  dist: False
+  rank: 0
+  world_size: 1
+  auto_resume: False
+  is_train: True
+  root_path: /Users/simonpochinda/Documents/PhD/CosmicDawnSynergies
+
+2026-07-09 23:18:25,281 INFO: Building BaseDataset
+2026-07-09 23:18:25,614 INFO: Training statistics:
+	Number of train samples: 1600000
+	Number of val samples: 108000
+	Batch size per gpu: 10000
+	World size (gpu number): 1
+	Total batch size: 10000
+	Iterations per epoch: 160
+	Total epochs: 10; iters: 1600.
+2026-07-09 23:18:25,615 INFO: Network: MLP, with parameters: 61,301
+2026-07-09 23:18:25,615 INFO: MLP(
+  (activation_fn): ReLU()
+  (network): Sequential(
+    (0): Linear(in_features=5, out_features=100, bias=True)
+    (1): ReLU()
+    (2): Linear(in_features=100, out_features=100, bias=True)
+    (3): ReLU()
+    (4): Linear(in_features=100, out_features=100, bias=True)
+    (5): ReLU()
+    (6): Linear(in_features=100, out_features=100, bias=True)
+    (7): ReLU()
+    (8): Linear(in_features=100, out_features=100, bias=True)
+    (9): ReLU()
+    (10): Linear(in_features=100, out_features=100, bias=True)
+    (11): ReLU()
+    (12): Linear(in_features=100, out_features=100, bias=True)
+    (13): ReLU()
+    (14): Linear(in_features=100, out_features=1, bias=True)
+  )
+)
+2026-07-09 23:18:25,616 INFO: Start training from epoch: 0, iter: 0
+2026-07-09 23:18:33,494 INFO: [xHI_S..][epoch:  0, iter:     160, lr:(1.000e-03,)] [eta: 0:01:09, time (data): 0.049 (0.038)] loss: 2.1375e-02 
+2026-07-09 23:18:33,494 INFO: Running validation...
+2026-07-09 23:18:33,535 INFO: Validation: RMSE=0.0313 (Best: 0.0313, iter 160)| NRMSE=0.1166 (Best: 0.1166, iter 160)| R²=0.9864 (Best: 0.9864, iter 160)
+2026-07-09 23:18:41,344 INFO: [xHI_S..][epoch:  1, iter:     320, lr:(1.000e-03,)] [eta: 0:01:02, time (data): 0.049 (0.038)] loss: 1.5864e-02 
+2026-07-09 23:18:41,344 INFO: Running validation...
+2026-07-09 23:18:41,382 INFO: Validation: RMSE=0.0274 (Best: 0.0274, iter 320)| NRMSE=0.1023 (Best: 0.1023, iter 320)| R²=0.9895 (Best: 0.9895, iter 320)
+2026-07-09 23:18:49,318 INFO: [xHI_S..][epoch:  2, iter:     480, lr:(1.000e-03,)] [eta: 0:00:54, time (data): 0.048 (0.038)] loss: 1.5649e-02 
+2026-07-09 23:18:49,318 INFO: Running validation...
+2026-07-09 23:18:49,358 INFO: Validation: RMSE=0.0265 (Best: 0.0265, iter 480)| NRMSE=0.0989 (Best: 0.0989, iter 480)| R²=0.9902 (Best: 0.9902, iter 480)
+2026-07-09 23:18:57,289 INFO: [xHI_S..][epoch:  3, iter:     640, lr:(1.000e-03,)] [eta: 0:00:47, time (data): 0.049 (0.039)] loss: 1.3443e-02 
+2026-07-09 23:18:57,289 INFO: Running validation...
+2026-07-09 23:18:57,325 INFO: Validation: RMSE=0.0261 (Best: 0.0261, iter 640)| NRMSE=0.0975 (Best: 0.0975, iter 640)| R²=0.9905 (Best: 0.9905, iter 640)
+2026-07-09 23:19:05,143 INFO: [xHI_S..][epoch:  4, iter:     800, lr:(1.000e-03,)] [eta: 0:00:39, time (data): 0.049 (0.038)] loss: 1.2835e-02 
+2026-07-09 23:19:05,143 INFO: Running validation...
+2026-07-09 23:19:05,181 INFO: Validation: RMSE=0.0253 (Best: 0.0253, iter 800)| NRMSE=0.0944 (Best: 0.0944, iter 800)| R²=0.9911 (Best: 0.9911, iter 800)
+2026-07-09 23:19:05,182 INFO: Saving models and training states.
+2026-07-09 23:19:13,104 INFO: [xHI_S..][epoch:  5, iter:     960, lr:(1.000e-03,)] [eta: 0:00:31, time (data): 0.049 (0.038)] loss: 1.5514e-02 
+2026-07-09 23:19:13,104 INFO: Running validation...
+2026-07-09 23:19:13,141 INFO: Validation: RMSE=0.0263 (Best: 0.0253, iter 800)| NRMSE=0.0979 (Best: 0.0944, iter 800)| R²=0.9904 (Best: 0.9911, iter 800)
+2026-07-09 23:19:21,050 INFO: [xHI_S..][epoch:  6, iter:   1,120, lr:(1.000e-03,)] [eta: 0:00:23, time (data): 0.049 (0.039)] loss: 1.2095e-02 
+2026-07-09 23:19:21,050 INFO: Running validation...
+2026-07-09 23:19:21,087 INFO: Validation: RMSE=0.0248 (Best: 0.0248, iter 1120)| NRMSE=0.0926 (Best: 0.0926, iter 1120)| R²=0.9914 (Best: 0.9914, iter 1120)
+2026-07-09 23:19:29,246 INFO: [xHI_S..][epoch:  7, iter:   1,280, lr:(1.000e-03,)] [eta: 0:00:15, time (data): 0.052 (0.040)] loss: 1.7161e-02 
+2026-07-09 23:19:29,246 INFO: Running validation...
+2026-07-09 23:19:29,286 INFO: Validation: RMSE=0.0285 (Best: 0.0248, iter 1120)| NRMSE=0.1063 (Best: 0.0926, iter 1120)| R²=0.9887 (Best: 0.9914, iter 1120)
+2026-07-09 23:19:37,223 INFO: [xHI_S..][epoch:  8, iter:   1,440, lr:(1.000e-03,)] [eta: 0:00:07, time (data): 0.049 (0.038)] loss: 1.5880e-02 
+2026-07-09 23:19:37,223 INFO: Running validation...
+2026-07-09 23:19:37,265 INFO: Validation: RMSE=0.0263 (Best: 0.0248, iter 1120)| NRMSE=0.0981 (Best: 0.0926, iter 1120)| R²=0.9904 (Best: 0.9914, iter 1120)
+2026-07-09 23:19:45,213 INFO: [xHI_S..][epoch:  9, iter:   1,600, lr:(1.000e-03,)] [eta: 0:00:00, time (data): 0.050 (0.039)] loss: 1.1193e-02 
+2026-07-09 23:19:45,214 INFO: Running validation...
+2026-07-09 23:19:45,253 INFO: Validation: RMSE=0.0243 (Best: 0.0243, iter 1600)| NRMSE=0.0906 (Best: 0.0906, iter 1600)| R²=0.9918 (Best: 0.9918, iter 1600)
+2026-07-09 23:19:45,254 INFO: Saving models and training states.
+2026-07-09 23:19:45,296 INFO: End of training. Time consumed: 0:01:19
+2026-07-09 23:19:45,296 INFO: Save the latest model.
+2026-07-09 23:19:45,334 INFO: Validation: RMSE=0.0243 (Best: 0.0243, iter 1600)| NRMSE=0.0906 (Best: 0.0906, iter 1600)| R²=0.9918 (Best: 0.9918, iter 1600)

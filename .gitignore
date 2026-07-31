@@ -48,6 +48,12 @@ trained_emulators/Pk_SDC3b_MLP_minmax_extended/training_states/*
 trained_emulators/Pk_SDC3b_MLP_minmax_extended/models/*
 !trained_emulators/Pk_SDC3b_MLP_minmax_extended/models/net_g_latest*
 
+!trained_emulators/xHI_SDC3b_minmax
+trained_emulators/xHI_SDC3b_minmax/training_states/*
+trained_emulators/xHI_SDC3b_minmax/visualization/*
+trained_emulators/xHI_SDC3b_minmax/models/*
+!trained_emulators/xHI_SDC3b_minmax/models/net_g_latest*
+
 # SLURM and log files
 *err
 *out
