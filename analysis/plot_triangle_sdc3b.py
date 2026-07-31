@@ -11,9 +11,8 @@ Usage:
         --chains chain1 chain2 chain3 --labels lab1 lab2 lab3
 
 With no --chains, defaults to the single legacy chain for the given PS, saved
-to analysis/triangle_legacy_<PS>.png/.pdf (the filename referenced by the
-paper). With --chains, saves to
-analysis/triangle_<PS>_<label1>_vs_<label2>_..._.png/.pdf instead.
+to analysis/triangle_legacy_<PS>.png. With --chains, saves to
+analysis/triangle_<PS>_<label1>_vs_<label2>_..._.png instead.
 """
 import sys, os, argparse, re
 import matplotlib
@@ -140,9 +139,6 @@ else:
     stem = f'triangle_{PS}_{slug}'
 
 out_png = os.path.join(OUT_DIR, f'{stem}.png')
-out_pdf = os.path.join(OUT_DIR, f'{stem}.pdf')
 fig.savefig(out_png, dpi=200, bbox_inches='tight')
-fig.savefig(out_pdf, bbox_inches='tight')
 plt.close(fig)
 print(f"Saved → {out_png}")
-print(f"Saved → {out_pdf}")

@@ -23,10 +23,10 @@ echo "    Saved to: inferences/SDC3b_PS2_minmax/"
 
 echo "=== [5/5] Generating plots ==="
 # single reproduced chain
-python analysis/plot_triangle_sdc3b.py --PS=PS1 --chains inferences/SDC3b_PS1_minmax/LikelihoodSDC3b --labels Reproduced
-python analysis/plot_triangle_sdc3b.py --PS=PS2 --chains inferences/SDC3b_PS2_minmax/LikelihoodSDC3b --labels Reproduced
-python analysis/SDC3b_xHI.py --PS=PS1 --chains inferences/SDC3b_PS1_minmax/LikelihoodSDC3b --labels Reproduced
-python analysis/SDC3b_xHI.py --PS=PS2 --chains inferences/SDC3b_PS2_minmax/LikelihoodSDC3b --labels Reproduced
+#python analysis/plot_triangle_sdc3b.py --PS=PS1 --chains inferences/SDC3b_PS1_minmax/LikelihoodSDC3b --labels Reproduced
+#python analysis/plot_triangle_sdc3b.py --PS=PS2 --chains inferences/SDC3b_PS2_minmax/LikelihoodSDC3b --labels Reproduced
+#python analysis/SDC3b_xHI.py --PS=PS1 --chains inferences/SDC3b_PS1_minmax/LikelihoodSDC3b --labels Reproduced
+#python analysis/SDC3b_xHI.py --PS=PS2 --chains inferences/SDC3b_PS2_minmax/LikelihoodSDC3b --labels Reproduced
 
 # legacy vs reproduced overlay
 python analysis/plot_triangle_sdc3b.py --PS=PS1 --chains scripts/non-public/LikelihoodSDC3b_SDC3b_PS1 inferences/SDC3b_PS1_minmax/LikelihoodSDC3b --labels Legacy Reproduced
